@@ -1,0 +1,22 @@
+# Development dependencies for django-missive
+# Install with: pip install -r requirements-dev.txt
+
+# Testing
+pytest>=7.0
+pytest-django>=4.5
+pytest-cov>=4.0
+
+# Code Quality
+black>=23.0
+flake8>=6.0
+isort>=5.12
+mypy>=1.0
+
+# Building and Publishing
+build>=0.10
+twine>=4.0
+wheel>=0.40
+
+# Django
+Django>=3.2
+

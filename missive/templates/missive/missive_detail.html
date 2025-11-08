@@ -1,0 +1,48 @@
+{% extends "missive/base.html" %}
+
+{% block title %}{{ missive.title }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>{{ missive.title }}</h1>
+            <div>
+                <a href="{% url 'missive:missive-list' %}" class="btn btn-secondary">Back to List</a>
+                {% if user == missive.user %}
+                <a href="{% url 'missive:missive-update' missive.pk %}" class="btn btn-primary">Edit</a>
+                <a href="{% url 'missive:missive-delete' missive.pk %}" class="btn btn-danger">Delete</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>Author:</strong> {{ missive.user.username }}
+                </div>
+                <div class="mb-3">
+                    <strong>Created:</strong> {{ missive.created_at|date:"F d, Y H:i" }}
+                </div>
+                <div class="mb-3">
+                    <strong>Last Updated:</strong> {{ missive.updated_at|date:"F d, Y H:i" }}
+                </div>
+                <div class="mb-3">
+                    <strong>Status:</strong> 
+                    {% if missive.is_active %}
+                    <span class="badge bg-success">Active</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Inactive</span>
+                    {% endif %}
+                </div>
+                <hr>
+                <div class="mt-4">
+                    <h5>Content:</h5>
+                    <p>{{ missive.content|linebreaks }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

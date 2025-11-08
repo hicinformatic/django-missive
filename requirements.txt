@@ -1,0 +1,6 @@
+# Production dependencies for django-missive
+# Auto-generated from pyproject.toml
+# Install with: pip install -r requirements.txt
+
+Django>=3.2
+
