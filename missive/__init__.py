@@ -6,6 +6,25 @@ __version__ = "0.1.0"
 
 default_app_config = "missive.apps.MissiveConfig"
 
+# Raccourcis pour imports faciles
+from .shortcuts import (
+    send_email,
+    send_missive,
+    send_slack,
+    send_sms,
+    send_telegram,
+    send_whatsapp,
+)
+
+__all__ = [
+    "send_missive",
+    "send_sms",
+    "send_email",
+    "send_whatsapp",
+    "send_slack",
+    "send_telegram",
+]
+
 
 def __getattr__(name):
     """Lazy imports pour éviter les imports circulaires"""
