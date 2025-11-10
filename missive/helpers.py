@@ -5,6 +5,7 @@ Utilitaires pour l'administration des providers.
 
 import importlib
 import inspect
+import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -15,6 +16,7 @@ from django.utils.translation import gettext_lazy as _
 from .models import Missive, MissivePriority, MissiveType
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class MissiveBuilder:
@@ -315,6 +317,9 @@ def get_providers_from_config():
        ]
 
     Chaque provider est automatiquement catégorisé selon ses supported_types.
+
+    Returns:
+        Dict[str, List[str]]: Dictionnaire {type_missive: [noms_courts]}
     """
     from django.utils.module_loading import import_string
 
@@ -363,6 +368,95 @@ def get_providers_from_config():
             "NOTIFICATION": ["notification"],
             "PUSH_NOTIFICATION": ["fcm", "apn"],
             "BRANDED": ["twilio", "slack", "teams", "telegram", "signal", "messenger"],
+        }
+
+    return providers_by_type
+
+
+def get_provider_paths_from_config():
+    """
+    Récupère la configuration MISSIVE_PROVIDERS depuis les settings
+    et retourne un dictionnaire {type_missive: [liste_chemins_complets]}.
+
+    Contrairement à get_providers_from_config(), cette fonction retourne
+    les chemins complets vers les classes (ex: 'missive.providers.twilio.TwilioProvider')
+    au lieu des noms courts (ex: 'twilio').
+
+    Utilisé par MissiveSender pour le failover.
+
+    Returns:
+        Dict[str, List[str]]: Dictionnaire {type_missive: [chemins_complets]}
+    """
+    from django.utils.module_loading import import_string
+
+    providers_config = getattr(settings, "MISSIVE_PROVIDERS", None)
+    providers_by_type = {}
+
+    # Format : Liste simple (auto-catégorisation)
+    if isinstance(providers_config, list):
+        for provider_path in providers_config:
+            try:
+                # Charger la classe du provider
+                provider_class = import_string(provider_path)
+
+                # Récupérer les types supportés
+                supported_types = getattr(provider_class, "supported_types", [])
+
+                # Ajouter le chemin complet à chaque type qu'il supporte
+                for missive_type in supported_types:
+                    if missive_type not in providers_by_type:
+                        providers_by_type[missive_type] = []
+                    if provider_path not in providers_by_type[missive_type]:
+                        providers_by_type[missive_type].append(provider_path)
+
+            except Exception as e:
+                # En cas d'erreur de chargement, ignorer silencieusement
+                logger.warning(f"Could not load provider {provider_path}: {e}")
+                continue
+
+    # Si aucune config, utiliser les valeurs par défaut (avec chemins complets)
+    if not providers_by_type:
+        providers_by_type = {
+            "EMAIL": [
+                "missive.providers.django_email.DjangoEmailProvider",
+                "missive.providers.sendgrid.SendGridProvider",
+                "missive.providers.mailgun.MailgunProvider",
+                "missive.providers.ses.SESProvider",
+                "missive.providers.brevo.BrevoProvider",
+                "missive.providers.smspartner.SMSPartnerProvider",
+            ],
+            "SMS": [
+                "missive.providers.twilio.TwilioProvider",
+                "missive.providers.vonage.VonageProvider",
+                "missive.providers.smspartner.SMSPartnerProvider",
+                "missive.providers.brevo.BrevoProvider",
+            ],
+            "RCS": ["missive.providers.twilio.TwilioProvider"],
+            "POSTAL": ["missive.providers.laposte.LaPosteProvider"],
+            "LRE": [
+                "missive.providers.ar24.AR24Provider",
+                "missive.providers.certeurope.CertEuropeProvider",
+            ],
+            "VOICE_CALL": [
+                "missive.providers.twilio.TwilioProvider",
+                "missive.providers.vonage.VonageProvider",
+                "missive.providers.smspartner.SMSPartnerProvider",
+            ],
+            "NOTIFICATION": [
+                "missive.providers.notification.InAppNotificationProvider"
+            ],
+            "PUSH_NOTIFICATION": [
+                "missive.providers.fcm.FCMProvider",
+                "missive.providers.apn.APNProvider",
+            ],
+            "BRANDED": [
+                "missive.providers.twilio.TwilioProvider",
+                "missive.providers.slack.SlackProvider",
+                "missive.providers.teams.TeamsProvider",
+                "missive.providers.telegram.TelegramProvider",
+                "missive.providers.signal.SignalProvider",
+                "missive.providers.messenger.MessengerProvider",
+            ],
         }
 
     return providers_by_type

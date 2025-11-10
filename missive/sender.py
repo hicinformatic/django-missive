@@ -8,6 +8,7 @@ from typing import List
 from django.conf import settings
 from django.utils.module_loading import import_string
 
+from .helpers import get_provider_paths_from_config
 from .models import Missive
 
 logger = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ class MissiveSender:
 
         Ordre de priorité :
         1. missive.provider (provider explicitement défini) - UN SEUL
-        2. MISSIVE_PROVIDERS[missive_type] (configuration avec fallback) - LISTE
+        2. get_provider_paths_from_config() (auto-catégorisation) - LISTE
         3. Ancienne config MISSIVE_CONFIG['PROVIDERS'] (deprecated) - STRING
         4. DEFAULT_PROVIDERS[missive_type] (providers par défaut) - LISTE
 
@@ -72,14 +73,11 @@ class MissiveSender:
             )
             return [missive.provider]
 
-        # 2. Configuration dans MISSIVE_PROVIDERS (nouveau système)
-        providers_config = getattr(settings, "MISSIVE_PROVIDERS", {})
-        provider_paths = providers_config.get(missive.missive_type)
+        # 2. Configuration depuis get_provider_paths_from_config() (auto-catégorisation)
+        providers_by_type = get_provider_paths_from_config()
+        provider_paths = providers_by_type.get(missive.missive_type)
 
         if provider_paths:
-            if isinstance(provider_paths, str):
-                # Si c'est une string, la convertir en liste
-                provider_paths = [provider_paths]
             logger.info(
                 f"Missive {missive.id}: Providers configurés pour {missive.missive_type}: {provider_paths}"
             )
