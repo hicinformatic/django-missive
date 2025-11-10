@@ -49,6 +49,9 @@ class SMSPartnerProvider(BaseProvider):
     API_BASE_VOICE = "http://api.voicepartner.fr/v1"
     API_BASE_EMAIL = "http://api.mailpartner.fr/v1"
 
+    # Plage IP officielle pour les webhooks SMSPartner
+    WEBHOOK_IP_RANGE = "185.66.232.0/24"
+
     # Mappings d'erreurs communes (codes d'erreur → messages)
     ERROR_CODES = {
         1: "Clé API requise",
@@ -806,11 +809,13 @@ class SMSPartnerProvider(BaseProvider):
         Les méthodes de sécurisation recommandées sont :
 
         1. Whitelist d'IPs (configurer SMSPARTNER_WEBHOOK_IPS dans settings)
+           Plage officielle SMSPartner: 185.66.232.0/24
         2. Token secret dans l'URL (ex: /webhooks/smspartner/sms/?token=SECRET)
         3. Vérifier que le messageId existe dans notre DB
 
-        Pour l'instant, on accepte tous les webhooks (retourne True).
-        Pour renforcer la sécurité, ajoutez SMSPARTNER_WEBHOOK_IPS dans settings.
+        Configuration:
+            SMSPARTNER_WEBHOOK_IPS: Liste d'IPs autorisées (séparées par virgules)
+                                   Format: "185.66.232.1,185.66.232.2,185.66.232.3"
 
         Args:
             payload: Données du webhook
