@@ -242,6 +242,7 @@ class MissiveAdmin(admin.ModelAdmin):
     )
 
     actions = [
+        "send_now_action",
         "mark_as_sent",
         "mark_as_delivered",
         "mark_as_failed",
@@ -447,6 +448,68 @@ class MissiveAdmin(admin.ModelAdmin):
 
         except Exception:
             return None
+
+    @admin.action(description=_("🚀 Envoyer maintenant"))
+    def send_now_action(self, request, queryset):
+        """Action pour envoyer les missives sélectionnées immédiatement"""
+        from ..sender import MissiveSender
+
+        sender = MissiveSender()
+        success_count = 0
+        error_count = 0
+        errors = []
+
+        for missive in queryset:
+            # Vérifier que la missive peut être envoyée
+            if missive.status in ["SENT", "DELIVERED", "READ"]:
+                error_count += 1
+                errors.append(
+                    f"Missive #{missive.id} déjà envoyée (statut: {missive.get_status_display()})"
+                )
+                continue
+
+            if missive.status == "CANCELLED":
+                error_count += 1
+                errors.append(
+                    f"Missive #{missive.id} annulée, ne peut pas être envoyée"
+                )
+                continue
+
+            # Envoyer la missive
+            try:
+                if sender.send(missive):
+                    success_count += 1
+                    self.message_user(
+                        request,
+                        _(f"✅ Missive #{missive.id} envoyée avec succès !"),
+                        level="success",
+                    )
+                else:
+                    error_count += 1
+                    error_msg = missive.error_message or "Erreur inconnue"
+                    errors.append(f"Missive #{missive.id}: {error_msg}")
+            except Exception as e:
+                error_count += 1
+                errors.append(f"Missive #{missive.id}: {str(e)}")
+
+        # Message récapitulatif
+        if success_count > 0:
+            self.message_user(
+                request,
+                _(f"🎉 {success_count} missive(s) envoyée(s) avec succès !"),
+                level="success",
+            )
+
+        if error_count > 0:
+            self.message_user(
+                request,
+                _(
+                    f"⚠️ {error_count} erreur(s) : "
+                    + " | ".join(errors[:5])
+                    + ("..." if len(errors) > 5 else "")
+                ),
+                level="warning",
+            )
 
     @admin.action(description=_("Marquer comme envoyé"))
     def mark_as_sent(self, request, queryset):
