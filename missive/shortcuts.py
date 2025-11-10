@@ -16,7 +16,7 @@ Usage simplifié pour tests et envois rapides :
 """
 
 import uuid
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from django.conf import settings
 

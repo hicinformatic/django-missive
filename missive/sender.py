@@ -5,7 +5,6 @@ Module pour envoyer des missives via différents providers avec fallback automat
 import logging
 from typing import List
 
-from django.conf import settings
 from django.utils.module_loading import import_string
 
 from .helpers import get_provider_paths_from_config
@@ -53,9 +52,8 @@ class MissiveSender:
 
         Ordre de priorité :
         1. missive.provider (provider explicitement défini) - UN SEUL
-        2. get_provider_paths_from_config() (auto-catégorisation) - LISTE
-        3. Ancienne config MISSIVE_CONFIG['PROVIDERS'] (deprecated) - STRING
-        4. DEFAULT_PROVIDERS[missive_type] (providers par défaut) - LISTE
+        2. get_provider_paths_from_config() (auto-catégorisation depuis MISSIVE_PROVIDERS) - LISTE
+        3. DEFAULT_PROVIDERS[missive_type] (providers par défaut) - LISTE
 
         Args:
             missive: La missive à envoyer
@@ -83,19 +81,7 @@ class MissiveSender:
             )
             return provider_paths
 
-        # 3. Fallback sur l'ancienne config MISSIVE_CONFIG['PROVIDERS']
-        missive_config = getattr(settings, "MISSIVE_CONFIG", {})
-        old_providers_config = missive_config.get("PROVIDERS", {})
-        old_provider_path = old_providers_config.get(missive.missive_type)
-
-        if old_provider_path:
-            logger.warning(
-                f"Missive {missive.id}: Utilisation de l'ancienne config MISSIVE_CONFIG['PROVIDERS']. "
-                f"Migrez vers MISSIVE_PROVIDERS."
-            )
-            return [old_provider_path]
-
-        # 4. Provider par défaut
+        # 3. Provider par défaut
         default_providers = DEFAULT_PROVIDERS.get(missive.missive_type, [])
         if default_providers:
             logger.info(
@@ -104,20 +90,6 @@ class MissiveSender:
             return default_providers
 
         raise ValueError(f"Aucun provider configuré pour {missive.missive_type}")
-
-    @staticmethod
-    def get_provider_class(missive: Missive):
-        """
-        DEPRECATED: Utilisez get_provider_classes() à la place.
-
-        Récupère le premier provider de la liste pour compatibilité.
-        """
-        logger.warning(
-            "get_provider_class() est deprecated, utilisez send() directement"
-        )
-
-        provider_paths = MissiveSender.get_provider_classes(missive)
-        return import_string(provider_paths[0])
 
     @staticmethod
     def is_provider_healthy(provider_class) -> bool:

@@ -272,15 +272,6 @@ class ProviderInfo(models.Model):
         return getattr(provider_class, "required_packages", [])
 
     @property
-    def required_package(self):
-        """
-        DEPRECATED: Utilisez required_packages à la place.
-        Retourne le premier package requis pour compatibilité rétroactive.
-        """
-        packages = self.required_packages
-        return packages[0] if packages else None
-
-    @property
     def is_installed(self):
         """Vérifie si tous les packages Python requis sont installés"""
         packages = self.required_packages

@@ -73,7 +73,6 @@ class WebhookView(View):
                 )
 
             # Charger dynamiquement le provider depuis la config
-            from django.conf import settings
 
             from ..helpers import get_providers_from_config
 
