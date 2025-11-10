@@ -199,13 +199,13 @@ class SMSPartnerProvider(BaseProvider):
                     scheduled_delivery_date (str): Date d'envoi différé (dd/mm/YYYY)
                     scheduled_time (int): Heure d'envoi (0-23)
                     scheduled_minute (int): Minute d'envoi (0-55)
-                    webhook_url (str): URL de callback DLR
-                    webhook_url_response (str): URL de callback pour réponses
-                    webhook_url_dlr (str): URL de callback pour DLR
+                    webhook_url (str): URL de callback (sera utilisée pour DLR et réponses)
                     is_commercial (bool): True pour SMS commercial (ajoute STOP)
                     is_unicode (bool): True pour activer Unicode
                     sandbox (bool): True pour mode test
-                    priority (str): 'low', 'normal', 'high'
+                    priority (str): 'low', 'normal', 'high' → gamme 2, 1, 3
+
+                Note: webhook_url sera automatiquement utilisé pour webhookUrl, urlDlr et urlResponse.
 
                 OPTIONS PROPRIÉTAIRES (compatibilité directe):
                     _format (str): 'json' ou 'xml'
@@ -262,12 +262,15 @@ class SMSPartnerProvider(BaseProvider):
             elif self.missive.id:
                 payload["tag"] = f"missive_{self.missive.id}"
 
-            # Ajouter webhook si configuré
+            # Ajouter webhook si configuré (même URL pour tous les types)
             webhook_url = kwargs.get("webhook_url") or self.config.get(
                 "SMSPARTNER_WEBHOOK_URL"
             )
             if webhook_url:
+                # Utiliser la même URL pour tous les webhooks
                 payload["webhookUrl"] = webhook_url
+                payload["urlDlr"] = webhook_url  # Delivery Reports
+                payload["urlResponse"] = webhook_url  # Réponses SMS
 
             # Mapping des kwargs standardisés Django → API SMSPartner
             kwargs_mapping = {
@@ -275,9 +278,6 @@ class SMSPartnerProvider(BaseProvider):
                 "scheduled_delivery_date": "scheduledDeliveryDate",  # dd/mm/YYYY
                 "scheduled_time": "time",  # 0-24
                 "scheduled_minute": "minute",  # 0-55 (intervalle 5min)
-                # Webhooks et callbacks
-                "webhook_url_response": "urlResponse",  # URL retour réponses
-                "webhook_url_dlr": "urlDlr",  # URL retour DLR
                 # Options SMS
                 "is_commercial": "isStopSms",  # 1 pour ajouter STOP
                 "is_unicode": "isUnicode",  # 1 pour Unicode (70 car.)
