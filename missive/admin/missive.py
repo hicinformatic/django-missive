@@ -133,6 +133,53 @@ class MissiveAdmin(admin.ModelAdmin):
 
     list_display_links = ["recipient_display_short"]
 
+    def changelist_view(self, request, extra_context=None):
+        """Affiche un warning si le mode sandbox est actif"""
+        extra_context = extra_context or {}
+
+        # Vérifier si le mode sandbox est activé
+        if getattr(settings, "MISSIVE_SANDBOX", False):
+            from django.contrib import messages
+
+            messages.warning(
+                request,
+                _(
+                    "⚠️ MODE SANDBOX ACTIVÉ : Tous les envois utilisent le mode test. "
+                    "Les messages ne seront pas réellement envoyés. "
+                    "Désactivez MISSIVE_SANDBOX dans settings.py pour envoyer en production."
+                ),
+            )
+
+        return super().changelist_view(request, extra_context=extra_context)
+
+    def add_view(self, request, form_url="", extra_context=None):
+        """Affiche un warning si le mode sandbox est actif (création)"""
+        extra_context = extra_context or {}
+
+        if getattr(settings, "MISSIVE_SANDBOX", False):
+            from django.contrib import messages
+
+            messages.info(
+                request,
+                _("ℹ️ Mode sandbox actif : Cette missive sera envoyée en mode test."),
+            )
+
+        return super().add_view(request, form_url, extra_context)
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        """Affiche un warning si le mode sandbox est actif (modification)"""
+        extra_context = extra_context or {}
+
+        if getattr(settings, "MISSIVE_SANDBOX", False):
+            from django.contrib import messages
+
+            messages.info(
+                request,
+                _("ℹ️ Mode sandbox actif : Cette missive sera envoyée en mode test."),
+            )
+
+        return super().change_view(request, object_id, form_url, extra_context)
+
     list_filter = [
         "missive_type",
         "status",
