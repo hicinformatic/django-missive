@@ -7,31 +7,11 @@ import logging
 
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
+from django.utils.module_loading import import_string
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
-from ..providers import (
-    BrevoProvider,
-    LaPosteProvider,
-    MailgunProvider,
-    SendGridProvider,
-    SMSPartnerProvider,
-    TwilioProvider,
-)
-
 logger = logging.getLogger(__name__)
-
-
-# Mapping provider name -> classe
-PROVIDER_CLASSES = {
-    "sendgrid": SendGridProvider,
-    "mailgun": MailgunProvider,
-    "twilio": TwilioProvider,
-    "smspartner": SMSPartnerProvider,
-    "laposte": LaPosteProvider,
-    "sendinblue": BrevoProvider,  # Ancienne URL pour rétrocompatibilité
-    "brevo": BrevoProvider,
-}
 
 
 def get_client_ip(request):
@@ -82,7 +62,8 @@ class WebhookView(View):
             headers = {
                 key: value
                 for key, value in request.META.items()
-                if key.startswith("HTTP_") or key in ["CONTENT_TYPE", "CONTENT_LENGTH"]
+                if key.startswith("HTTP_")
+                or key in ["CONTENT_TYPE", "CONTENT_LENGTH", "REMOTE_ADDR"]
             }
 
             # Obtenir le provider depuis l'URL
@@ -91,13 +72,41 @@ class WebhookView(View):
                     {"error": "Provider manquant dans l'URL"}, status=400
                 )
 
-            # Obtenir la classe du provider
-            provider_class = PROVIDER_CLASSES.get(provider.lower())
-            if not provider_class:
+            # Charger dynamiquement le provider depuis la config
+            from django.conf import settings
+
+            from ..helpers import get_providers_from_config
+
+            providers_config = get_providers_from_config()
+            provider_path = None
+
+            # Chercher le provider dans la config
+            for type_providers in providers_config.values():
+                for path in type_providers:
+                    try:
+                        provider_class = import_string(path)
+                        # Normaliser le nom du provider pour la comparaison
+                        provider_name = (
+                            provider_class.name.lower()
+                            .replace(" ", "")
+                            .replace("-", "")
+                        )
+                        if provider_name == provider.lower().replace("-", ""):
+                            provider_path = path
+                            break
+                    except Exception:
+                        continue
+                if provider_path:
+                    break
+
+            if not provider_path:
                 logger.error(f"Provider inconnu : {provider}")
                 return JsonResponse(
                     {"error": f"Provider inconnu: {provider}"}, status=400
                 )
+
+            # Charger la classe du provider
+            provider_class = import_string(provider_path)
 
             # Créer une instance du provider
             provider_instance = provider_class()
@@ -156,11 +165,28 @@ def webhook_test_view(request):
 
     if request.method == "POST":
         try:
+            from ..helpers import get_providers_from_config
+
             data = json.loads(request.body.decode("utf-8"))
             provider_name = data.get("provider", "sendgrid")
             payload = data.get("payload", {})
 
-            provider_class = PROVIDER_CLASSES.get(provider_name)
+            # Charger dynamiquement le provider
+            providers_config = get_providers_from_config()
+            provider_class = None
+
+            for type_providers in providers_config.values():
+                for path in type_providers:
+                    try:
+                        cls = import_string(path)
+                        if cls.name.lower().replace(" ", "") == provider_name.lower():
+                            provider_class = cls
+                            break
+                    except Exception:
+                        continue
+                if provider_class:
+                    break
+
             if not provider_class:
                 return JsonResponse(
                     {"error": f"Provider {provider_name} inconnu"}, status=400

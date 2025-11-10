@@ -886,8 +886,11 @@ class SMSPartnerProvider(BaseProvider):
 
     def extract_missive_id(self, payload: Dict) -> Optional[str]:
         """Extrait l'ID depuis SMSPartner webhook"""
-        return payload.get("messageId") or payload.get("tag", "").replace(
-            "missive_", ""
+        # SMSPartner utilise message_id (avec underscore) dans les webhooks
+        return (
+            payload.get("message_id")
+            or payload.get("messageId")
+            or payload.get("tag", "").replace("missive_", "")
         )
 
     def extract_event_type(self, payload: Dict) -> str:
