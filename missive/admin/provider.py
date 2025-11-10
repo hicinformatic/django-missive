@@ -596,7 +596,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
     documentation_url_display.short_description = _("Documentation")
 
     def webhook_urls_display(self, obj):
-        """Affiche les URLs de webhook pour chaque type de service supporté"""
+        """Affiche l'URL webhook unique pour ce provider"""
         from django.conf import settings
 
         types = obj.missive_types_list
@@ -605,19 +605,6 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 '<span style="color: #6c757d; font-style: italic;">Aucun service configuré</span>'
             )
 
-        # Mapping des types de missive vers des noms lisibles
-        type_labels = {
-            "EMAIL": "📧 Email",
-            "SMS": "📱 SMS",
-            "VOICE_CALL": "📞 Appel vocal",
-            "BRANDED": "💬 Messageries",
-            "POSTAL": "📮 Courrier",
-            "LRE": "📨 LRE",
-            "NOTIFICATION": "🔔 Notification",
-            "PUSH_NOTIFICATION": "📲 Push",
-            "RCS": "💬 RCS",
-        }
-
         # Récupérer le domaine de base depuis la config
         base_domain = getattr(
             settings, "MISSIVE_WEBHOOK_BASE_URL", "https://example.com"
@@ -625,26 +612,37 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         # Retirer le slash final si présent
         base_domain = base_domain.rstrip("/")
 
-        # Construire les URLs de webhook
+        # Construire l'URL unique du webhook (une seule URL pour tous les types)
         provider_slug = obj.name.lower().replace(" ", "")
+        webhook_url = f"{base_domain}/missive/webhooks/{provider_slug}/"
 
         html_parts = []
-        html_parts.append('<div style="margin-top: 5px;">')
 
-        for missive_type in types:
-            label = type_labels.get(missive_type, missive_type)
-            # URL spécifique par type
-            type_slug = missive_type.lower().replace("_", "-")
-            webhook_url = f"{base_domain}/webhooks/{provider_slug}/{type_slug}/"
+        # Afficher l'URL unique
+        html_parts.append(
+            '<div style="margin-top: 5px; padding: 12px; background: #e7f3ff; border-left: 4px solid #0d6efd; border-radius: 4px;">'
+            '<div style="font-weight: 600; color: #0c5b9d; margin-bottom: 8px; font-size: 13px;">🔗 URL Webhook unique</div>'
+            f'<code style="background: #fff; padding: 6px 12px; border-radius: 4px; font-size: 12px; color: #0d6efd; display: block; word-break: break-all;">{webhook_url}</code>'
+            '<div style="margin-top: 8px; padding: 6px; background: #fff; border-radius: 3px;">'
+            '<small style="color: #6c757d;">✅ Une seule URL pour tous les types de services :'
+        )
 
-            html_parts.append(
-                f'<div style="margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-left: 3px solid #0d6efd; border-radius: 3px;">'
-                f'<div style="font-weight: 500; color: #495057; margin-bottom: 4px;">{label}</div>'
-                f'<code style="background: #fff; padding: 4px 8px; border-radius: 3px; font-size: 11px; color: #0d6efd;">{webhook_url}</code>'
-                f"</div>"
-            )
+        # Liste des types supportés
+        type_labels = {
+            "EMAIL": "Email",
+            "SMS": "SMS",
+            "VOICE_CALL": "Appels vocaux",
+            "BRANDED": "Messageries",
+            "POSTAL": "Courrier",
+            "LRE": "LRE",
+            "NOTIFICATION": "Notifications",
+            "PUSH_NOTIFICATION": "Push",
+            "RCS": "RCS",
+        }
 
-        html_parts.append("</div>")
+        type_names = [type_labels.get(t, t) for t in types]
+        html_parts.append(f' {", ".join(type_names)}</small>')
+        html_parts.append("</div></div>")
 
         # Note d'aide avec info sur la config
         if base_domain == "https://example.com":
