@@ -6,25 +6,6 @@ __version__ = "0.1.0"
 
 default_app_config = "missive.apps.MissiveConfig"
 
-# Raccourcis pour imports faciles
-from .shortcuts import (
-    send_email,
-    send_missive,
-    send_slack,
-    send_sms,
-    send_telegram,
-    send_whatsapp,
-)
-
-__all__ = [
-    "send_missive",
-    "send_sms",
-    "send_email",
-    "send_whatsapp",
-    "send_slack",
-    "send_telegram",
-]
-
 
 def __getattr__(name):
     """Lazy imports pour éviter les imports circulaires"""
@@ -76,6 +57,31 @@ def __getattr__(name):
         from .helpers import get_missives_stats_for_object
 
         return get_missives_stats_for_object
+    # Shortcuts
+    elif name == "send_missive":
+        from .shortcuts import send_missive
+
+        return send_missive
+    elif name == "send_sms":
+        from .shortcuts import send_sms
+
+        return send_sms
+    elif name == "send_email":
+        from .shortcuts import send_email
+
+        return send_email
+    elif name == "send_whatsapp":
+        from .shortcuts import send_whatsapp
+
+        return send_whatsapp
+    elif name == "send_slack":
+        from .shortcuts import send_slack
+
+        return send_slack
+    elif name == "send_telegram":
+        from .shortcuts import send_telegram
+
+        return send_telegram
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
@@ -93,4 +99,11 @@ __all__ = [
     "MissiveSender",
     "MissiveBuilder",
     "get_missives_stats_for_object",
+    # Shortcuts
+    "send_missive",
+    "send_sms",
+    "send_email",
+    "send_whatsapp",
+    "send_slack",
+    "send_telegram",
 ]
