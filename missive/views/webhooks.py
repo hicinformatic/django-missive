@@ -91,8 +91,21 @@ class WebhookView(View):
                     {"error": f"Provider inconnu: {provider}"}, status=400
                 )
 
-            # Créer une instance et traiter le webhook
+            # Créer une instance du provider
             provider_instance = provider_class()
+
+            # SÉCURITÉ : Valider la signature du webhook
+            is_valid, validation_error = provider_instance.validate_webhook_signature(
+                payload, headers
+            )
+            if not is_valid:
+                logger.warning(
+                    f"Signature invalide pour webhook {provider}: {validation_error}"
+                )
+                # Retourner 200 pour ne pas révéler qu'on a rejeté
+                return HttpResponse(status=200)
+
+            # Traiter le webhook
             success, error, missive = provider_instance.handle_webhook(payload, headers)
 
             if success:
