@@ -69,6 +69,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         "config_vars_display_detail",
         "installation_display",
         "configuration_display",
+        "webhook_urls_display",
         "site_url_display",
         "status_url_display",
         "documentation_url_display",
@@ -131,9 +132,10 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                         "fields": (
                             "documentation_url_display",
                             "config_vars_display_detail",
+                            "webhook_urls_display",
                         ),
                         "description": _(
-                            "Variables d'environnement nécessaires pour ce provider"
+                            "Variables d'environnement et URLs de webhook pour ce provider"
                         ),
                     },
                 ),
@@ -592,6 +594,58 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
     site_url_display.short_description = _("Site officiel")
     documentation_url_display.short_description = _("Documentation")
+
+    def webhook_urls_display(self, obj):
+        """Affiche les URLs de webhook pour chaque type de service supporté"""
+        from django.urls import reverse
+
+        types = obj.missive_types_list
+        if not types:
+            return format_html(
+                '<span style="color: #6c757d; font-style: italic;">Aucun service configuré</span>'
+            )
+
+        # Mapping des types de missive vers des noms lisibles
+        type_labels = {
+            "EMAIL": "📧 Email",
+            "SMS": "📱 SMS",
+            "VOICE_CALL": "📞 Appel vocal",
+            "BRANDED": "💬 Messageries",
+            "POSTAL": "📮 Courrier",
+            "LRE": "📨 LRE",
+            "NOTIFICATION": "🔔 Notification",
+            "PUSH_NOTIFICATION": "📲 Push",
+            "RCS": "💬 RCS",
+        }
+
+        # Construire les URLs de webhook
+        base_url = f"/webhooks/{obj.name.lower().replace(' ', '')}/"
+
+        html_parts = []
+        html_parts.append('<div style="margin-top: 5px;">')
+
+        for missive_type in types:
+            label = type_labels.get(missive_type, missive_type)
+            # URL spécifique par type
+            webhook_url = f"{base_url}{missive_type.lower().replace('_', '-')}/"
+
+            html_parts.append(
+                f'<div style="margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-left: 3px solid #0d6efd; border-radius: 3px;">'
+                f'<div style="font-weight: 500; color: #495057; margin-bottom: 4px;">{label}</div>'
+                f'<code style="background: #fff; padding: 4px 8px; border-radius: 3px; font-size: 11px; color: #0d6efd;">{webhook_url}</code>'
+                f"</div>"
+            )
+
+        html_parts.append("</div>")
+        html_parts.append(
+            '<div style="margin-top: 10px; padding: 8px; background: #fff3cd; border-left: 3px solid #ffc107; border-radius: 3px;">'
+            '<small style="color: #856404;">💡 <strong>Note:</strong> Configurez ces URLs dans le dashboard de votre provider pour recevoir les notifications de statut.</small>'
+            "</div>"
+        )
+
+        return format_html("".join(html_parts))
+
+    webhook_urls_display.short_description = _("URLs de Webhook")
 
     def usage_display(self, obj):
         """Affiche le nombre d'utilisations"""
