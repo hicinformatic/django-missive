@@ -61,6 +61,11 @@ class WebhookView(View):
     def post(self, request, provider=None, *args, **kwargs):
         """Reçoit et traite le webhook"""
         try:
+            # Logger la réception du webhook
+            logger.info(
+                f"🔔 Webhook reçu de {provider} depuis {get_client_ip(request)}"
+            )
+
             # Parser le payload
             content_type = request.META.get("CONTENT_TYPE", "")
 
@@ -69,6 +74,9 @@ class WebhookView(View):
             else:
                 # Form data (Twilio notamment)
                 payload = dict(request.POST.items())
+
+            # Logger le payload pour debug
+            logger.debug(f"📦 Payload reçu: {json.dumps(payload, indent=2)}")
 
             # Extraire les headers
             headers = {
