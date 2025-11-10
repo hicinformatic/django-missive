@@ -15,13 +15,8 @@ from .email import BaseEmailMixin
 from .monitoring import BaseMonitoringMixin
 from .notification import BaseNotificationMixin
 from .postal import BasePostalMixin
-from .slack import BaseSlackMixin
 from .sms import BaseSMSMixin
-from .teams import BaseTeamsMixin
 from .voice_call import BaseVoiceCallMixin
-
-# Mixins spécifiques (pour compatibilité et implémentations de référence)
-from .whatsapp import BaseWhatsAppMixin  # DÉPRÉCIÉ : utiliser BaseBrandedMixin
 
 
 class BaseProvider(
@@ -32,12 +27,7 @@ class BaseProvider(
     BaseNotificationMixin,
     BaseVoiceCallMixin,
     BaseMonitoringMixin,
-    # Mixin générique pour TOUTES les messageries d'applications
-    BaseBrandedMixin,
-    # Mixins spécifiques (compatibilité et référence)
-    BaseWhatsAppMixin,
-    BaseSlackMixin,
-    BaseTeamsMixin,
+    BaseBrandedMixin,  # Mixin générique pour TOUTES les messageries d'applications
 ):
     """
     Classe de base pour tous les providers.
@@ -55,9 +45,6 @@ class BaseProvider(
     - BaseVoiceCallMixin : Appels vocaux, TTS, messages vocaux
     - BaseMonitoringMixin : Monitoring, crédits, SLA, health check
     - BaseBrandedMixin : TOUTES les messageries d'applications (WhatsApp, Slack, Teams, Discord, Telegram, etc.)
-    - BaseWhatsAppMixin : DÉPRÉCIÉ - utiliser BaseBrandedMixin
-    - BaseSlackMixin : Implémentation de référence pour Slack
-    - BaseTeamsMixin : Implémentation de référence pour Teams
 
     Architecture ultra-simplifiée pour messageries :
     Pour le type BRANDED, le nom du provider (self.name) détermine automatiquement
