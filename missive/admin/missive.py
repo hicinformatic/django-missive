@@ -63,10 +63,9 @@ class MissiveAdminForm(forms.ModelForm):
                     (current_provider, f"{current_provider} (personnalisé)")
                 ]
             self.fields["provider_choice"].initial = current_provider
-            self.fields["provider_choice"].disabled = True
+            # Permettre la modification du provider
             self.fields["provider_choice"].help_text = _(
-                "Le provider ne peut pas être modifié après la création. "
-                "Il est défini dans l'événement d'envoi initial (voir onglet Événements)."
+                "Provider utilisé pour l'envoi. Changez-le si nécessaire avant l'envoi."
             )
             # Rendre sender readonly en modification
             self.fields["sender"].disabled = True
