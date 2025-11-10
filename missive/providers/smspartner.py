@@ -799,8 +799,52 @@ class SMSPartnerProvider(BaseProvider):
     def validate_webhook_signature(
         self, payload: Dict, headers: Dict
     ) -> Tuple[bool, str]:
-        """Valide la signature SMSPartner"""
-        # À implémenter selon la doc SMSPartner
+        """
+        Valide les webhooks SMSPartner.
+
+        SMSPartner n'utilise pas de signature cryptographique pour les webhooks.
+        Les méthodes de sécurisation recommandées sont :
+
+        1. Whitelist d'IPs (configurer SMSPARTNER_WEBHOOK_IPS dans settings)
+        2. Token secret dans l'URL (ex: /webhooks/smspartner/sms/?token=SECRET)
+        3. Vérifier que le messageId existe dans notre DB
+
+        Pour l'instant, on accepte tous les webhooks (retourne True).
+        Pour renforcer la sécurité, ajoutez SMSPARTNER_WEBHOOK_IPS dans settings.
+
+        Args:
+            payload: Données du webhook
+            headers: Headers HTTP
+
+        Returns:
+            Tuple (is_valid, error_message)
+        """
+        # Vérification par IP (si configurée)
+        allowed_ips = self.config.get("SMSPARTNER_WEBHOOK_IPS", [])
+        if allowed_ips:
+            # Récupérer l'IP du client depuis les headers
+            client_ip = None
+            if "HTTP_X_FORWARDED_FOR" in headers:
+                # Prendre la première IP si plusieurs proxies
+                client_ip = headers["HTTP_X_FORWARDED_FOR"].split(",")[0].strip()
+            elif "REMOTE_ADDR" in headers:
+                client_ip = headers["REMOTE_ADDR"]
+
+            if client_ip and client_ip not in allowed_ips:
+                return False, f"IP non autorisée: {client_ip}"
+
+        # Vérification que le messageId existe (si fourni)
+        message_id = payload.get("messageId") or payload.get("message_id")
+        if message_id:
+            # Vérifier que ce message existe dans notre DB
+            from ...models import Missive
+
+            exists = Missive.objects.filter(external_id=str(message_id)).exists()
+            if not exists:
+                return False, f"Message ID inconnu: {message_id}"
+
+        # Par défaut, accepter le webhook
+        # Note: SMSPartner ne fournit pas de signature HMAC dans leur API standard
         return True, ""
 
     def extract_missive_id(self, payload: Dict) -> Optional[str]:
