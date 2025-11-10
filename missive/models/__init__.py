@@ -13,6 +13,7 @@ from .missive import Missive
 # Import des modèles
 from .recipient import Recipient
 from .template import MissiveTemplate
+from .provider import ProviderInfo  # Modèle virtuel pour l'admin
 
 __all__ = [
     # Choix
@@ -26,4 +27,5 @@ __all__ = [
     "MissiveAttachment",
     "MissiveEvent",
     "MissiveTemplate",
+    "ProviderInfo",  # Modèle virtuel
 ]

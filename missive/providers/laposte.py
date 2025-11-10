@@ -2,7 +2,7 @@
 Provider La Poste pour courrier postal.
 """
 
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from ..models import MissiveStatus
 from .base import BaseProvider
@@ -18,6 +18,7 @@ class LaPosteProvider(BaseProvider):
     """
 
     name = "La Poste"
+    display_name = "La Poste"
     supported_types = ["POSTAL", "EMAIL"]  # La Poste peut faire les 2 !
     services = [
         "postal",           # Courrier simple
@@ -26,6 +27,8 @@ class LaPosteProvider(BaseProvider):
         "email_ar",          # Email avec AR électronique
         "colissimo",         # Colis (future extension)
     ]
+    config_keys = ["LAPOSTE_API_KEY"]
+    required_package = "requests"
 
     def send_postal(self) -> bool:
         """Envoie du courrier postal via La Poste API"""
@@ -152,6 +155,147 @@ class LaPosteProvider(BaseProvider):
     def extract_event_type(self, payload: Dict) -> str:
         """Extrait le type d'événement La Poste"""
         return payload.get("status", "unknown")
+
+    def get_proofs_of_delivery(self, service_type: Optional[str] = None) -> list:
+        """
+        Récupère toutes les preuves La Poste.
+        
+        La Poste génère plusieurs documents selon le service :
+        - Courrier simple : Preuve de dépôt
+        - Courrier recommandé R1 : Preuve de dépôt + AR + avis de passage
+        - Courrier recommandé R2/R3 : Preuve de dépôt + AR + signature + copie scannée
+        - Email AR : Accusé de réception électronique
+        
+        TODO: Implémenter via l'API La Poste
+        GET https://api.laposte.fr/sls/v2/suivi/{tracking_number}/proofs
+        """
+        if not self.missive:
+            return []
+        
+        external_id = self.missive.external_id
+        if not external_id or not external_id.startswith('laposte_'):
+            return []
+        
+        # Déterminer le type de service
+        if not service_type:
+            if self.missive.missive_type == "EMAIL":
+                service_type = "email_ar"
+            elif self.missive.requires_signature:
+                service_type = "postal_signature"
+            elif self.missive.is_registered:
+                service_type = "postal_registered"
+            else:
+                service_type = "postal"
+        
+        # TODO: Appel API réel
+        
+        # Simulation
+        from django.utils import timezone
+        
+        sent_at = self.missive.sent_at or timezone.now()
+        tracking_number = external_id.replace('laposte_', '')
+        proofs = []
+        
+        # 1. Preuve de dépôt (toujours disponible)
+        proofs.append({
+            "type": "deposit_receipt",
+            "label": "Preuve de dépôt",
+            "available": True,
+            "url": f"https://www.laposte.fr/suivi/proof/deposit/{tracking_number}.pdf",
+            "generated_at": sent_at,
+            "expires_at": None,
+            "format": "pdf",
+            "metadata": {
+                "proof_type": "deposit",
+                "provider": "laposte",
+                "tracking_number": tracking_number,
+            }
+        })
+        
+        # 2. Copie du document (si courrier postal)
+        if "postal" in service_type:
+            proofs.append({
+                "type": "document_copy",
+                "label": "Copie du courrier",
+                "available": True,
+                "url": f"https://www.laposte.fr/suivi/document/{tracking_number}.pdf",
+                "generated_at": sent_at,
+                "expires_at": None,
+                "format": "pdf",
+                "metadata": {
+                    "document_type": "copy",
+                    "provider": "laposte",
+                }
+            })
+        
+        # 3. Avis de passage (si recommandé et non livré)
+        if self.missive.is_registered and not self.missive.delivered_at:
+            proofs.append({
+                "type": "delivery_notice",
+                "label": "Avis de passage",
+                "available": False,
+                "url": None,
+                "generated_at": None,
+                "expires_at": None,
+                "format": "pdf",
+                "metadata": {
+                    "status": "pending",
+                    "message": "Disponible si le destinataire est absent",
+                    "provider": "laposte",
+                }
+            })
+        
+        # 4. AR (si recommandé et livré)
+        if self.missive.is_registered:
+            if self.missive.delivered_at:
+                proofs.append({
+                    "type": "acknowledgment_receipt",
+                    "label": "Accusé de réception",
+                    "available": True,
+                    "url": f"https://www.laposte.fr/suivi/ar/{tracking_number}.pdf",
+                    "generated_at": self.missive.delivered_at,
+                    "expires_at": None,
+                    "format": "pdf",
+                    "metadata": {
+                        "ar_type": "R1" if not self.missive.requires_signature else "R2/R3",
+                        "delivery_date": self.missive.delivered_at.isoformat() if self.missive.delivered_at else None,
+                        "provider": "laposte",
+                    }
+                })
+            else:
+                proofs.append({
+                    "type": "acknowledgment_receipt",
+                    "label": "Accusé de réception",
+                    "available": False,
+                    "url": None,
+                    "generated_at": None,
+                    "expires_at": None,
+                    "format": "pdf",
+                    "metadata": {
+                        "status": "pending",
+                        "message": "En attente de livraison",
+                        "provider": "laposte",
+                    }
+                })
+        
+        # 5. Signature (si R2/R3 et livré)
+        if self.missive.requires_signature and self.missive.delivered_at:
+            proofs.append({
+                "type": "signature_proof",
+                "label": "Preuve de signature",
+                "available": True,
+                "url": f"https://www.laposte.fr/suivi/signature/{tracking_number}.pdf",
+                "generated_at": self.missive.delivered_at,
+                "expires_at": None,
+                "format": "pdf",
+                "metadata": {
+                    "signature_type": "handwritten",
+                    "signer_name": "À récupérer via API",
+                    "provider": "laposte",
+                }
+            })
+        
+        return proofs
 
     def get_service_status(self) -> Dict:
         """

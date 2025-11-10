@@ -2,7 +2,7 @@
 Mixin pour les fonctionnalités email des providers.
 """
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from django.utils import timezone
 
@@ -11,6 +11,38 @@ class BaseEmailMixin:
     """
     Mixin fournissant les fonctionnalités spécifiques aux emails.
     """
+
+    def get_email_service_info(self) -> Dict[str, Any]:
+        """
+        Récupère les informations du compte/service Email.
+        
+        Retourne les informations importantes pour le service Email :
+        - Crédits disponibles (nombre d'emails ou montant)
+        - Limites et quotas (emails/jour, taille max, etc.)
+        - État du service (actif/inactif)
+        - Réputation de l'expéditeur
+        
+        Returns:
+            Dict contenant :
+                - credits: Nombre d'emails ou montant disponible
+                - credits_type: 'count' (nombre) ou 'amount' (montant) ou 'unlimited'
+                - is_available: bool, service accessible
+                - limits: Dict avec les limites (quota_daily, max_attachment_size, etc.)
+                - warnings: Liste des alertes
+                - reputation: Dict avec infos de réputation (score, bounces, etc.)
+                - details: Dict avec infos supplémentaires
+        
+        À surcharger dans les providers concrets.
+        """
+        return {
+            "credits": None,
+            "credits_type": "unlimited",
+            "is_available": None,
+            "limits": {},
+            "warnings": ["Méthode get_email_service_info() non implémentée pour ce provider"],
+            "reputation": {},
+            "details": {},
+        }
 
     def send_email(self) -> bool:
         """

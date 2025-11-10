@@ -16,8 +16,11 @@ class SendGridProvider(BaseProvider):
     """Provider pour SendGrid (Email uniquement)"""
 
     name = "SendGrid"
+    display_name = "SendGrid"
     supported_types = ["EMAIL"]
     services = ["email", "email_transactional", "email_marketing"]
+    config_keys = ["SENDGRID_API_KEY"]
+    required_package = "sendgrid"
 
     def send_email(self) -> bool:
         """Envoie un email via SendGrid API"""

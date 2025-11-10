@@ -1,13 +1,44 @@
 """
 Mixin pour les fonctionnalités notification in-app des providers.
 """
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 class BaseNotificationMixin:
     """
     Mixin fournissant les fonctionnalités spécifiques aux notifications in-app.
     """
+
+    def get_notification_service_info(self) -> Dict[str, Any]:
+        """
+        Récupère les informations du compte/service Notification.
+        
+        Retourne les informations importantes pour le service de notifications :
+        - Nombre de notifications envoyées/limites
+        - État du service (actif/inactif)
+        - Channels disponibles (in-app, push, etc.)
+        
+        Returns:
+            Dict contenant :
+                - credits: Généralement 'unlimited' pour les notifications in-app
+                - credits_type: 'unlimited' ou 'count'
+                - is_available: bool, service accessible
+                - limits: Dict avec les limites (notifications/jour, etc.)
+                - warnings: Liste des alertes
+                - channels: Liste des canaux disponibles
+                - details: Dict avec infos supplémentaires
+        
+        À surcharger dans les providers concrets.
+        """
+        return {
+            "credits": None,
+            "credits_type": "unlimited",
+            "is_available": None,
+            "limits": {},
+            "warnings": ["Méthode get_notification_service_info() non implémentée pour ce provider"],
+            "channels": [],
+            "details": {},
+        }
 
     def send_notification(self) -> bool:
         """

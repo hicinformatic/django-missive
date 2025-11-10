@@ -1,0 +1,13 @@
+# Toutes les dépendances (core + tous les providers)
+# Install avec: pip install -r requirements-all.txt
+
+# Core
+-r requirements.txt
+
+# Tous les providers par catégorie
+-r requirements-email.txt
+-r requirements-sms.txt
+-r requirements-messaging.txt
+-r requirements-push.txt
+-r requirements-professional.txt
+-r requirements-postal.txt

@@ -1,13 +1,45 @@
 """
 Mixin pour les fonctionnalités WhatsApp des providers.
 """
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 class BaseWhatsAppMixin:
     """
     Mixin fournissant les fonctionnalités spécifiques à WhatsApp.
     """
+
+    def get_whatsapp_service_info(self) -> Dict[str, Any]:
+        """
+        Récupère les informations du compte/service WhatsApp.
+        
+        Retourne les informations importantes pour le service WhatsApp :
+        - Crédits disponibles (conversations ou montant)
+        - Limites et quotas
+        - État du service (actif/inactif)
+        - Numéro WhatsApp Business enregistré
+        
+        Returns:
+            Dict contenant :
+                - credits: Nombre de conversations ou montant disponible
+                - credits_type: 'conversations' ou 'amount'
+                - is_available: bool, service accessible
+                - limits: Dict avec les limites (messages/jour, etc.)
+                - warnings: Liste des alertes
+                - phone_number: Numéro WhatsApp Business enregistré
+                - details: Dict avec infos supplémentaires
+        
+        À surcharger dans les providers concrets.
+        """
+        return {
+            "credits": None,
+            "credits_type": "conversations",
+            "is_available": None,
+            "limits": {},
+            "warnings": ["Méthode get_whatsapp_service_info() non implémentée pour ce provider"],
+            "phone_number": None,
+            "details": {},
+        }
 
     def send_whatsapp(self) -> bool:
         """

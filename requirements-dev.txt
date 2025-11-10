@@ -1,22 +1,28 @@
-# Development dependencies for django-missive
-# Install with: pip install -r requirements-dev.txt
+# Development dependencies
+# Install avec: pip install -r requirements-dev.txt
+
+# Core dependencies
+-r requirements.txt
 
 # Testing
 pytest>=7.0
 pytest-django>=4.5
 pytest-cov>=4.0
+coverage>=7.3
 
-# Code Quality
+# Code quality
 black>=23.0
 flake8>=6.0
 isort>=5.12
 mypy>=1.0
 
-# Building and Publishing
-build>=0.10
-twine>=4.0
-wheel>=0.40
+# Django extensions pour dev
+django-extensions>=3.2
+django-debug-toolbar>=4.2
 
-# Django
-Django>=3.2
+# Environment variables
+python-dotenv>=1.0
 
+# Documentation
+sphinx>=7.2
+sphinx-rtd-theme>=2.0

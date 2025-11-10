@@ -12,8 +12,11 @@ class DjangoEmailProvider(BaseProvider):
     """Provider utilisant le système d'email de Django (SMTP)"""
 
     name = "Django Email"
+    display_name = "Django Email (par défaut)"
     supported_types = ["EMAIL"]
     services = ["email"]  # Email via SMTP configuré dans Django
+    config_keys = ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_HOST_USER", "EMAIL_HOST_PASSWORD"]
+    required_package = None  # Toujours disponible avec Django
 
     def send_email(self) -> bool:
         """Envoie via Django mail (SMTP)"""

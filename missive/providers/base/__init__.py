@@ -13,6 +13,7 @@ from .monitoring import BaseMonitoringMixin
 from .notification import BaseNotificationMixin
 from .postal import BasePostalMixin
 from .sms import BaseSMSMixin
+from .voice_call import BaseVoiceCallMixin
 from .whatsapp import BaseWhatsAppMixin
 
 
@@ -23,6 +24,7 @@ class BaseProvider(
     BaseWhatsAppMixin,
     BasePostalMixin,
     BaseNotificationMixin,
+    BaseVoiceCallMixin,
     BaseMonitoringMixin,
 ):
     """
@@ -39,11 +41,12 @@ class BaseProvider(
     - BaseWhatsAppMixin : Formatage WhatsApp, attachments média
     - BasePostalMixin : Validation adresse, calcul coût postal
     - BaseNotificationMixin : Formatage notifications, préférences user
+    - BaseVoiceCallMixin : Appels vocaux, TTS, messages vocaux
     - BaseMonitoringMixin : Monitoring, crédits, SLA, health check
 
     À implémenter dans les sous-classes :
     - supported_types : Liste des MissiveType supportés
-    - send_email() / send_sms() / send_whatsapp() / send_postal() / send_notification()
+    - send_email() / send_sms() / send_whatsapp() / send_postal() / send_notification() / send_voice_call()
     - handle_webhook() : pour traiter les webhooks
     """
 
@@ -80,6 +83,8 @@ class BaseProvider(
             return self.send_postal()
         elif self.missive.missive_type == MissiveType.NOTIFICATION:
             return self.send_notification()
+        elif self.missive.missive_type == MissiveType.VOICE_CALL:
+            return self.send_voice_call()
 
         return False
 

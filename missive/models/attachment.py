@@ -16,9 +16,6 @@ class MissiveAttachment(models.Model):
     - À n'importe quel autre modèle (via content_object)
     """
 
-    # Import tardif pour éviter les imports circulaires
-    # La relation sera résolue au runtime par Django
-    # Relation avec une missive (optionnel si content_object est fourni)
     missive = models.ForeignKey(
         "missive.Missive",
         on_delete=models.CASCADE,
@@ -67,14 +64,21 @@ class MissiveAttachment(models.Model):
     )
 
     # Métadonnées
-    filename = models.CharField(max_length=255, verbose_name=_("Nom du fichier"))
+    filename = models.CharField(
+        max_length=255,
+        verbose_name=_("Nom du fichier"),
+        help_text=_("Nom du fichier avec extension"),
+    )
     description = models.TextField(
         blank=True,
         verbose_name=_("Description"),
         help_text=_("Description ou notes sur cette pièce jointe"),
     )
     file_size = models.PositiveIntegerField(
-        null=True, blank=True, verbose_name=_("Taille (bytes)")
+        null=True,
+        blank=True,
+        verbose_name=_("Taille (bytes)"),
+        help_text=_("Taille du fichier en octets"),
     )
     mime_type = models.CharField(
         max_length=100,
@@ -87,7 +91,11 @@ class MissiveAttachment(models.Model):
         verbose_name=_("Ordre"),
         help_text=_("Ordre d'affichage (automatique si non fourni)"),
     )
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Date d'ajout"))
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Date d'ajout"),
+        help_text=_("Date d'ajout automatique de la pièce jointe"),
+    )
 
     class Meta:
         verbose_name = _("Pièce jointe")

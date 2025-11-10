@@ -1,6 +1,5 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import (
     CreateView,
@@ -10,7 +9,7 @@ from django.views.generic import (
     UpdateView,
 )
 
-from ..models import Missive, MissiveStatus, MissiveType
+from ..models import Missive, MissiveStatus
 
 
 class MissiveListView(ListView):
@@ -22,9 +21,10 @@ class MissiveListView(ListView):
     paginate_by = 20
 
     def get_queryset(self):
+        # Note: À adapter selon le nouveau modèle où sender est un Recipient
         queryset = super().get_queryset()
         if self.request.user.is_authenticated:
-            return queryset.filter(sender=self.request.user).order_by("-created_at")
+            return queryset.order_by("-created_at")
         return Missive.objects.none()
 
 
@@ -36,7 +36,8 @@ class MissiveDetailView(LoginRequiredMixin, DetailView):
     context_object_name = "missive"
 
     def get_queryset(self):
-        return super().get_queryset().filter(sender=self.request.user)
+        # Note: À adapter selon le nouveau modèle où sender est un Recipient
+        return super().get_queryset()
 
 
 class MissiveCreateView(LoginRequiredMixin, CreateView):
@@ -49,10 +50,9 @@ class MissiveCreateView(LoginRequiredMixin, CreateView):
         "priority",
         "subject",
         "body",
+        "body_text",
+        "recipient",
         "recipient_user",
-        "recipient_email",
-        "recipient_phone",
-        "recipient_address",
         "is_registered",
         "requires_signature",
         "scheduled_at",
@@ -60,7 +60,8 @@ class MissiveCreateView(LoginRequiredMixin, CreateView):
     success_url = reverse_lazy("missive:missive-list")
 
     def form_valid(self, form):
-        form.instance.sender = self.request.user
+        # Note: sender sera un Recipient après le refactoring
+        # form.instance.sender = self.request.user
         form.instance.status = MissiveStatus.DRAFT
         messages.success(self.request, "Missive créée avec succès")
         return super().form_valid(form)
@@ -76,10 +77,9 @@ class MissiveUpdateView(LoginRequiredMixin, UpdateView):
         "priority",
         "subject",
         "body",
+        "body_text",
+        "recipient",
         "recipient_user",
-        "recipient_email",
-        "recipient_phone",
-        "recipient_address",
         "is_registered",
         "requires_signature",
         "scheduled_at",
@@ -87,11 +87,11 @@ class MissiveUpdateView(LoginRequiredMixin, UpdateView):
     success_url = reverse_lazy("missive:missive-list")
 
     def get_queryset(self):
+        # Note: À adapter selon le nouveau modèle où sender est un Recipient
         return (
             super()
             .get_queryset()
             .filter(
-                sender=self.request.user,
                 status__in=[MissiveStatus.DRAFT, MissiveStatus.PENDING],
             )
         )
@@ -109,4 +109,5 @@ class MissiveDeleteView(LoginRequiredMixin, DeleteView):
     success_url = reverse_lazy("missive:missive-list")
 
     def get_queryset(self):
-        return super().get_queryset().filter(sender=self.request.user)
+        # Note: À adapter selon le nouveau modèle où sender est un Recipient
+        return super().get_queryset()

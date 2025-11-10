@@ -1,13 +1,45 @@
 """
 Mixin pour les fonctionnalités courrier postal des providers.
 """
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 class BasePostalMixin:
     """
     Mixin fournissant les fonctionnalités spécifiques au courrier postal.
     """
+
+    def get_postal_service_info(self) -> Dict[str, Any]:
+        """
+        Récupère les informations du compte/service Courrier postal.
+        
+        Retourne les informations importantes pour le service postal :
+        - Crédits disponibles (montant en euros généralement)
+        - Limites et tarifs
+        - État du service (actif/inactif)
+        - Options disponibles (recommandé, suivi, signature, etc.)
+        
+        Returns:
+            Dict contenant :
+                - credits: Montant disponible (généralement en euros)
+                - credits_type: 'amount' (montant en €)
+                - is_available: bool, service accessible
+                - limits: Dict avec les limites
+                - warnings: Liste des alertes
+                - options: Liste des options disponibles (recommandé, suivi, etc.)
+                - details: Dict avec infos supplémentaires
+        
+        À surcharger dans les providers concrets.
+        """
+        return {
+            "credits": None,
+            "credits_type": "amount",
+            "is_available": None,
+            "limits": {},
+            "warnings": ["Méthode get_postal_service_info() non implémentée pour ce provider"],
+            "options": [],
+            "details": {},
+        }
 
     def send_postal(self) -> bool:
         """

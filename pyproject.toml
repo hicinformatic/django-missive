@@ -50,6 +50,61 @@ dev = [
     "mypy>=1.0",
 ]
 
+# Providers Email
+email = [
+    "sendgrid>=6.11",
+    "mailgun>=0.1.1",
+    "boto3>=1.28",  # Amazon SES
+]
+
+# Providers SMS et Vocal
+sms = [
+    "twilio>=8.10",
+    "vonage>=3.11",
+]
+
+# Providers Messageries instantanées
+messaging = [
+    "python-telegram-bot>=20.7",
+    "requests>=2.31",  # Pour Signal, Messenger
+]
+
+# Providers Notifications push
+push = [
+    "firebase-admin>=6.3",  # FCM
+    "aioapns>=3.1",  # Apple Push Notification
+]
+
+# Providers Messageries professionnelles
+professional = [
+    "slack-sdk>=3.26",
+    "msgraph-core>=1.0",  # Microsoft Teams/Graph API
+]
+
+# Providers Courrier
+postal = [
+    "requests>=2.31",  # La Poste, LRE (AR24)
+    "reportlab>=4.0",  # Génération PDF pour courrier
+]
+
+# Toutes les dépendances optionnelles
+all = [
+    "sendgrid>=6.11",
+    "mailgun>=0.1.1",
+    "boto3>=1.28",
+    "twilio>=8.10",
+    "vonage>=3.11",
+    "python-telegram-bot>=20.7",
+    "requests>=2.31",
+    "firebase-admin>=6.3",
+    "aioapns>=3.1",
+    "slack-sdk>=3.26",
+    "msgraph-core>=1.0",
+    "reportlab>=4.0",
+    "phonenumbers>=8.13",  # Validation numéros de téléphone
+    "email-validator>=2.1",  # Validation emails
+]
+
 [project.urls]
 Homepage = "https://github.com/yourusername/django-missive"
 Documentation = "https://github.com/yourusername/django-missive#readme"
@@ -73,7 +128,7 @@ multi_line_output = 3
 include_trailing_comma = true
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false

@@ -2,12 +2,9 @@
 Provider Twilio pour SMS et WhatsApp.
 """
 
-import base64
-import hashlib
-import hmac
 from typing import Dict, Optional, Tuple
 
-from ..models import MissiveStatus, MissiveType
+from ..models import MissiveStatus
 from .base import BaseProvider
 
 
@@ -15,8 +12,11 @@ class TwilioProvider(BaseProvider):
     """Provider pour Twilio (SMS ET WhatsApp)"""
 
     name = "Twilio"
+    display_name = "Twilio"
     supported_types = ["SMS", "WHATSAPP"]
     services = ["sms", "whatsapp", "voice", "verify"]
+    config_keys = ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER"]
+    required_package = "twilio"
 
     def send_sms(self) -> bool:
         """Envoie un SMS via Twilio"""

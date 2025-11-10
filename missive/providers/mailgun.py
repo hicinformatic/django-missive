@@ -14,8 +14,11 @@ class MailgunProvider(BaseProvider):
     """Provider pour Mailgun (Email uniquement)"""
 
     name = "Mailgun"
+    display_name = "Mailgun"
     supported_types = ["EMAIL"]
     services = ["email", "email_validation", "email_routing"]
+    config_keys = ["MAILGUN_API_KEY", "MAILGUN_DOMAIN"]
+    required_package = "mailgun"
 
     def send_email(self) -> bool:
         """Envoie via Mailgun API"""

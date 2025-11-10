@@ -6,8 +6,8 @@
 
 ### Fonctionnalités principales
 
-- 📧 **Multi-canaux** : Email, SMS, WhatsApp, Courrier postal, Notifications in-app
-- 🔌 **8 providers intégrés** : SendGrid, Mailgun, Twilio, La Poste, SendinBlue, etc.
+- 📧 **Multi-canaux** : 14 types supportés (Email, SMS, WhatsApp, Telegram, Signal, Messenger, RCS, Courrier postal, LRE, Appels vocaux, Notifications push, Slack, Teams)
+- 🔌 **15+ providers intégrés** : SendGrid, Mailgun, Twilio, La Poste, Telegram, FCM, APN, Slack, Teams, etc.
 - 📎 **Pièces jointes flexibles** : Fichiers locaux OU URLs externes (S3, Google Drive)
 - 🔔 **Webhooks unifiés** : Un seul endpoint `/missive/webhook/{provider}/`
 - 📊 **Tracking complet** : Historique, statuts, événements
@@ -31,10 +31,33 @@
 
 ## Installation
 
-Install using pip:
+### 🔧 Mode développement (projet local)
 
 ```bash
+# Core uniquement (Django + validation)
+pip install -r requirements.txt
+
+# Développement (tests, linters)
+pip install -r requirements-dev.txt
+
+# Tous les providers
+pip install -r requirements-all.txt
+```
+
+### 📦 Mode production (futur - après publication PyPI)
+
+```bash
+# Installation de base
 pip install django-missive
+
+# Avec providers spécifiques
+pip install django-missive[email]        # Email (SendGrid, Mailgun, SES)
+pip install django-missive[sms]          # SMS & Vocal (Twilio, Vonage)
+pip install django-missive[messaging]    # Telegram, Signal, Messenger
+pip install django-missive[push]         # Notifications push (FCM, APN)
+pip install django-missive[professional] # Slack, Teams
+pip install django-missive[postal]       # Courrier, LRE
+pip install django-missive[all]          # Tous les providers
 ```
 
 ## Quick Start

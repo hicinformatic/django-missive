@@ -1,0 +1,10 @@
+# Providers SMS & Vocal
+# Install avec: pip install -r requirements-sms.txt
+
+# Dépendances core requises
+-r requirements.txt
+
+# Providers SMS et Vocal
+twilio>=8.10
+vonage>=3.11
+

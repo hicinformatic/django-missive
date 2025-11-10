@@ -11,11 +11,10 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
 from ..providers import (
-    BaseProvider,
+    BrevoProvider,
     LaPosteProvider,
     MailgunProvider,
     SendGridProvider,
-    SendinBlueProvider,
     SMSPartnerProvider,
     TwilioProvider,
 )
@@ -30,8 +29,8 @@ PROVIDER_CLASSES = {
     "twilio": TwilioProvider,
     "smspartner": SMSPartnerProvider,
     "laposte": LaPosteProvider,
-    "sendinblue": SendinBlueProvider,
-    "brevo": SendinBlueProvider,
+    "sendinblue": BrevoProvider,  # Ancienne URL pour rétrocompatibilité
+    "brevo": BrevoProvider,
 }
 
 

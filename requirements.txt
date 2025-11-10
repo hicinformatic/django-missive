@@ -1,6 +1,12 @@
 # Production dependencies for django-missive
-# Auto-generated from pyproject.toml
 # Install with: pip install -r requirements.txt
 
+# Core
 Django>=3.2
 
+# Validation
+phonenumbers>=8.13
+email-validator>=2.1
+
+# HTTP requests (pour certains providers)
+requests>=2.31

@@ -28,6 +28,22 @@ class BaseProviderCommon:
     # - La Poste: ['postal', 'postal_registered', 'postal_signature', 'email_ar']
     # - Twilio: ['sms', 'whatsapp', 'voice']
     services = []
+    
+    # Variables de configuration requises (depuis settings.py ou .env)
+    # Format: ['VARIABLE_NAME', ...]
+    # Exemples:
+    # - SendGrid: ['SENDGRID_API_KEY']
+    # - Twilio: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN']
+    # - SMSPartner: ['SMSPARTNER_API_KEY', 'SMSPARTNER_SENDER']
+    config_keys = []
+    
+    # Package Python requis (pour vérifier l'installation)
+    # Format: 'package_name' ou None si pas de dépendance externe
+    # Exemples:
+    # - SendGrid: 'sendgrid'
+    # - Twilio: 'twilio'
+    # - Django Email: None (toujours disponible)
+    required_package = None
 
     def __init__(self, missive: Optional[Missive] = None):
         """
@@ -81,7 +97,7 @@ class BaseProviderCommon:
         Args:
             status: Nouveau statut
             provider: Nom du provider
-            external_id: ID externe du provider
+            external_id: Référence externe du provider
             error_message: Message d'erreur éventuel
         """
         if not self.missive:
@@ -154,4 +170,146 @@ class BaseProviderCommon:
             "dropped": MissiveStatus.FAILED,
         }
         return event_mapping.get(event_type.lower())
+
+    def get_proofs_of_delivery(self, service_type: Optional[str] = None) -> list:
+        """
+        Récupère toutes les preuves de dépôt/livraison selon le type de service.
+        
+        Un envoi peut générer plusieurs preuves :
+        - LRE : Certificat de dépôt + AR électronique + copie du document
+        - Courrier recommandé : Preuve de dépôt + avis de passage + AR + copie scannée
+        - Email AR : Accusé de réception + logs SMTP
+        - SMS : Statut de livraison + logs opérateur
+        
+        Args:
+            service_type: Type de service spécifique (postal_registered, lre, email_ar, etc.)
+                         Si None, déduit automatiquement depuis la missive.
+        
+        Returns:
+            Liste de Dict, chaque Dict contenant :
+            {
+                "type": str,                    # Type de preuve (deposit_certificate, delivery_receipt, etc.)
+                "label": str,                   # Label affiché (ex: "Certificat de dépôt")
+                "available": bool,              # Preuve disponible ?
+                "url": str,                     # URL de téléchargement
+                "generated_at": datetime,       # Date de génération
+                "expires_at": datetime,         # Date d'expiration (optionnel)
+                "format": str,                  # Format (pdf, xml, json, etc.)
+                "metadata": dict,               # Métadonnées additionnelles
+            }
+        
+        Example:
+            # Pour une LRE AR24
+            provider = AR24Provider(missive)
+            proofs = provider.get_proofs_of_delivery('lre')
+            for proof in proofs:
+                if proof['available']:
+                    print(f"{proof['label']}: {proof['url']}")
+        """
+        if not self.missive:
+            return []
+        
+        # Déterminer automatiquement le type de service si non fourni
+        if not service_type:
+            service_type = self._detect_service_type()
+        
+        # Par défaut, retourner une liste vide
+        # Les providers concrets doivent override cette méthode
+        return []
+    
+    def _detect_service_type(self) -> str:
+        """
+        Détecte automatiquement le type de service selon la missive.
+        
+        Returns:
+            Type de service détecté (lre, postal_registered, email_ar, sms, etc.)
+        """
+        if not self.missive:
+            return "unknown"
+        
+        missive_type = self.missive.missive_type
+        
+        # Mapping type de missive + options → service
+        if missive_type == "LRE":
+            return "lre"
+        elif missive_type == "POSTAL":
+            if self.missive.is_registered:
+                return "postal_registered"
+            return "postal"
+        elif missive_type == "EMAIL":
+            if self.missive.is_registered:
+                return "email_ar"
+            return "email"
+        elif missive_type == "SMS":
+            return "sms"
+        elif missive_type == "WHATSAPP":
+            return "whatsapp"
+        elif missive_type == "RCS":
+            return "rcs"
+        
+        return missive_type.lower()
+    
+    def list_available_proofs(self) -> Dict[str, bool]:
+        """
+        Liste tous les types de preuves disponibles pour cette missive.
+        
+        Returns:
+            Dict {service_type: available}
+            
+        Example:
+            {
+                "lre": True,
+                "deposit_certificate": True,
+                "delivery_receipt": False,
+            }
+        """
+        if not self.missive:
+            return {}
+        
+        service_type = self._detect_service_type()
+        
+        # Services qui génèrent des preuves
+        proof_services = {
+            "lre",
+            "postal_registered",
+            "postal_signature",
+            "email_ar",
+        }
+        
+        return {
+            service_type: service_type in proof_services
+        }
+
+    def get_service_status(self) -> Dict[str, Any]:
+        """
+        Récupère le statut du service provider.
+        
+        Cette méthode doit être override par les providers concrets pour fournir
+        des informations réelles (crédits, quotas, SLA, etc.).
+        
+        Returns:
+            Dict avec les informations de statut :
+            {
+                "status": str,                  # operational, critical, unreachable, etc.
+                "is_available": bool,           # Le service est-il disponible ?
+                "services": list,               # Liste des services du provider
+                "credits": dict,                # Informations de crédits
+                "rate_limits": dict,            # Limites de taux
+                "sla": dict,                    # SLA du provider
+                "last_check": datetime,         # Date de dernière vérification
+                "warnings": list,               # Avertissements éventuels
+                "details": dict,                # Détails spécifiques
+            }
+        """
+        return {
+            "status": "unknown",
+            "is_available": None,
+            "services": self.services,
+            "credits": None,
+            "rate_limits": {},
+            "sla": {},
+            "last_check": timezone.now(),
+            "warnings": ["Méthode get_service_status() non implémentée pour ce provider"],
+            "details": {},
+        }
 

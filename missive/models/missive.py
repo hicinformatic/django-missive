@@ -2,6 +2,8 @@
 Modèle principal Missive pour l'envoi de missives multi-canaux.
 """
 
+from typing import Optional
+
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -20,21 +22,22 @@ class Missive(models.Model):
 
     # Identification
     sender = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        Recipient,
+        on_delete=models.PROTECT,
         related_name="sent_missives",
         verbose_name=_("Expéditeur"),
+        help_text=_("Expéditeur de cette missive (utilise le modèle Recipient)"),
     )
 
-    # Destinataire (nouveau modèle Recipient)
+    # Destinataire
     recipient = models.ForeignKey(
         Recipient,
         on_delete=models.PROTECT,
         null=True,
         blank=True,
-        related_name="missives",
+        related_name="received_missives",
         verbose_name=_("Destinataire"),
-        help_text=_("Destinataire avec toutes ses coordonnées"),
+        help_text=_("Destinataire de cette missive (utilise le modèle Recipient)"),
     )
 
     # Compatibilité : lien direct avec User (optionnel si recipient est fourni)
@@ -69,13 +72,17 @@ class Missive(models.Model):
 
     # Type et configuration
     missive_type = models.CharField(
-        max_length=20, choices=MissiveType.choices, verbose_name=_("Type de missive")
+        max_length=20,
+        choices=MissiveType.choices,
+        verbose_name=_("Type de missive"),
+        help_text=_("Email, SMS, WhatsApp, Courrier postal ou Notification"),
     )
     priority = models.CharField(
         max_length=10,
         choices=MissivePriority.choices,
         default=MissivePriority.NORMAL,
         verbose_name=_("Priorité"),
+        help_text=_("Basse, Normale, Haute ou Urgente"),
     )
 
     # Contenu
@@ -95,26 +102,13 @@ class Missive(models.Model):
             "Version texte brut du message (fallback pour emails, obligatoire pour SMS)"
         ),
     )
-
-    # Destinataire (selon le type)
-    recipient_email = models.EmailField(
+    context = models.JSONField(
+        default=dict,
         blank=True,
-        null=True,
-        verbose_name=_("Email destinataire"),
-        help_text=_("Pour les emails"),
-    )
-    recipient_phone = models.CharField(
-        max_length=20,
-        blank=True,
-        null=True,
-        verbose_name=_("Téléphone destinataire"),
-        help_text=_("Pour SMS/WhatsApp (format international +33...)"),
-    )
-    recipient_address = models.TextField(
-        blank=True,
-        null=True,
-        verbose_name=_("Adresse postale"),
-        help_text=_("Pour le courrier postal"),
+        verbose_name=_("Variables de contexte"),
+        help_text=_(
+            "Variables JSON pour le rendu du template (ex: {'nom': 'Dupont', 'montant': 150})"
+        ),
     )
 
     # Options spécifiques
@@ -135,14 +129,19 @@ class Missive(models.Model):
         choices=MissiveStatus.choices,
         default=MissiveStatus.DRAFT,
         verbose_name=_("Statut"),
+        help_text=_("Brouillon, En attente, Envoyé, Délivré, Lu, Échec ou Annulé"),
     )
 
     # Dates
     created_at = models.DateTimeField(
-        auto_now_add=True, verbose_name=_("Date de création")
+        auto_now_add=True,
+        verbose_name=_("Date de création"),
+        help_text=_("Date de création automatique de la missive"),
     )
     updated_at = models.DateTimeField(
-        auto_now=True, verbose_name=_("Date de modification")
+        auto_now=True,
+        verbose_name=_("Date de modification"),
+        help_text=_("Date de dernière modification automatique"),
     )
     scheduled_at = models.DateTimeField(
         null=True,
@@ -151,34 +150,37 @@ class Missive(models.Model):
         help_text=_("Laisser vide pour envoi immédiat"),
     )
     sent_at = models.DateTimeField(
-        null=True, blank=True, verbose_name=_("Date d'envoi")
+        null=True,
+        blank=True,
+        verbose_name=_("Date d'envoi"),
+        help_text=_("Date et heure d'envoi effective de la missive"),
     )
     delivered_at = models.DateTimeField(
-        null=True, blank=True, verbose_name=_("Date de réception")
+        null=True,
+        blank=True,
+        verbose_name=_("Date de réception"),
+        help_text=_("Date et heure de réception confirmée par le destinataire"),
     )
     read_at = models.DateTimeField(
-        null=True, blank=True, verbose_name=_("Date de lecture")
+        null=True,
+        blank=True,
+        verbose_name=_("Date de lecture"),
+        help_text=_("Date et heure d'ouverture par le destinataire"),
     )
 
-    # Provider et tracking
-    provider = models.CharField(
-        max_length=50,
-        blank=True,
-        null=True,
-        verbose_name=_("Provider"),
-        help_text=_(
-            "Provider à utiliser (sendgrid, twilio, laposte, etc.). Laissez vide pour utiliser la config par défaut."
-        ),
-    )
+    # Tracking
     external_id = models.CharField(
         max_length=255,
         blank=True,
         null=True,
-        verbose_name=_("ID externe"),
-        help_text=_("ID de tracking du provider (LaPoste, SendGrid, etc.)"),
+        verbose_name=_("Référence externe"),
+        help_text=_("Référence de tracking du provider (LaPoste, SendGrid, etc.)"),
     )
     error_message = models.TextField(
-        blank=True, null=True, verbose_name=_("Message d'erreur")
+        blank=True,
+        null=True,
+        verbose_name=_("Message d'erreur"),
+        help_text=_("Message d'erreur en cas d'échec d'envoi"),
     )
     metadata = models.JSONField(
         default=dict,
@@ -189,7 +191,9 @@ class Missive(models.Model):
 
     # Pièces jointes
     attachments_count = models.PositiveIntegerField(
-        default=0, verbose_name=_("Nombre de pièces jointes")
+        default=0,
+        verbose_name=_("Nombre de pièces jointes"),
+        help_text=_("Nombre total de pièces jointes associées"),
     )
 
     # Coût et facturation
@@ -231,40 +235,26 @@ class Missive(models.Model):
             return self.recipient.display_name
         elif self.recipient_user:
             return str(self.recipient_user)
-        elif self.missive_type == MissiveType.EMAIL:
-            return self.recipient_email or ""
-        elif self.missive_type in [MissiveType.SMS, MissiveType.WHATSAPP]:
-            return self.recipient_phone or ""
-        elif self.missive_type == MissiveType.POSTAL:
-            return (
-                self.recipient_address.split("\n")[0] if self.recipient_address else ""
-            )
         return _("Destinataire inconnu")
 
     def get_recipient_email(self):
-        """Récupère l'email du destinataire (Recipient prioritaire)"""
+        """Récupère l'email du destinataire"""
         if self.recipient and self.recipient.email:
             return self.recipient.email
-        elif self.recipient_email:
-            return self.recipient_email
         elif self.recipient_user and hasattr(self.recipient_user, "email"):
             return self.recipient_user.email
         return None
 
     def get_recipient_phone(self):
-        """Récupère le téléphone du destinataire (Recipient prioritaire)"""
+        """Récupère le téléphone du destinataire"""
         if self.recipient:
             return self.recipient.mobile or self.recipient.phone
-        elif self.recipient_phone:
-            return self.recipient_phone
         return None
 
     def get_recipient_address(self):
-        """Récupère l'adresse postale du destinataire (Recipient prioritaire)"""
+        """Récupère l'adresse postale du destinataire"""
         if self.recipient and self.recipient.postal_address:
             return self.recipient.postal_address
-        elif self.recipient_address:
-            return self.recipient_address
         return None
 
     @property
@@ -284,3 +274,158 @@ class Missive(models.Model):
     def can_send(self):
         """Vérifie si la missive peut être envoyée"""
         return self.status in [MissiveStatus.DRAFT, MissiveStatus.PENDING]
+
+    @property
+    def provider(self):
+        """Récupère le provider depuis le premier événement d'envoi"""
+        first_event = self.events.filter(event_type="sent").first()
+        return first_event.provider if first_event else None
+
+    def create_send_event(self, provider, status=None, description=""):
+        """
+        Crée un événement d'envoi initial pour cette missive.
+        Cette méthode doit être appelée lors de la création de la missive.
+        
+        Args:
+            provider: Nom du provider (sendgrid, twilio, laposte, etc.)
+            status: Statut associé (optionnel)
+            description: Description de l'événement (optionnel)
+        
+        Returns:
+            L'événement créé
+        """
+        from .event import MissiveEvent
+        
+        return MissiveEvent.objects.create(
+            missive=self,
+            event_type="created",
+            provider=provider or "django_email",
+            status=status or self.status,
+            description=description or f"Missive créée avec le provider {provider or 'django_email'}",
+        )
+
+    def render_body(self):
+        """
+        Rend le corps du message avec les variables de contexte.
+        
+        Utilise le moteur de template Django pour remplacer les variables
+        dans le body avec les valeurs du champ context.
+        
+        Example:
+            body = "Bonjour {{ nom }}, votre commande #{{ numero }} est prête."
+            context = {"nom": "Jean", "numero": "12345"}
+            render_body() => "Bonjour Jean, votre commande #12345 est prête."
+        
+        Returns:
+            Le corps rendu avec les variables remplacées
+        """
+        from django.template import Context, Template
+        
+        if not self.context:
+            return self.body
+        
+        try:
+            template = Template(self.body)
+            context = Context(self.context)
+            return template.render(context)
+        except Exception:
+            # En cas d'erreur de template, retourner le body original
+            return self.body
+
+    def render_body_text(self):
+        """
+        Rend la version texte du corps avec les variables de contexte.
+        
+        Returns:
+            Le corps texte rendu avec les variables remplacées
+        """
+        from django.template import Context, Template
+        
+        if not self.body_text:
+            return ""
+        
+        if not self.context:
+            return self.body_text
+        
+        try:
+            template = Template(self.body_text)
+            context = Context(self.context)
+            return template.render(context)
+        except Exception:
+            # En cas d'erreur de template, retourner le body_text original
+            return self.body_text
+
+    def render_subject(self):
+        """
+        Rend le sujet avec les variables de contexte.
+        
+        Returns:
+            Le sujet rendu avec les variables remplacées
+        """
+        from django.template import Context, Template
+        
+        if not self.context:
+            return self.subject
+        
+        try:
+            template = Template(self.subject)
+            context = Context(self.context)
+            return template.render(context)
+        except Exception:
+            # En cas d'erreur de template, retourner le sujet original
+            return self.subject
+
+    def get_proofs_of_delivery(self, service_type: Optional[str] = None):
+        """
+        Récupère toutes les preuves de dépôt/livraison depuis le provider.
+        
+        Cette méthode instancie le provider approprié et récupère toutes les preuves disponibles.
+        
+        Args:
+            service_type: Type de service (lre, postal_registered, email_ar, etc.)
+        
+        Returns:
+            Liste de dict avec les informations de chaque preuve
+            
+        Example:
+            missive = Missive.objects.get(id=123)
+            proofs = missive.get_proofs_of_delivery()
+            for proof in proofs:
+                if proof['available']:
+                    print(f"{proof['label']}: {proof['url']}")
+        """
+        from django.utils.module_loading import import_string
+
+        # Récupérer le provider depuis le premier événement d'envoi
+        provider_name = self.provider
+        if not provider_name:
+            return []
+        
+        try:
+            # Charger dynamiquement la classe du provider
+            from django.conf import settings
+            providers_config = getattr(settings, 'MISSIVE_PROVIDERS', {})
+            
+            # Chercher le provider dans la config
+            provider_path = None
+            for missive_type, providers_list in providers_config.items():
+                for prov in providers_list:
+                    if provider_name.lower() in prov.lower():
+                        provider_path = prov
+                        break
+                if provider_path:
+                    break
+            
+            if not provider_path:
+                # Fallback : essayer de construire le chemin
+                provider_path = f'missive.providers.{provider_name.lower()}.{provider_name.capitalize()}Provider'
+            
+            # Importer et instancier le provider
+            provider_class = import_string(provider_path)
+            provider_instance = provider_class(missive=self)
+            
+            # Récupérer toutes les preuves
+            return provider_instance.get_proofs_of_delivery(service_type)
+            
+        except Exception as e:
+            return []

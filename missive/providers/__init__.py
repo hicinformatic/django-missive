@@ -4,7 +4,7 @@ Chaque provider gère à la fois l'envoi et la réception des webhooks.
 
 Providers multi-types :
 - LaPosteProvider : POSTAL + EMAIL (Email AR)
-- SendinBlueProvider : EMAIL + SMS
+- BrevoProvider : EMAIL + SMS
 - TwilioProvider : SMS + WHATSAPP
 
 Providers mono-type :
@@ -16,12 +16,12 @@ Providers mono-type :
 """
 
 from .base import BaseProvider
+from .brevo import BrevoProvider
 from .django_email import DjangoEmailProvider
 from .laposte import LaPosteProvider
 from .mailgun import MailgunProvider
 from .notification import InAppNotificationProvider
 from .sendgrid import SendGridProvider
-from .sendinblue import SendinBlueProvider
 from .smspartner import SMSPartnerProvider
 from .twilio import TwilioProvider
 
@@ -33,6 +33,6 @@ __all__ = [
     "TwilioProvider",
     "SMSPartnerProvider",
     "LaPosteProvider",
-    "SendinBlueProvider",
+    "BrevoProvider",
     "InAppNotificationProvider",
 ]

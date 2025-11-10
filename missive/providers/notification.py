@@ -14,6 +14,7 @@ class InAppNotificationProvider(BaseProvider):
     """Provider pour les notifications in-app"""
 
     name = "In-App Notification"
+    display_name = "Notification In-App"
     supported_types = ["NOTIFICATION"]
     services = ["notification", "push_notification", "badge"]
 

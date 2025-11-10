@@ -2,7 +2,6 @@
 Modèle Recipient pour gérer les destinataires.
 """
 
-from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
@@ -14,18 +13,8 @@ from .choices import RecipientType
 class Recipient(models.Model):
     """
     Modèle pour gérer les destinataires avec toutes leurs coordonnées.
-    Peut être lié à un User ou à n'importe quel objet via GenericForeignKey.
+    Peut être lié à n'importe quel objet via GenericForeignKey (Customer, Contact, etc.).
     """
-
-    # Lien optionnel avec un utilisateur Django
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="recipient_profiles",
-        verbose_name=_("Utilisateur"),
-    )
 
     # Lien générique optionnel (Customer, Contact, etc.)
     content_type = models.ForeignKey(
@@ -34,9 +23,13 @@ class Recipient(models.Model):
         null=True,
         blank=True,
         verbose_name=_("Type d'objet"),
+        help_text=_("Type d'objet lié (Customer, Contact, etc.)"),
     )
     object_id = models.PositiveIntegerField(
-        null=True, blank=True, verbose_name=_("ID de l'objet")
+        null=True,
+        blank=True,
+        verbose_name=_("ID de l'objet"),
+        help_text=_("ID de l'objet lié"),
     )
     content_object = GenericForeignKey("content_type", "object_id")
 
@@ -46,6 +39,7 @@ class Recipient(models.Model):
         choices=RecipientType.choices,
         default=RecipientType.INDIVIDUAL,
         verbose_name=_("Type de destinataire"),
+        help_text=_("Particulier, Entreprise ou Administration"),
     )
 
     # Identité
@@ -55,98 +49,163 @@ class Recipient(models.Model):
         verbose_name=_("Civilité"),
         help_text=_("M., Mme, Dr, etc."),
     )
-    first_name = models.CharField(max_length=100, blank=True, verbose_name=_("Prénom"))
-    last_name = models.CharField(max_length=100, blank=True, verbose_name=_("Nom"))
-    company_name = models.CharField(
-        max_length=255, blank=True, verbose_name=_("Nom de l'entreprise")
+    name = models.CharField(
+        max_length=255,
+        default="",
+        verbose_name=_("Nom"),
+        help_text=_("Nom complet (personne) ou dénomination (entreprise/administration)"),
     )
 
     # Coordonnées
-    email = models.EmailField(blank=True, null=True, verbose_name=_("Email"))
-    phone = models.CharField(
-        max_length=20,
+    email = models.EmailField(
         blank=True,
         null=True,
-        verbose_name=_("Téléphone"),
-        help_text=_("Format international : +33600000000"),
+        verbose_name=_("Email"),
+        help_text=_("Adresse email du destinataire"),
     )
     mobile = models.CharField(
         max_length=20,
         blank=True,
         null=True,
-        verbose_name=_("Mobile"),
-        help_text=_("Format international"),
+        verbose_name=_("Téléphone mobile"),
+        help_text=_("Numéro de téléphone mobile au format international (ex: +33 6 12 34 56 78)"),
     )
 
     # Adresse postale complète
     address_line1 = models.CharField(
-        max_length=255, blank=True, verbose_name=_("Adresse ligne 1")
+        max_length=255,
+        blank=True,
+        verbose_name=_("Adresse ligne 1"),
+        help_text=_("Numéro et nom de rue"),
     )
     address_line2 = models.CharField(
-        max_length=255, blank=True, verbose_name=_("Adresse ligne 2")
+        max_length=255,
+        blank=True,
+        verbose_name=_("Adresse ligne 2"),
+        help_text=_("Bâtiment, appartement, étage (optionnel)"),
     )
     address_line3 = models.CharField(
-        max_length=255, blank=True, verbose_name=_("Adresse ligne 3")
+        max_length=255,
+        blank=True,
+        verbose_name=_("Adresse ligne 3"),
+        help_text=_("Complément d'adresse (optionnel)"),
     )
     postal_code = models.CharField(
-        max_length=20, blank=True, verbose_name=_("Code postal")
+        max_length=20,
+        blank=True,
+        verbose_name=_("Code postal"),
+        help_text=_("Code postal"),
     )
-    city = models.CharField(max_length=100, blank=True, verbose_name=_("Ville"))
-    state = models.CharField(max_length=100, blank=True, verbose_name=_("État/Région"))
+    city = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("Ville"),
+        help_text=_("Ville"),
+    )
+    state = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("État/Région"),
+        help_text=_("Région, département ou état"),
+    )
     country = models.CharField(
-        max_length=2, blank=True, default="FR", verbose_name=_("Pays (code ISO)")
+        max_length=2,
+        blank=True,
+        default="FR",
+        verbose_name=_("Pays (code ISO)"),
+        help_text=_("Code pays ISO (FR, BE, CH, etc.)"),
     )
 
     # Métadonnées
-    notes = models.TextField(blank=True, verbose_name=_("Notes"))
-    is_active = models.BooleanField(default=True, verbose_name=_("Actif"))
+    notes = models.TextField(
+        blank=True,
+        verbose_name=_("Notes"),
+        help_text=_("Notes internes sur ce destinataire"),
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name=_("Actif"),
+        help_text=_("Désactiver pour masquer ce destinataire sans le supprimer"),
+    )
+    
+    # Configuration expéditeur
+    can_be_sender = models.BooleanField(
+        default=False,
+        verbose_name=_("Utilisable comme expéditeur"),
+        help_text=_("Cocher si ce destinataire peut être utilisé comme expéditeur de missives"),
+    )
+    is_default_sender = models.BooleanField(
+        default=False,
+        verbose_name=_("Expéditeur par défaut"),
+        help_text=_("Un seul expéditeur par défaut possible dans le système"),
+    )
 
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Créé le"))
-    updated_at = models.DateTimeField(auto_now=True, verbose_name=_("Modifié le"))
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Créé le"),
+        help_text=_("Date de création automatique"),
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name=_("Modifié le"),
+        help_text=_("Date de dernière modification automatique"),
+    )
 
     class Meta:
         verbose_name = _("Destinataire")
         verbose_name_plural = _("Destinataires")
-        ordering = ["last_name", "first_name", "company_name"]
+        ordering = ["name"]
         indexes = [
+            models.Index(fields=["name"]),
             models.Index(fields=["email"]),
-            models.Index(fields=["phone"]),
             models.Index(fields=["mobile"]),
             models.Index(fields=["content_type", "object_id"]),
-            models.Index(fields=["last_name", "first_name"]),
-            models.Index(fields=["company_name"]),
+        ]
+        constraints = [
+            # Un email ne peut être utilisé qu'une seule fois (si fourni)
+            models.UniqueConstraint(
+                fields=["email"],
+                condition=models.Q(email__isnull=False) & ~models.Q(email=""),
+                name="unique_email",
+                violation_error_message=_("Un destinataire avec cet email existe déjà"),
+            ),
+            # Un mobile ne peut être utilisé qu'une seule fois (si fourni)
+            models.UniqueConstraint(
+                fields=["mobile"],
+                condition=models.Q(mobile__isnull=False) & ~models.Q(mobile=""),
+                name="unique_mobile",
+                violation_error_message=_("Un destinataire avec ce mobile existe déjà"),
+            ),
+            # Une adresse postale complète ne peut être dupliquée
+            models.UniqueConstraint(
+                fields=["name", "address_line1", "postal_code", "city"],
+                condition=models.Q(address_line1__isnull=False) & ~models.Q(address_line1=""),
+                name="unique_postal_address",
+                violation_error_message=_("Un destinataire avec cette adresse existe déjà"),
+            ),
         ]
 
     def __str__(self):
-        if self.company_name:
-            return self.company_name
-        elif self.first_name or self.last_name:
-            parts = [self.civility, self.first_name, self.last_name]
-            return " ".join(p for p in parts if p)
-        elif self.email:
-            return self.email
-        elif self.phone or self.mobile:
-            return self.phone or self.mobile
-        return f"Recipient #{self.id}"
+        """Représentation textuelle du destinataire avec contact principal"""
+        name_part = self.full_name or f"Recipient #{self.id}"
+        contact = self.primary_contact
+        if contact:
+            return f"{name_part} - {contact}"
+        return name_part
 
     @property
     def full_name(self):
-        """Retourne le nom complet"""
-        parts = [self.civility, self.first_name, self.last_name]
-        return " ".join(p for p in parts if p).strip()
+        """Retourne le nom complet avec civilité"""
+        if self.civility and self.name:
+            return f"{self.civility} {self.name}"
+        return self.name or ""
 
     @property
     def display_name(self):
         """Nom d'affichage"""
-        if self.company_name:
-            name = self.company_name
-            if self.full_name:
-                name += f" ({self.full_name})"
-            return name
         return (
             self.full_name
             or self.email
-            or self.phone
             or self.mobile
             or f"Recipient #{self.id}"
         )
@@ -157,8 +216,6 @@ class Recipient(models.Model):
         lines = []
 
         # Nom
-        if self.company_name:
-            lines.append(self.company_name)
         if self.full_name:
             lines.append(self.full_name)
 
@@ -186,3 +243,36 @@ class Recipient(models.Model):
             lines.append(self.country)
 
         return "\n".join(lines)
+
+    @property
+    def primary_contact(self):
+        """Retourne le contact principal : email, téléphone mobile ou adresse (1ère ligne)"""
+        if self.email:
+            return self.email
+        elif self.mobile:
+            return self.mobile
+        elif self.address_line1:
+            # Retourne l'adresse courte : ligne1, code postal ville
+            parts = [self.address_line1]
+            if self.postal_code and self.city:
+                parts.append(f"{self.postal_code} {self.city}")
+            elif self.city:
+                parts.append(self.city)
+            return ", ".join(parts)
+        return None
+
+    def save(self, *args, **kwargs):
+        """
+        Assure qu'un seul expéditeur par défaut existe.
+        Si is_default_sender est True, tous les autres sont mis à False.
+        """
+        if self.is_default_sender:
+            # Si on marque celui-ci comme expéditeur par défaut,
+            # on retire le flag des autres
+            Recipient.objects.filter(is_default_sender=True).exclude(pk=self.pk).update(
+                is_default_sender=False
+            )
+            # Activer automatiquement can_be_sender si c'est l'expéditeur par défaut
+            self.can_be_sender = True
+        
+        super().save(*args, **kwargs)

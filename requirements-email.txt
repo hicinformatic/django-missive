@@ -1,0 +1,11 @@
+# Providers Email
+# Install avec: pip install -r requirements-email.txt
+
+# Dépendances core requises
+-r requirements.txt
+
+# Providers Email
+sendgrid>=6.11
+mailgun>=0.1.1
+boto3>=1.28  # Amazon SES
+

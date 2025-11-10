@@ -1,5 +1,5 @@
 """
-Provider SendinBlue/Brevo pour Email ET SMS.
+Provider Brevo (anciennement SendinBlue) pour Email ET SMS.
 Exemple parfait de provider multi-types.
 """
 
@@ -9,16 +9,17 @@ from ..models import MissiveStatus
 from .base import BaseProvider
 
 
-class SendinBlueProvider(BaseProvider):
+class BrevoProvider(BaseProvider):
     """
-    Provider pour SendinBlue/Brevo.
+    Provider pour Brevo (anciennement SendinBlue).
 
     Supporte :
     - Email (transactionnel et marketing)
     - SMS
     """
 
-    name = "SendinBlue"
+    name = "Brevo"
+    display_name = "Brevo"
     supported_types = ["EMAIL", "SMS"]
     services = [
         "email",
@@ -28,9 +29,11 @@ class SendinBlueProvider(BaseProvider):
         "contacts",  # Gestion de contacts
         "automation",  # Marketing automation
     ]  # Multi-types !
+    config_keys = ["BREVO_API_KEY"]
+    required_package = "sib_api_v3_sdk"
 
     def send_email(self) -> bool:
-        """Envoie un email via SendinBlue API"""
+        """Envoie un email via Brevo API"""
         # Validation
         is_valid, error = self.validate()
         if not is_valid:
@@ -42,12 +45,12 @@ class SendinBlueProvider(BaseProvider):
             return False
 
         try:
-            # TODO: Intégrer avec SendinBlue
+            # TODO: Intégrer avec Brevo
             # import sib_api_v3_sdk
             # from sib_api_v3_sdk.rest import ApiException
             #
             # configuration = sib_api_v3_sdk.Configuration()
-            # configuration.api_key['api-key'] = self.config.get('SENDINBLUE_API_KEY')
+            # configuration.api_key['api-key'] = self.config.get('BREVO_API_KEY')
             #
             # api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
             #     sib_api_v3_sdk.ApiClient(configuration)
@@ -65,12 +68,12 @@ class SendinBlueProvider(BaseProvider):
             # external_id = result.message_id
 
             # Simulation
-            external_id = f"sib_email_{self.missive.id}"
+            external_id = f"brevo_email_{self.missive.id}"
 
             self._update_status(
                 MissiveStatus.SENT, provider=self.name, external_id=external_id
             )
-            self._create_event("sent", "Email envoyé via SendinBlue")
+            self._create_event("sent", "Email envoyé via Brevo")
 
             return True
 
@@ -80,7 +83,7 @@ class SendinBlueProvider(BaseProvider):
             return False
 
     def send_sms(self) -> bool:
-        """Envoie un SMS via SendinBlue API"""
+        """Envoie un SMS via Brevo API"""
         # Validation
         is_valid, error = self.validate()
         if not is_valid:
@@ -92,18 +95,18 @@ class SendinBlueProvider(BaseProvider):
             return False
 
         try:
-            # TODO: Intégrer avec SendinBlue SMS
+            # TODO: Intégrer avec Brevo SMS
             # import sib_api_v3_sdk
             #
             # configuration = sib_api_v3_sdk.Configuration()
-            # configuration.api_key['api-key'] = self.config.get('SENDINBLUE_API_KEY')
+            # configuration.api_key['api-key'] = self.config.get('BREVO_API_KEY')
             #
             # api_instance = sib_api_v3_sdk.TransactionalSMSApi(
             #     sib_api_v3_sdk.ApiClient(configuration)
             # )
             #
             # send_transac_sms = sib_api_v3_sdk.SendTransacSms(
-            #     sender=self.config.get('SENDINBLUE_SMS_SENDER'),
+            #     sender=self.config.get('BREVO_SMS_SENDER'),
             #     recipient=self.missive.recipient_phone,
             #     content=self.missive.body,
             #     tag=f"missive_{self.missive.id}"
@@ -113,12 +116,12 @@ class SendinBlueProvider(BaseProvider):
             # external_id = result.reference
 
             # Simulation
-            external_id = f"sib_sms_{self.missive.id}"
+            external_id = f"brevo_sms_{self.missive.id}"
 
             self._update_status(
                 MissiveStatus.SENT, provider=self.name, external_id=external_id
             )
-            self._create_event("sent", "SMS envoyé via SendinBlue")
+            self._create_event("sent", "SMS envoyé via Brevo")
 
             return True
 
@@ -130,24 +133,24 @@ class SendinBlueProvider(BaseProvider):
     def validate_webhook_signature(
         self, payload: Dict, headers: Dict
     ) -> Tuple[bool, str]:
-        """Valide la signature SendinBlue"""
-        # À implémenter selon la documentation SendinBlue
+        """Valide la signature Brevo"""
+        # À implémenter selon la documentation Brevo
         return True, ""
 
     def extract_missive_id(self, payload: Dict) -> Optional[str]:
-        """Extrait l'ID depuis SendinBlue webhook"""
+        """Extrait l'ID depuis Brevo webhook"""
         return payload.get("tag", "").replace("missive_", "")
 
     def extract_event_type(self, payload: Dict) -> str:
-        """Extrait le type d'événement SendinBlue"""
+        """Extrait le type d'événement Brevo"""
         return payload.get("event", "unknown")
 
     def get_service_status(self) -> Dict:
         """
-        Récupère le statut et les crédits Brevo/SendinBlue.
-        
+        Récupère le statut et les crédits Brevo.
+
         Brevo utilise un système de quota d'emails par jour + crédits SMS.
-        
+
         Returns:
             Dict avec status, crédits email + SMS, etc.
         """
@@ -155,7 +158,7 @@ class SendinBlueProvider(BaseProvider):
         # import requests
         #
         # try:
-        #     api_key = self.config.get("SENDINBLUE_API_KEY")
+        #     api_key = self.config.get("BREVO_API_KEY")
         #     headers = {"api-key": api_key}
         #
         #     # Vérifier le compte
@@ -168,14 +171,14 @@ class SendinBlueProvider(BaseProvider):
         #     if response.status_code == 200:
         #         data = response.json()
         #         plan = data.get("plan", [{}])[0]
-        #         
+        #
         #         # Email quota
         #         email_credits = plan.get("credits", 0)
         #         email_limit = plan.get("creditsType", "unlimited")
-        #         
+        #
         #         # SMS credits
         #         sms_credits = data.get("smsCredits", {}).get("remaining", 0)
-        #         
+        #
         #         warnings = []
         #         if email_limit != "unlimited" and email_credits < 1000:
         #             warnings.append(f"Quota email faible: {email_credits}")
@@ -247,3 +250,4 @@ class SendinBlueProvider(BaseProvider):
                 "api_docs": "https://developers.brevo.com/reference/getaccount-1",
             },
         }
+

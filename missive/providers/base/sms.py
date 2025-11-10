@@ -2,13 +2,43 @@
 Mixin pour les fonctionnalités SMS des providers.
 """
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 class BaseSMSMixin:
     """
     Mixin fournissant les fonctionnalités spécifiques aux SMS.
     """
+
+    def get_sms_service_info(self) -> Dict[str, Any]:
+        """
+        Récupère les informations du compte/service SMS.
+        
+        Retourne les informations importantes pour le service SMS :
+        - Crédits disponibles (nombre de SMS ou montant en euros)
+        - Limites et quotas
+        - État du service (actif/inactif)
+        - Informations de facturation
+        
+        Returns:
+            Dict contenant :
+                - credits: Nombre de SMS ou montant disponible
+                - credits_type: 'count' (nombre de SMS) ou 'amount' (montant en €)
+                - is_available: bool, service accessible
+                - limits: Dict avec les limites (quotas journaliers, etc.)
+                - warnings: Liste des alertes (crédits bas, etc.)
+                - details: Dict avec infos supplémentaires
+        
+        À surcharger dans les providers concrets.
+        """
+        return {
+            "credits": None,
+            "credits_type": "count",
+            "is_available": None,
+            "limits": {},
+            "warnings": ["Méthode get_sms_service_info() non implémentée pour ce provider"],
+            "details": {},
+        }
 
     def send_sms(self) -> bool:
         """
