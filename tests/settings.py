@@ -116,6 +116,22 @@ MISSIVE_PROVIDERS = [
 # ajoutés à chaque catégorie selon leurs supported_types. Plus besoin de les répéter !
 
 # =============================================================================
+# Configuration globale Missive
+# =============================================================================
+
+# Mode sandbox : si True, tous les envois sont en mode test (aucun envoi réel)
+MISSIVE_SANDBOX = os.getenv("MISSIVE_SANDBOX", "False").lower() == "true"
+
+# Base URL pour les webhooks (domaine accessible par les providers)
+# Exemples :
+#   - Production : "https://api.monapp.com"
+#   - Développement : "https://1234.ngrok.io" (tunnel ngrok)
+#   - Local : "http://192.168.1.100:8000" (IP locale sur réseau)
+MISSIVE_WEBHOOK_BASE_URL = os.getenv(
+    "MISSIVE_WEBHOOK_BASE_URL", "http://127.0.0.1:8000"
+)
+
+# =============================================================================
 # Configuration des clés API (depuis variables d'environnement)
 # =============================================================================
 

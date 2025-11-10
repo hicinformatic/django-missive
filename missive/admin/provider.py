@@ -597,7 +597,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
     def webhook_urls_display(self, obj):
         """Affiche les URLs de webhook pour chaque type de service supporté"""
-        from django.urls import reverse
+        from django.conf import settings
 
         types = obj.missive_types_list
         if not types:
@@ -618,8 +618,15 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             "RCS": "💬 RCS",
         }
 
+        # Récupérer le domaine de base depuis la config
+        base_domain = getattr(
+            settings, "MISSIVE_WEBHOOK_BASE_URL", "https://example.com"
+        )
+        # Retirer le slash final si présent
+        base_domain = base_domain.rstrip("/")
+
         # Construire les URLs de webhook
-        base_url = f"/webhooks/{obj.name.lower().replace(' ', '')}/"
+        provider_slug = obj.name.lower().replace(" ", "")
 
         html_parts = []
         html_parts.append('<div style="margin-top: 5px;">')
@@ -627,7 +634,8 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         for missive_type in types:
             label = type_labels.get(missive_type, missive_type)
             # URL spécifique par type
-            webhook_url = f"{base_url}{missive_type.lower().replace('_', '-')}/"
+            type_slug = missive_type.lower().replace("_", "-")
+            webhook_url = f"{base_domain}/webhooks/{provider_slug}/{type_slug}/"
 
             html_parts.append(
                 f'<div style="margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-left: 3px solid #0d6efd; border-radius: 3px;">'
@@ -637,10 +645,28 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             )
 
         html_parts.append("</div>")
+
+        # Note d'aide avec info sur la config
+        if base_domain == "https://example.com":
+            note_color = "#dc3545"  # Rouge si pas configuré
+            note_icon = "⚠️"
+            note_text = (
+                f"{note_icon} <strong>Configuration requise:</strong> "
+                f"Ajoutez <code>MISSIVE_WEBHOOK_BASE_URL = 'https://votre-domaine.com'</code> "
+                f"dans settings.py pour obtenir les vraies URLs."
+            )
+        else:
+            note_color = "#856404"  # Jaune si configuré
+            note_icon = "💡"
+            note_text = (
+                f"{note_icon} <strong>Note:</strong> Configurez ces URLs dans le dashboard de votre provider "
+                f"pour recevoir les notifications de statut."
+            )
+
         html_parts.append(
-            '<div style="margin-top: 10px; padding: 8px; background: #fff3cd; border-left: 3px solid #ffc107; border-radius: 3px;">'
-            '<small style="color: #856404;">💡 <strong>Note:</strong> Configurez ces URLs dans le dashboard de votre provider pour recevoir les notifications de statut.</small>'
-            "</div>"
+            f'<div style="margin-top: 10px; padding: 8px; background: #fff3cd; border-left: 3px solid #ffc107; border-radius: 3px;">'
+            f'<small style="color: {note_color};">{note_text}</small>'
+            f"</div>"
         )
 
         return format_html("".join(html_parts))

@@ -442,7 +442,7 @@ class SMSPartnerProvider(BaseProvider):
                 )
                 return False
 
-            # Récupérer les options depuis provider_options
+            # Récupérer les options depuis provider_options et kwargs
             options = self.missive.provider_options or {}
             options.update(kwargs)  # Les kwargs explicites ont la priorité
 
@@ -673,7 +673,7 @@ class SMSPartnerProvider(BaseProvider):
                 )
                 return False
 
-            # Récupérer les options depuis provider_options
+            # Récupérer les options depuis provider_options et kwargs
             options = self.missive.provider_options or {}
             options.update(kwargs)  # Les kwargs explicites ont la priorité
 

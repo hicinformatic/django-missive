@@ -174,3 +174,75 @@ def webhook_test_view(request):
             },
         }
     )
+
+
+@csrf_exempt
+def webhook_status_view(request):
+    """
+    Vue de vérification du statut des webhooks.
+
+    Répond toujours "ok" pour permettre aux providers de tester la connectivité.
+    Si l'utilisateur est admin, affiche la liste complète des providers et leurs URLs.
+
+    Usage:
+        GET /webhooks/status/
+        → {"status": "ok", "message": "Webhooks are ready..."}
+
+        GET /webhooks/status/ (en tant qu'admin)
+        → {"status": "ok", "admin": true, "providers": {...}, ...}
+    """
+    from django.conf import settings
+
+    from ..helpers import get_providers_from_config
+
+    # Réponse de base (toujours accessible)
+    response_data = {
+        "status": "ok",
+        "message": "Webhooks are ready to receive notifications",
+    }
+
+    # Si utilisateur admin, ajouter les détails
+    if request.user.is_authenticated and request.user.is_staff:
+        providers_by_type = get_providers_from_config()
+        base_url = getattr(
+            settings, "MISSIVE_WEBHOOK_BASE_URL", "https://example.com"
+        ).rstrip("/")
+
+        # Récupérer tous les providers uniques
+        all_providers = set()
+        for provider_names in providers_by_type.values():
+            all_providers.update(provider_names)
+
+        # Construire la liste des URLs de webhook
+        webhook_urls = {}
+        for provider_name in sorted(all_providers):
+            provider_slug = provider_name.lower().replace(" ", "")
+
+            # Récupérer les types supportés pour ce provider
+            provider_types = []
+            for missive_type, provider_names in providers_by_type.items():
+                if provider_name in provider_names:
+                    provider_types.append(missive_type)
+
+            # Générer les URLs pour chaque type
+            urls = {}
+            for missive_type in provider_types:
+                type_slug = missive_type.lower().replace("_", "-")
+                urls[missive_type] = f"{base_url}/webhooks/{provider_slug}/{type_slug}/"
+
+            webhook_urls[provider_name] = {
+                "types": provider_types,
+                "urls": urls,
+            }
+
+        response_data.update(
+            {
+                "admin": True,
+                "sandbox_mode": getattr(settings, "MISSIVE_SANDBOX", False),
+                "webhook_base_url": base_url,
+                "providers_count": len(all_providers),
+                "providers": webhook_urls,
+            }
+        )
+
+    return JsonResponse(response_data, json_dumps_params={"indent": 2})

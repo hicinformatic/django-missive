@@ -236,6 +236,25 @@ class Missive(models.Model):
         parts.append(f"({self.get_status_display()})")
         return " - ".join(parts)
 
+    def save(self, *args, **kwargs):
+        """
+        Sauvegarde la missive.
+
+        Si MISSIVE_SANDBOX=True dans settings, force automatiquement
+        sandbox=True dans provider_options pour TOUS les providers.
+        """
+        from django.conf import settings
+
+        # Forcer le mode sandbox si activé globalement
+        if getattr(settings, "MISSIVE_SANDBOX", False):
+            if not self.provider_options:
+                self.provider_options = {}
+            # Forcer sandbox=True (sauf si explicitement désactivé)
+            if "sandbox" not in self.provider_options:
+                self.provider_options["sandbox"] = True
+
+        super().save(*args, **kwargs)
+
     @property
     def recipient_display(self):
         """Retourne l'identifiant du destinataire"""
