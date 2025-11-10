@@ -806,16 +806,15 @@ class SMSPartnerProvider(BaseProvider):
         Valide les webhooks SMSPartner.
 
         SMSPartner n'utilise pas de signature cryptographique pour les webhooks.
-        Les méthodes de sécurisation recommandées sont :
+        La validation se fait via :
 
-        1. Whitelist d'IPs (configurer SMSPARTNER_WEBHOOK_IPS dans settings)
-           Plage officielle SMSPartner: 185.66.232.0/24
-        2. Token secret dans l'URL (ex: /webhooks/smspartner/sms/?token=SECRET)
-        3. Vérifier que le messageId existe dans notre DB
+        1. Whitelist d'IPs (CIDR range par défaut: 185.66.232.0/24)
+        2. Vérification que le messageId existe dans notre DB
 
         Configuration:
-            SMSPARTNER_WEBHOOK_IPS: Liste d'IPs autorisées (séparées par virgules)
-                                   Format: "185.66.232.1,185.66.232.2,185.66.232.3"
+            SMSPARTNER_WEBHOOK_IPS: IPs autorisées (séparées par virgules)
+                                   ou CIDR range (ex: "185.66.232.0/24")
+                                   Par défaut: utilise WEBHOOK_IP_RANGE (185.66.232.0/24)
 
         Args:
             payload: Données du webhook
@@ -824,19 +823,40 @@ class SMSPartnerProvider(BaseProvider):
         Returns:
             Tuple (is_valid, error_message)
         """
-        # Vérification par IP (si configurée)
-        allowed_ips = self.config.get("SMSPARTNER_WEBHOOK_IPS", [])
-        if allowed_ips:
-            # Récupérer l'IP du client depuis les headers
-            client_ip = None
-            if "HTTP_X_FORWARDED_FOR" in headers:
-                # Prendre la première IP si plusieurs proxies
-                client_ip = headers["HTTP_X_FORWARDED_FOR"].split(",")[0].strip()
-            elif "REMOTE_ADDR" in headers:
-                client_ip = headers["REMOTE_ADDR"]
+        from ipaddress import ip_address, ip_network
 
-            if client_ip and client_ip not in allowed_ips:
-                return False, f"IP non autorisée: {client_ip}"
+        # Récupérer l'IP du client
+        client_ip_str = None
+        if "HTTP_X_FORWARDED_FOR" in headers:
+            client_ip_str = headers["HTTP_X_FORWARDED_FOR"].split(",")[0].strip()
+        elif "REMOTE_ADDR" in headers:
+            client_ip_str = headers["REMOTE_ADDR"]
+
+        if not client_ip_str:
+            return False, "Impossible de déterminer l'IP du client"
+
+        # Vérification par IP (utilise WEBHOOK_IP_RANGE par défaut)
+        allowed_range = self.config.get("SMSPARTNER_WEBHOOK_IPS", self.WEBHOOK_IP_RANGE)
+
+        if allowed_range:
+            try:
+                client_ip = ip_address(client_ip_str)
+
+                # Vérifier si c'est un CIDR range ou une liste d'IPs
+                if "/" in allowed_range:
+                    # C'est un CIDR range
+                    if client_ip not in ip_network(allowed_range, strict=False):
+                        return (
+                            False,
+                            f"IP non autorisée: {client_ip_str} (plage autorisée: {allowed_range})",
+                        )
+                else:
+                    # C'est une liste d'IPs séparées par des virgules
+                    allowed_ips = [ip.strip() for ip in allowed_range.split(",")]
+                    if client_ip_str not in allowed_ips:
+                        return False, f"IP non autorisée: {client_ip_str}"
+            except ValueError as e:
+                return False, f"Erreur validation IP: {e}"
 
         # Vérification que le messageId existe (si fourni)
         message_id = payload.get("messageId") or payload.get("message_id")
