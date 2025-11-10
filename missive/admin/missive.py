@@ -2,19 +2,18 @@
 Administration pour le modèle Missive.
 """
 
+import json
+
 from django import forms
 from django.conf import settings
 from django.contrib import admin
-from django.urls import reverse, path
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
-from django.shortcuts import render
-from django.db.models import Count
-import json
 
-from ..models import Missive, Recipient, MissiveEvent
-from ..helpers import get_providers_from_config, get_all_provider_choices
+from ..helpers import get_all_provider_choices, get_providers_from_config
+from ..models import Missive, Recipient
 
 
 class MissiveAdminForm(forms.ModelForm):
@@ -29,7 +28,7 @@ class MissiveAdminForm(forms.ModelForm):
     provider_choice = forms.ChoiceField(
         choices=PROVIDER_CHOICES,
         required=True,
-        initial='django_email',
+        initial="django_email",
         label=_("Provider"),
         help_text=_(
             "Provider à utiliser pour l'envoi (filtré selon le type de missive)"
@@ -41,19 +40,21 @@ class MissiveAdminForm(forms.ModelForm):
         fields = "__all__"
 
     class Media:
-        js = ('admin/js/missive_provider_filter.js',)
+        js = ("admin/js/missive_provider_filter.js",)
 
     def __init__(self, *args, **kwargs):
         # Supprimer la request non utilisée
-        kwargs.pop('request', None)
+        kwargs.pop("request", None)
         super().__init__(*args, **kwargs)
 
         # Ajouter le mapping des providers au widget pour le JavaScript
-        self.fields["provider_choice"].widget.attrs['data-providers-config'] = json.dumps(self.PROVIDERS_BY_TYPE)
+        self.fields["provider_choice"].widget.attrs["data-providers-config"] = (
+            json.dumps(self.PROVIDERS_BY_TYPE)
+        )
 
         # Si on édite une missive existante, pré-remplir le provider depuis les événements
         if self.instance.pk:
-            current_provider = self.instance.provider or 'django_email'
+            current_provider = self.instance.provider or "django_email"
             # Vérifier si le provider actuel est dans la liste
             provider_values = [choice[0] for choice in self.PROVIDER_CHOICES]
             if current_provider not in provider_values:
@@ -80,13 +81,16 @@ class MissiveAdminForm(forms.ModelForm):
 
             # Filtrer les providers selon le type de missive si un type est déjà sélectionné
             if self.instance.missive_type:
-                compatible_providers = self.PROVIDERS_BY_TYPE.get(self.instance.missive_type, [])
+                compatible_providers = self.PROVIDERS_BY_TYPE.get(
+                    self.instance.missive_type, []
+                )
                 self.fields["provider_choice"].choices = [
-                    choice for choice in self.PROVIDER_CHOICES
+                    choice
+                    for choice in self.PROVIDER_CHOICES
                     if choice[0] in compatible_providers
                 ]
                 # Ajuster l'initial si le provider par défaut n'est pas compatible
-                if 'django_email' not in compatible_providers and compatible_providers:
+                if "django_email" not in compatible_providers and compatible_providers:
                     self.fields["provider_choice"].initial = compatible_providers[0]
 
     def save(self, commit=True):
@@ -184,12 +188,14 @@ class MissiveAdmin(admin.ModelAdmin):
                 "fields": (
                     "missive_type",
                     "provider_choice",
+                    "provider_options",
                     "priority",
                     "is_registered",
                     "requires_signature",
                 ),
                 "description": _(
-                    "Le provider disponible est automatiquement filtré selon le type de missive sélectionné"
+                    "Le provider disponible est automatiquement filtré selon le type de missive sélectionné. "
+                    "Les options du provider permettent de personnaliser l'envoi (scheduled_time, track_clicks, etc.)"
                 ),
             },
         ),
@@ -204,7 +210,9 @@ class MissiveAdmin(admin.ModelAdmin):
                     "external_id",
                     "error_message",
                 ),
-                "description": _("Objet source optionnel pour lier cette missive à une Commande, Participant, etc."),
+                "description": _(
+                    "Objet source optionnel pour lier cette missive à une Commande, Participant, etc."
+                ),
             },
         ),
         (
@@ -252,19 +260,13 @@ class MissiveAdmin(admin.ModelAdmin):
             # SMS et évolutions
             "SMS": "#198754",
             "RCS": "#20c997",
-            # Messageries instantanées
-            "WHATSAPP": "#25D366",
-            "TELEGRAM": "#0088cc",
-            "SIGNAL": "#3a76f0",
-            "MESSENGER": "#0084ff",
             # Vocal
             "VOICE_CALL": "#6f42c1",
             # Notifications
             "NOTIFICATION": "#fd7e14",
             "PUSH_NOTIFICATION": "#dc3545",
-            # Pro
-            "SLACK": "#4A154B",
-            "TEAMS": "#6264A7",
+            # Messageries d'applications (type générique)
+            "BRANDED": "#9b59b6",
         }
         color = colors.get(obj.missive_type, "#6c757d")
         return format_html(
@@ -374,10 +376,10 @@ class MissiveAdmin(admin.ModelAdmin):
             # Afficher toutes les preuves
             proof_badges = []
             for proof in proofs:
-                proof_label = proof.get('label', proof.get('type', 'Preuve'))
-                proof_format = proof.get('format', 'pdf').upper()
-                url = proof.get('url')
-                available = proof.get('available', False)
+                proof_label = proof.get("label", proof.get("type", "Preuve"))
+                proof_format = proof.get("format", "pdf").upper()
+                url = proof.get("url")
+                available = proof.get("available", False)
 
                 if available and url:
                     # Badge vert cliquable
@@ -385,30 +387,34 @@ class MissiveAdmin(admin.ModelAdmin):
                         '<a href="{}" target="_blank" style="display: inline-block; margin: 2px;">'
                         '<span style="background-color: #198754; color: white; padding: 3px 8px; '
                         'border-radius: 3px; font-size: 10px; font-weight: bold; white-space: nowrap;">'
-                        '📄 {} ({})</span></a>'.format(url, proof_label, proof_format)
+                        "📄 {} ({})</span></a>".format(url, proof_label, proof_format)
                     )
                 elif available:
                     # Disponible mais sans URL
                     proof_badges.append(
                         '<span style="background-color: #198754; color: white; padding: 3px 8px; '
-                        'border-radius: 3px; font-size: 10px; font-weight: bold; white-space: nowrap; '
-                        'display: inline-block; margin: 2px;">✓ {}</span>'.format(proof_label)
+                        "border-radius: 3px; font-size: 10px; font-weight: bold; white-space: nowrap; "
+                        'display: inline-block; margin: 2px;">✓ {}</span>'.format(
+                            proof_label
+                        )
                     )
                 else:
                     # En attente
-                    message = proof.get('metadata', {}).get('message', 'En attente')
+                    message = proof.get("metadata", {}).get("message", "En attente")
                     proof_badges.append(
                         '<span style="background-color: #ffc107; color: black; padding: 3px 8px; '
-                        'border-radius: 3px; font-size: 10px; font-weight: bold; white-space: nowrap; '
-                        'display: inline-block; margin: 2px;" title="{}">⏳ {}</span>'.format(message, proof_label)
+                        "border-radius: 3px; font-size: 10px; font-weight: bold; white-space: nowrap; "
+                        'display: inline-block; margin: 2px;" title="{}">⏳ {}</span>'.format(
+                            message, proof_label
+                        )
                     )
 
-            return format_html(''.join(proof_badges))
+            return format_html("".join(proof_badges))
 
         except Exception as e:
             return format_html(
                 '<span style="color: #dc3545; white-space: nowrap;" title="{}">❌ Erreur</span>',
-                str(e)
+                str(e),
             )
 
     proof_of_delivery_display.short_description = _("Preuves de dépôt")
@@ -423,7 +429,7 @@ class MissiveAdmin(admin.ModelAdmin):
                 return None
 
             # Chercher le provider dans la config
-            providers_config = getattr(settings, 'MISSIVE_PROVIDERS', {})
+            providers_config = getattr(settings, "MISSIVE_PROVIDERS", {})
             provider_path = None
 
             for missive_type, providers_list in providers_config.items():
@@ -435,7 +441,7 @@ class MissiveAdmin(admin.ModelAdmin):
                     break
 
             if not provider_path:
-                provider_path = f'missive.providers.{provider_name.lower()}.{provider_name.capitalize()}Provider'
+                provider_path = f"missive.providers.{provider_name.lower()}.{provider_name.capitalize()}Provider"
 
             provider_class = import_string(provider_path)
             return provider_class(missive=obj)
@@ -501,7 +507,3 @@ class MissiveAdmin(admin.ModelAdmin):
                 critical_risk,
             ),
         )
-
-
-
-

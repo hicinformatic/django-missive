@@ -285,59 +285,85 @@ def get_provider_name_from_path(provider_path):
     Ex: 'missive.providers.sendgrid.SendGridProvider' -> 'sendgrid'
     """
     if not provider_path:
-        return 'custom'
+        return "custom"
 
     # Si c'est déjà un nom court, le retourner tel quel
-    if '.' not in provider_path:
+    if "." not in provider_path:
         return provider_path.lower()
 
     # Extraire le nom du module provider
-    parts = provider_path.split('.')
-    if len(parts) >= 3 and parts[0] == 'missive' and parts[1] == 'providers':
+    parts = provider_path.split(".")
+    if len(parts) >= 3 and parts[0] == "missive" and parts[1] == "providers":
         return parts[2].lower()
 
     # Fallback: extraire le nom de la classe sans "Provider"
     class_name = parts[-1]
-    provider_name = class_name.replace('Provider', '').lower()
-    return provider_name or 'custom'
+    provider_name = class_name.replace("Provider", "").lower()
+    return provider_name or "custom"
 
 
 def get_providers_from_config():
     """
     Récupère la configuration MISSIVE_PROVIDERS depuis les settings
     et retourne un dictionnaire {type_missive: [liste_noms_providers]}.
+
+    Configuration (liste simple avec auto-catégorisation):
+       MISSIVE_PROVIDERS = [
+           'missive.providers.twilio.TwilioProvider',
+           'missive.providers.sendgrid.SendGridProvider',
+           ...
+       ]
+
+    Chaque provider est automatiquement catégorisé selon ses supported_types.
     """
-    providers_config = getattr(settings, 'MISSIVE_PROVIDERS', {})
+    from django.utils.module_loading import import_string
+
+    providers_config = getattr(settings, "MISSIVE_PROVIDERS", None)
     providers_by_type = {}
 
-    for missive_type, provider_paths in providers_config.items():
-        if isinstance(provider_paths, list):
-            provider_names = [get_provider_name_from_path(path) for path in provider_paths]
-            providers_by_type[missive_type] = provider_names
+    # Format : Liste simple (auto-catégorisation)
+    if isinstance(providers_config, list):
+        for provider_path in providers_config:
+            try:
+                # Charger la classe du provider
+                provider_class = import_string(provider_path)
+                provider_name = get_provider_name_from_path(provider_path)
 
-    # Si aucune config n'est trouvée, utiliser des valeurs par défaut
+                # Récupérer les types supportés
+                supported_types = getattr(provider_class, "supported_types", [])
+
+                # Ajouter le provider à chaque type qu'il supporte
+                for missive_type in supported_types:
+                    if missive_type not in providers_by_type:
+                        providers_by_type[missive_type] = []
+                    if provider_name not in providers_by_type[missive_type]:
+                        providers_by_type[missive_type].append(provider_name)
+
+            except Exception as e:
+                # En cas d'erreur de chargement, ignorer silencieusement
+                print(f"Warning: Could not load provider {provider_path}: {e}")
+                continue
+
+    # Si aucune config, utiliser les valeurs par défaut
     if not providers_by_type:
         providers_by_type = {
-            'EMAIL': ['django_email', 'sendgrid', 'mailgun', 'ses', 'smspartner'],
-            'SMS': ['twilio', 'vonage', 'smspartner'],
-            'RCS': ['twilio'],
-            'WHATSAPP': ['twilio'],
-            'TELEGRAM': ['telegram'],
-            'SIGNAL': ['signal'],
-            'MESSENGER': ['messenger'],
-            'POSTAL': ['laposte'],
-            'LRE': ['ar24', 'certeurope'],
-            'VOICE_CALL': ['twilio', 'vonage', 'smspartner'],
-            'NOTIFICATION': [],
-            'PUSH_NOTIFICATION': ['fcm', 'apn'],
-            'SLACK': ['slack'],
-            'TEAMS': ['teams'],
+            "EMAIL": [
+                "django_email",
+                "sendgrid",
+                "mailgun",
+                "ses",
+                "brevo",
+                "smspartner",
+            ],
+            "SMS": ["twilio", "vonage", "smspartner", "brevo"],
+            "RCS": ["twilio"],
+            "POSTAL": ["laposte"],
+            "LRE": ["ar24", "certeurope"],
+            "VOICE_CALL": ["twilio", "vonage", "smspartner"],
+            "NOTIFICATION": ["notification"],
+            "PUSH_NOTIFICATION": ["fcm", "apn"],
+            "BRANDED": ["twilio", "slack", "teams", "telegram", "signal", "messenger"],
         }
-
-    # Ajouter 'custom' à chaque type pour permettre l'utilisation de providers personnalisés
-    for missive_type in providers_by_type:
-        if 'custom' not in providers_by_type[missive_type]:
-            providers_by_type[missive_type].append('custom')
 
     return providers_by_type
 
@@ -350,40 +376,46 @@ def discover_providers():
     providers_dict = {}
 
     # Ajouter le provider "custom" spécial
-    providers_dict['custom'] = _('Provider personnalisé')
+    providers_dict["custom"] = _("Provider personnalisé")
 
     # Chemin vers le dossier providers
-    providers_dir = Path(__file__).parent / 'providers'
+    providers_dir = Path(__file__).parent / "providers"
 
     if not providers_dir.exists():
         return providers_dict
 
     # Parcourir tous les fichiers Python du dossier providers
-    for file_path in providers_dir.glob('*.py'):
+    for file_path in providers_dir.glob("*.py"):
         # Ignorer __init__.py et les fichiers privés
-        if file_path.name.startswith('_'):
+        if file_path.name.startswith("_"):
             continue
 
         module_name = file_path.stem  # Nom du fichier sans .py
 
         try:
             # Importer dynamiquement le module
-            module = importlib.import_module(f'missive.providers.{module_name}')
+            module = importlib.import_module(f"missive.providers.{module_name}")
 
             # Chercher toutes les classes qui héritent de BaseProvider
             for name, obj in inspect.getmembers(module, inspect.isclass):
                 # Vérifier que c'est une classe Provider définie dans CE module (pas importée)
-                if (name.endswith('Provider') and
-                    hasattr(obj, 'name') and
-                    obj.__module__ == f'missive.providers.{module_name}'):
+                if (
+                    name.endswith("Provider")
+                    and hasattr(obj, "name")
+                    and obj.__module__ == f"missive.providers.{module_name}"
+                ):
                     # Utiliser le nom du module (fichier) comme identifiant, pas obj.name
                     provider_name = module_name.lower()
 
                     # Récupérer display_name ou fallback sur name
-                    if hasattr(obj, 'display_name'):
+                    if hasattr(obj, "display_name"):
                         display_name = obj.display_name
                     else:
-                        display_name = obj.name if hasattr(obj, 'name') else module_name.capitalize()
+                        display_name = (
+                            obj.name
+                            if hasattr(obj, "name")
+                            else module_name.capitalize()
+                        )
 
                     providers_dict[provider_name] = display_name
                     break  # Une seule classe provider par fichier

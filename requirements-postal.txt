@@ -1,11 +1,12 @@
-# Providers Courrier & LRE
+# Providers Courrier & LRE (tous les providers postal groupés)
 # Install avec: pip install -r requirements-postal.txt
 
 # Dépendances core requises
 -r requirements.txt
 
-# Courrier et LRE
+# Génération de documents
 reportlab>=4.0  # Génération PDF pour courrier
 Pillow>=10.1  # Traitement d'images pour documents
-# La Poste et LRE (AR24) utilisent requests (déjà dans requirements.txt)
+
+# Note: La Poste, AR24, CertEurope utilisent requests (déjà dans requirements.txt)
 

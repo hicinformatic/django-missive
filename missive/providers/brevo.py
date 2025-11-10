@@ -30,7 +30,11 @@ class BrevoProvider(BaseProvider):
         "automation",  # Marketing automation
     ]  # Multi-types !
     config_keys = ["BREVO_API_KEY"]
-    required_package = "sib_api_v3_sdk"
+    required_packages = ["sib-api-v3-sdk"]
+    site_url = "https://www.brevo.com/"
+    status_url = "https://status.brevo.com/"
+    documentation_url = "https://developers.brevo.com/"
+    description_text = "Plateforme CRM complète (Email, SMS, Marketing automation)"
 
     def send_email(self) -> bool:
         """Envoie un email via Brevo API"""
@@ -250,4 +254,3 @@ class BrevoProvider(BaseProvider):
                 "api_docs": "https://developers.brevo.com/reference/getaccount-1",
             },
         }
-

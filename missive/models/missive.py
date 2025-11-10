@@ -110,6 +110,14 @@ class Missive(models.Model):
             "Variables JSON pour le rendu du template (ex: {'nom': 'Dupont', 'montant': 150})"
         ),
     )
+    provider_options = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name=_("Options du provider"),
+        help_text=_(
+            "Options spécifiques au provider (ex: {'scheduled_time': 14, 'track_clicks': true, 'priority': 'high'})"
+        ),
+    )
 
     # Options spécifiques
     is_registered = models.BooleanField(
@@ -285,45 +293,46 @@ class Missive(models.Model):
         """
         Crée un événement d'envoi initial pour cette missive.
         Cette méthode doit être appelée lors de la création de la missive.
-        
+
         Args:
             provider: Nom du provider (sendgrid, twilio, laposte, etc.)
             status: Statut associé (optionnel)
             description: Description de l'événement (optionnel)
-        
+
         Returns:
             L'événement créé
         """
         from .event import MissiveEvent
-        
+
         return MissiveEvent.objects.create(
             missive=self,
             event_type="created",
             provider=provider or "django_email",
             status=status or self.status,
-            description=description or f"Missive créée avec le provider {provider or 'django_email'}",
+            description=description
+            or f"Missive créée avec le provider {provider or 'django_email'}",
         )
 
     def render_body(self):
         """
         Rend le corps du message avec les variables de contexte.
-        
+
         Utilise le moteur de template Django pour remplacer les variables
         dans le body avec les valeurs du champ context.
-        
+
         Example:
             body = "Bonjour {{ nom }}, votre commande #{{ numero }} est prête."
             context = {"nom": "Jean", "numero": "12345"}
             render_body() => "Bonjour Jean, votre commande #12345 est prête."
-        
+
         Returns:
             Le corps rendu avec les variables remplacées
         """
         from django.template import Context, Template
-        
+
         if not self.context:
             return self.body
-        
+
         try:
             template = Template(self.body)
             context = Context(self.context)
@@ -335,18 +344,18 @@ class Missive(models.Model):
     def render_body_text(self):
         """
         Rend la version texte du corps avec les variables de contexte.
-        
+
         Returns:
             Le corps texte rendu avec les variables remplacées
         """
         from django.template import Context, Template
-        
+
         if not self.body_text:
             return ""
-        
+
         if not self.context:
             return self.body_text
-        
+
         try:
             template = Template(self.body_text)
             context = Context(self.context)
@@ -358,15 +367,15 @@ class Missive(models.Model):
     def render_subject(self):
         """
         Rend le sujet avec les variables de contexte.
-        
+
         Returns:
             Le sujet rendu avec les variables remplacées
         """
         from django.template import Context, Template
-        
+
         if not self.context:
             return self.subject
-        
+
         try:
             template = Template(self.subject)
             context = Context(self.context)
@@ -378,15 +387,15 @@ class Missive(models.Model):
     def get_proofs_of_delivery(self, service_type: Optional[str] = None):
         """
         Récupère toutes les preuves de dépôt/livraison depuis le provider.
-        
+
         Cette méthode instancie le provider approprié et récupère toutes les preuves disponibles.
-        
+
         Args:
             service_type: Type de service (lre, postal_registered, email_ar, etc.)
-        
+
         Returns:
             Liste de dict avec les informations de chaque preuve
-            
+
         Example:
             missive = Missive.objects.get(id=123)
             proofs = missive.get_proofs_of_delivery()
@@ -400,12 +409,13 @@ class Missive(models.Model):
         provider_name = self.provider
         if not provider_name:
             return []
-        
+
         try:
             # Charger dynamiquement la classe du provider
             from django.conf import settings
-            providers_config = getattr(settings, 'MISSIVE_PROVIDERS', {})
-            
+
+            providers_config = getattr(settings, "MISSIVE_PROVIDERS", {})
+
             # Chercher le provider dans la config
             provider_path = None
             for missive_type, providers_list in providers_config.items():
@@ -415,17 +425,80 @@ class Missive(models.Model):
                         break
                 if provider_path:
                     break
-            
+
             if not provider_path:
                 # Fallback : essayer de construire le chemin
-                provider_path = f'missive.providers.{provider_name.lower()}.{provider_name.capitalize()}Provider'
-            
+                provider_path = f"missive.providers.{provider_name.lower()}.{provider_name.capitalize()}Provider"
+
             # Importer et instancier le provider
             provider_class = import_string(provider_path)
             provider_instance = provider_class(missive=self)
-            
+
             # Récupérer toutes les preuves
             return provider_instance.get_proofs_of_delivery(service_type)
-            
-        except Exception as e:
+
+        except Exception:
             return []
+
+    def cancel(self) -> bool:
+        """
+        Annule l'envoi de cette missive si elle est en attente ou programmée.
+
+        Cette méthode :
+        1. Vérifie que la missive est annulable (status PENDING ou SCHEDULED)
+        2. Si déjà envoyée au provider, tente d'annuler via son API
+        3. Sinon, change simplement le status à CANCELLED
+
+        Returns:
+            True si l'annulation a réussi, False sinon
+
+        Example:
+            missive = Missive.objects.get(id=123)
+            if missive.cancel():
+                print("Missive annulée avec succès")
+        """
+        from django.conf import settings
+        from django.utils.module_loading import import_string
+
+        # Vérifier que la missive est annulable
+        if self.status not in [MissiveStatus.PENDING, MissiveStatus.DRAFT]:
+            return False
+
+        # Si déjà envoyée à un provider avec external_id, tenter d'annuler via API
+        if self.provider and self.external_id:
+            try:
+                # Chercher le provider dans la config
+                providers_config = getattr(settings, "MISSIVE_PROVIDERS", {})
+                provider_path = None
+
+                for missive_type, providers_list in providers_config.items():
+                    for prov in providers_list:
+                        if self.provider.lower() in prov.lower():
+                            provider_path = prov
+                            break
+                    if provider_path:
+                        break
+
+                if not provider_path:
+                    # Fallback : essayer de construire le chemin
+                    provider_path = f"missive.providers.{self.provider.lower()}.{self.provider.capitalize()}Provider"
+
+                # Importer et instancier le provider
+                provider_class = import_string(provider_path)
+                provider_instance = provider_class(missive=self)
+
+                # Essayer d'appeler la méthode cancel appropriée
+                # Utiliser cancel() du provider qui dispatche automatiquement
+                if provider_instance.cancel():
+                    self.status = MissiveStatus.CANCELLED
+                    self.save()
+                    return True
+
+            except Exception:
+                # En cas d'erreur, on continue pour annuler localement
+                pass
+
+        # Si pas encore envoyé ou annulation provider échouée, simple changement de statut
+        self.status = MissiveStatus.CANCELLED
+        self.save()
+        return True

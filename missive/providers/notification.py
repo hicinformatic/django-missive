@@ -13,12 +13,16 @@ from .base import BaseProvider
 class InAppNotificationProvider(BaseProvider):
     """Provider pour les notifications in-app"""
 
-    name = "In-App Notification"
+    name = "notification"
     display_name = "Notification In-App"
     supported_types = ["NOTIFICATION"]
     services = ["notification", "push_notification", "badge"]
+    required_packages = []
+    description_text = (
+        "Notifications dans l'application (in-app) sans dépendance externe"
+    )
 
-    def send_notification(self) -> bool:
+    def send_notification(self, **kwargs) -> bool:
         """Crée une notification in-app"""
         # Validation
         is_valid, error = self.validate()
@@ -78,9 +82,9 @@ class InAppNotificationProvider(BaseProvider):
     def get_service_status(self) -> Dict:
         """
         Récupère le statut du système de notification in-app.
-        
+
         Les notifications in-app sont gérées en local, pas de limitation.
-        
+
         Returns:
             Dict avec status, disponibilité, etc.
         """

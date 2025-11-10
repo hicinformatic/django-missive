@@ -14,14 +14,16 @@ class RecipientAdmin(admin.ModelAdmin):
     """Admin pour les destinataires"""
 
     class Media:
-        js = ('admin/js/recipient_context_filter.js',)
+        js = ("admin/js/recipient_context_filter.js",)
 
     def get_search_results(self, request, queryset, search_term):
         """Filtre les résultats de recherche selon le contexte (sender vs recipient)"""
-        queryset, use_distinct = super().get_search_results(request, queryset, search_term)
+        queryset, use_distinct = super().get_search_results(
+            request, queryset, search_term
+        )
 
         # Si on cherche pour le champ sender, filtrer sur can_be_sender
-        if 'field_name=sender' in request.get_full_path():
+        if "field_name=sender" in request.get_full_path():
             queryset = queryset.filter(can_be_sender=True)
 
         return queryset, use_distinct
@@ -36,7 +38,14 @@ class RecipientAdmin(admin.ModelAdmin):
         "can_be_sender",
         "is_default_sender",
     ]
-    list_filter = ["recipient_type", "is_active", "can_be_sender", "is_default_sender", "country", "created_at"]
+    list_filter = [
+        "recipient_type",
+        "is_active",
+        "can_be_sender",
+        "is_default_sender",
+        "country",
+        "created_at",
+    ]
     search_fields = [
         "name",
         "email",
@@ -68,7 +77,9 @@ class RecipientAdmin(admin.ModelAdmin):
                     "can_be_sender",
                     "is_default_sender",
                 ),
-                "description": _("Configurer si ce destinataire peut être utilisé comme expéditeur"),
+                "description": _(
+                    "Configurer si ce destinataire peut être utilisé comme expéditeur"
+                ),
             },
         ),
         (
@@ -110,17 +121,24 @@ class RecipientAdmin(admin.ModelAdmin):
         if obj.is_active:
             return format_html('<strong style="white-space: nowrap;">{}</strong>', name)
         else:
-            return format_html('<strong style="color: #6c757d; white-space: nowrap;">{}</strong> <span style="color: #dc3545;">●</span>', name)
+            return format_html(
+                '<strong style="color: #6c757d; white-space: nowrap;">{}</strong> <span style="color: #dc3545;">●</span>',
+                name,
+            )
 
     name_display.short_description = _("Nom")
 
     def email_display(self, obj):
         """Affiche l'email avec icône"""
         if not obj.email:
-            return format_html('<span style="color: #ccc; white-space: nowrap;">-</span>')
+            return format_html(
+                '<span style="color: #ccc; white-space: nowrap;">-</span>'
+            )
 
         return format_html(
-            '<span style="white-space: nowrap;"><span style="color: #0d6efd;">✉️</span> {}</span>'.format(obj.email)
+            '<span style="white-space: nowrap;"><span style="color: #0d6efd;">✉️</span> {}</span>'.format(
+                obj.email
+            )
         )
 
     email_display.short_description = _("Email")
@@ -128,10 +146,14 @@ class RecipientAdmin(admin.ModelAdmin):
     def phone_display(self, obj):
         """Affiche le numéro de téléphone mobile avec icône"""
         if not obj.mobile:
-            return format_html('<span style="color: #ccc; white-space: nowrap;">-</span>')
+            return format_html(
+                '<span style="color: #ccc; white-space: nowrap;">-</span>'
+            )
 
         return format_html(
-            '<span style="white-space: nowrap;"><span style="color: #198754;">📱</span> {}</span>'.format(obj.mobile)
+            '<span style="white-space: nowrap;"><span style="color: #198754;">📱</span> {}</span>'.format(
+                obj.mobile
+            )
         )
 
     phone_display.short_description = _("Mobile")
@@ -139,7 +161,9 @@ class RecipientAdmin(admin.ModelAdmin):
     def address_display(self, obj):
         """Affiche l'adresse courte sur une ligne avec truncation"""
         if not obj.address_line1:
-            return format_html('<span style="color: #ccc; white-space: nowrap;">-</span>')
+            return format_html(
+                '<span style="color: #ccc; white-space: nowrap;">-</span>'
+            )
 
         # Adresse courte : ligne1, code postal ville (tout sur une ligne)
         parts = [obj.address_line1]
@@ -156,8 +180,7 @@ class RecipientAdmin(admin.ModelAdmin):
 
         return format_html(
             '<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; max-width: 300px;" title="{}">📍 {}</span>'.format(
-                ", ".join(parts),  # Tooltip avec adresse complète
-                address_text
+                ", ".join(parts), address_text  # Tooltip avec adresse complète
             )
         )
 
@@ -298,6 +321,3 @@ class RecipientAdmin(admin.ModelAdmin):
                 phone_issues,
             ),
         )
-
-
-

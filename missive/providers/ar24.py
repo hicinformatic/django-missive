@@ -12,19 +12,22 @@ from .base import BaseProvider
 class AR24Provider(BaseProvider):
     """
     Provider pour AR24 (Lettre Recommandée Électronique).
-    
+
     Configuration requise:
         AR24_API_TOKEN: Token d'API AR24
         AR24_API_URL: URL de l'API (production ou sandbox)
         AR24_SENDER_ID: ID de l'expéditeur enregistré sur AR24
-        
+
     Le destinataire doit avoir un email et idéalement une adresse postale complète.
     """
 
     name = "ar24"
     display_name = "AR24 (LRE)"
+    supported_types = ["LRE"]
     config_keys = ["AR24_API_TOKEN", "AR24_API_URL", "AR24_SENDER_ID"]
-    required_package = "requests"
+    required_packages = ["requests"]
+    site_url = "https://www.ar24.fr/"
+    description_text = "Email recommandé électronique (LRE) avec valeur juridique"
 
     def validate(self) -> Dict[str, Any]:
         """Valide que le destinataire a un email et une adresse"""
@@ -50,7 +53,7 @@ class AR24Provider(BaseProvider):
     def send(self) -> Dict[str, Any]:
         """
         Envoie une LRE via AR24.
-        
+
         TODO: Implémenter l'envoi réel via:
         POST https://api.ar24.fr/api/v2/mail/send
         """
@@ -79,7 +82,7 @@ class AR24Provider(BaseProvider):
     def check_status(self, external_id: Optional[str] = None) -> Optional[str]:
         """
         Vérifie le statut de la LRE (dépôt, envoi, réception, lecture).
-        
+
         TODO: Implémenter via:
         GET https://api.ar24.fr/api/v2/mail/{mail_id}/status
         """
@@ -88,23 +91,23 @@ class AR24Provider(BaseProvider):
     def get_proofs_of_delivery(self, service_type: Optional[str] = None) -> list:
         """
         Récupère toutes les preuves AR24.
-        
+
         AR24 génère plusieurs documents :
         1. Certificat de dépôt (immédiat)
         2. Copie du document envoyé
         3. Accusé de réception (quand le destinataire lit)
         4. Certificat de refus (si non réclamé après 15 jours)
-        
+
         TODO: Implémenter via:
         GET https://api.ar24.fr/api/v2/mail/{mail_id}/proofs
         """
         if not self.missive:
             return []
-        
+
         external_id = self.missive.external_id
-        if not external_id or not external_id.startswith('ar24_'):
+        if not external_id or not external_id.startswith("ar24_"):
             return []
-        
+
         # TODO: Appel API réel
         # try:
         #     api_token = self.config.get('AR24_API_TOKEN')
@@ -135,76 +138,87 @@ class AR24Provider(BaseProvider):
         #         return proofs_list
         # except Exception as e:
         #     return []
-        
+
         # Simulation
         from django.utils import timezone
-        
+
         sent_at = self.missive.sent_at or timezone.now()
         proofs = []
-        
+
         # 1. Certificat de dépôt (toujours disponible dès l'envoi)
-        proofs.append({
-            "type": "deposit_certificate",
-            "label": "Certificat de dépôt",
-            "available": True,
-            "url": f"https://www.ar24.fr/certificate/deposit/{external_id}.pdf",
-            "generated_at": sent_at,
-            "expires_at": None,
-            "format": "pdf",
-            "metadata": {
-                "certificate_type": "deposit",
-                "legal_value": "Valeur probante",
-                "provider": "ar24",
+        proofs.append(
+            {
+                "type": "deposit_certificate",
+                "label": "Certificat de dépôt",
+                "available": True,
+                "url": f"https://www.ar24.fr/certificate/deposit/{external_id}.pdf",
+                "generated_at": sent_at,
+                "expires_at": None,
+                "format": "pdf",
+                "metadata": {
+                    "certificate_type": "deposit",
+                    "legal_value": "Valeur probante",
+                    "provider": "ar24",
+                },
             }
-        })
-        
+        )
+
         # 2. Copie du document envoyé
-        proofs.append({
-            "type": "sent_document",
-            "label": "Document envoyé",
-            "available": True,
-            "url": f"https://www.ar24.fr/mail/{external_id}/document.pdf",
-            "generated_at": sent_at,
-            "expires_at": None,
-            "format": "pdf",
-            "metadata": {
-                "document_type": "sent_copy",
-                "provider": "ar24",
+        proofs.append(
+            {
+                "type": "sent_document",
+                "label": "Document envoyé",
+                "available": True,
+                "url": f"https://www.ar24.fr/mail/{external_id}/document.pdf",
+                "generated_at": sent_at,
+                "expires_at": None,
+                "format": "pdf",
+                "metadata": {
+                    "document_type": "sent_copy",
+                    "provider": "ar24",
+                },
             }
-        })
-        
+        )
+
         # 3. AR électronique (si déjà lu)
         if self.missive.read_at:
-            proofs.append({
-                "type": "acknowledgment_receipt",
-                "label": "Accusé de réception",
-                "available": True,
-                "url": f"https://www.ar24.fr/certificate/ar/{external_id}.pdf",
-                "generated_at": self.missive.read_at,
-                "expires_at": None,
-                "format": "pdf",
-                "metadata": {
-                    "certificate_type": "acknowledgment",
-                    "read_date": self.missive.read_at.isoformat() if self.missive.read_at else None,
-                    "provider": "ar24",
+            proofs.append(
+                {
+                    "type": "acknowledgment_receipt",
+                    "label": "Accusé de réception",
+                    "available": True,
+                    "url": f"https://www.ar24.fr/certificate/ar/{external_id}.pdf",
+                    "generated_at": self.missive.read_at,
+                    "expires_at": None,
+                    "format": "pdf",
+                    "metadata": {
+                        "certificate_type": "acknowledgment",
+                        "read_date": (
+                            self.missive.read_at.isoformat()
+                            if self.missive.read_at
+                            else None
+                        ),
+                        "provider": "ar24",
+                    },
                 }
-            })
+            )
         else:
             # AR en attente
-            proofs.append({
-                "type": "acknowledgment_receipt",
-                "label": "Accusé de réception",
-                "available": False,
-                "url": None,
-                "generated_at": None,
-                "expires_at": None,
-                "format": "pdf",
-                "metadata": {
-                    "status": "pending",
-                    "message": "En attente de lecture par le destinataire",
-                    "provider": "ar24",
+            proofs.append(
+                {
+                    "type": "acknowledgment_receipt",
+                    "label": "Accusé de réception",
+                    "available": False,
+                    "url": None,
+                    "generated_at": None,
+                    "expires_at": None,
+                    "format": "pdf",
+                    "metadata": {
+                        "status": "pending",
+                        "message": "En attente de lecture par le destinataire",
+                        "provider": "ar24",
+                    },
                 }
-            })
-        
-        return proofs
+            )
 
+        return proofs

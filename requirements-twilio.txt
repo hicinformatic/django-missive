@@ -1,0 +1,9 @@
+# Provider Twilio (SMS, WhatsApp, Voice)
+# Install avec: pip install -r requirements-twilio.txt
+
+# Dépendances core requises
+-r requirements.txt
+
+# Package Twilio
+twilio>=8.10
+

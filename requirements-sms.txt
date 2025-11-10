@@ -1,10 +1,9 @@
-# Providers SMS & Vocal
+# Providers SMS & Vocal (tous les providers SMS groupés)
 # Install avec: pip install -r requirements-sms.txt
 
-# Dépendances core requises
--r requirements.txt
+# Providers SMS individuels
+-r requirements-twilio.txt
+-r requirements-vonage.txt
 
-# Providers SMS et Vocal
-twilio>=8.10
-vonage>=3.11
+# Note: SMSPartner utilise requests (déjà dans requirements.txt)
 

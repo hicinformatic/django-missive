@@ -9,11 +9,11 @@ from .attachment import MissiveAttachment
 from .choices import MissivePriority, MissiveStatus, MissiveType, RecipientType
 from .event import MissiveEvent
 from .missive import Missive
+from .provider import ProviderInfo  # Modèle virtuel pour l'admin
 
 # Import des modèles
 from .recipient import Recipient
 from .template import MissiveTemplate
-from .provider import ProviderInfo  # Modèle virtuel pour l'admin
 
 __all__ = [
     # Choix

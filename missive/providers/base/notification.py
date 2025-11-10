@@ -1,7 +1,8 @@
 """
 Mixin pour les fonctionnalités notification in-app des providers.
 """
-from typing import Any, Dict, Optional
+
+from typing import Any, Dict
 
 
 class BaseNotificationMixin:
@@ -12,12 +13,12 @@ class BaseNotificationMixin:
     def get_notification_service_info(self) -> Dict[str, Any]:
         """
         Récupère les informations du compte/service Notification.
-        
+
         Retourne les informations importantes pour le service de notifications :
         - Nombre de notifications envoyées/limites
         - État du service (actif/inactif)
         - Channels disponibles (in-app, push, etc.)
-        
+
         Returns:
             Dict contenant :
                 - credits: Généralement 'unlimited' pour les notifications in-app
@@ -27,7 +28,7 @@ class BaseNotificationMixin:
                 - warnings: Liste des alertes
                 - channels: Liste des canaux disponibles
                 - details: Dict avec infos supplémentaires
-        
+
         À surcharger dans les providers concrets.
         """
         return {
@@ -35,14 +36,43 @@ class BaseNotificationMixin:
             "credits_type": "unlimited",
             "is_available": None,
             "limits": {},
-            "warnings": ["Méthode get_notification_service_info() non implémentée pour ce provider"],
+            "warnings": [
+                "Méthode get_notification_service_info() non implémentée pour ce provider"
+            ],
             "channels": [],
             "details": {},
         }
 
-    def send_notification(self) -> bool:
+    def check_notification_delivery_status(self, **kwargs) -> Dict[str, Any]:
+        """
+        Vérifie le statut de livraison d'une notification spécifique.
+
+        Returns:
+            Dict contenant :
+                - status: Statut actuel ('delivered', 'read', 'dismissed', etc.)
+                - delivered_at: Date/heure de livraison
+                - read_at: Date/heure de lecture
+                - error_code: Code d'erreur (si échec)
+                - error_message: Message d'erreur (si échec)
+                - details: Infos supplémentaires du provider
+
+        À surcharger dans les providers concrets.
+        """
+        return {
+            "status": "unknown",
+            "delivered_at": None,
+            "read_at": None,
+            "error_code": None,
+            "error_message": "Méthode check_notification_delivery_status() non implémentée pour ce provider",
+            "details": {},
+        }
+
+    def send_notification(self, **kwargs) -> bool:
         """
         Envoie une notification in-app. À surcharger dans les providers concrets.
+
+        Args:
+            **kwargs: Options propriétaires du provider
 
         Returns:
             bool: True si succès, False sinon
@@ -143,3 +173,17 @@ class BaseNotificationMixin:
             "preferences": {},
         }
 
+    def cancel_notification(self, **kwargs) -> bool:
+        """
+        Annule une notification programmée.
+
+        Args:
+            **kwargs: Options propriétaires du provider
+
+        Méthode de base qui retourne False. Les providers qui supportent
+        l'annulation doivent surcharger cette méthode avec leur implémentation API.
+
+        Returns:
+            bool: True si annulation réussie, False sinon
+        """
+        return False

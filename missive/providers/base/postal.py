@@ -1,7 +1,8 @@
 """
 Mixin pour les fonctionnalités courrier postal des providers.
 """
-from typing import Any, Dict, List, Optional
+
+from typing import Any, Dict, List
 
 
 class BasePostalMixin:
@@ -12,13 +13,13 @@ class BasePostalMixin:
     def get_postal_service_info(self) -> Dict[str, Any]:
         """
         Récupère les informations du compte/service Courrier postal.
-        
+
         Retourne les informations importantes pour le service postal :
         - Crédits disponibles (montant en euros généralement)
         - Limites et tarifs
         - État du service (actif/inactif)
         - Options disponibles (recommandé, suivi, signature, etc.)
-        
+
         Returns:
             Dict contenant :
                 - credits: Montant disponible (généralement en euros)
@@ -28,7 +29,7 @@ class BasePostalMixin:
                 - warnings: Liste des alertes
                 - options: Liste des options disponibles (recommandé, suivi, etc.)
                 - details: Dict avec infos supplémentaires
-        
+
         À surcharger dans les providers concrets.
         """
         return {
@@ -36,14 +37,45 @@ class BasePostalMixin:
             "credits_type": "amount",
             "is_available": None,
             "limits": {},
-            "warnings": ["Méthode get_postal_service_info() non implémentée pour ce provider"],
+            "warnings": [
+                "Méthode get_postal_service_info() non implémentée pour ce provider"
+            ],
             "options": [],
             "details": {},
         }
 
-    def send_postal(self) -> bool:
+    def check_postal_delivery_status(self, **kwargs) -> Dict[str, Any]:
+        """
+        Vérifie le statut de livraison d'un courrier postal spécifique.
+
+        Returns:
+            Dict contenant :
+                - status: Statut actuel ('posted', 'in_transit', 'delivered', 'returned', etc.)
+                - delivered_at: Date/heure de livraison
+                - tracking_events: Liste des événements de tracking
+                - signature_proof: Preuve de signature (si applicable)
+                - error_code: Code d'erreur (si échec)
+                - error_message: Message d'erreur (si échec)
+                - details: Infos supplémentaires du provider
+
+        À surcharger dans les providers concrets.
+        """
+        return {
+            "status": "unknown",
+            "delivered_at": None,
+            "tracking_events": [],
+            "signature_proof": None,
+            "error_code": None,
+            "error_message": "Méthode check_postal_delivery_status() non implémentée pour ce provider",
+            "details": {},
+        }
+
+    def send_postal(self, **kwargs) -> bool:
         """
         Envoie un courrier postal. À surcharger dans les providers concrets.
+
+        Args:
+            **kwargs: Options propriétaires du provider
 
         Returns:
             bool: True si succès, False sinon
@@ -109,7 +141,10 @@ class BasePostalMixin:
         }
 
     def calculate_postal_cost(
-        self, weight_grams: int = 20, is_registered: bool = False, international: bool = False
+        self,
+        weight_grams: int = 20,
+        is_registered: bool = False,
+        international: bool = False,
     ) -> Dict[str, Any]:
         """
         Calcule le coût d'envoi d'un courrier postal.
@@ -192,3 +227,17 @@ class BasePostalMixin:
 
         return prepared
 
+    def cancel_postal(self, **kwargs) -> bool:
+        """
+        Annule l'envoi d'un courrier postal.
+
+        Args:
+            **kwargs: Options propriétaires du provider
+
+        Méthode de base qui retourne False. Les providers qui supportent
+        l'annulation doivent surcharger cette méthode avec leur implémentation API.
+
+        Returns:
+            bool: True si annulation réussie, False sinon
+        """
+        return False

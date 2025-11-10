@@ -7,7 +7,12 @@
 # Tous les providers par catégorie
 -r requirements-email.txt
 -r requirements-sms.txt
--r requirements-messaging.txt
+-r requirements-branded.txt
 -r requirements-push.txt
--r requirements-professional.txt
 -r requirements-postal.txt
+
+# Note: Les providers suivants utilisent uniquement 'requests' (déjà dans requirements.txt)
+# - SMSPartner (SMS, Email, Voice)
+# - LaPoste, AR24, CertEurope (Postal)
+# - Signal, Messenger (Branded)
+# - Django Email (toujours disponible)

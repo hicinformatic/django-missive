@@ -217,8 +217,8 @@ class SendGridProvider(BaseProvider):
 from .base import BaseProvider
 
 class TwilioProvider(BaseProvider):
-    name = "Twilio"
-    supported_types = [MissiveType.SMS, MissiveType.WHATSAPP]
+    name = "twilio"  # Lowercase pour dispatch automatique
+    supported_types = [MissiveType.SMS, MissiveType.BRANDED]  # BRANDED pour WhatsApp
     
     def send_sms(self) -> bool:
         """Implémentation Twilio SMS"""
@@ -226,6 +226,10 @@ class TwilioProvider(BaseProvider):
         # - validate_phone_number()
         # - calculate_sms_segments()
         # - format_phone_international()
+    
+    def send_twilio(self) -> bool:
+        """Pour le type BRANDED - dispatch vers WhatsApp"""
+        return self.send_whatsapp()
         
         phone = self.missive.get_recipient_phone()
         formatted = self.format_phone_international(phone)

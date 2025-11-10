@@ -18,9 +18,13 @@ class MailgunProvider(BaseProvider):
     supported_types = ["EMAIL"]
     services = ["email", "email_validation", "email_routing"]
     config_keys = ["MAILGUN_API_KEY", "MAILGUN_DOMAIN"]
-    required_package = "mailgun"
+    required_packages = ["mailgun"]
+    site_url = "https://www.mailgun.com/"
+    status_url = "https://status.mailgun.com/"
+    documentation_url = "https://documentation.mailgun.com/"
+    description_text = "Service email transactionnel avec validation et routage avancés"
 
-    def send_email(self) -> bool:
+    def send_email(self, **kwargs) -> bool:
         """Envoie via Mailgun API"""
         # Validation
         is_valid, error = self.validate()
@@ -103,9 +107,9 @@ class MailgunProvider(BaseProvider):
     def get_service_status(self) -> Dict:
         """
         Récupère le statut et les crédits Mailgun.
-        
+
         Mailgun facture par email envoyé.
-        
+
         Returns:
             Dict avec status, crédits, etc.
         """
@@ -115,7 +119,7 @@ class MailgunProvider(BaseProvider):
         # try:
         #     api_key = self.config.get("MAILGUN_API_KEY")
         #     domain = self.config.get("MAILGUN_DOMAIN")
-        #     
+        #
         #     # Vérifier les stats du compte
         #     response = requests.get(
         #         f"https://api.mailgun.net/v3/{domain}/stats/total",
@@ -126,10 +130,10 @@ class MailgunProvider(BaseProvider):
         #
         #     if response.status_code == 200:
         #         data = response.json()
-        #         
+        #
         #         # Mailgun a des quotas par plan
         #         # À ajuster selon le plan de l'utilisateur
-        #         
+        #
         #         return {
         #             "status": "operational",
         #             "is_available": True,

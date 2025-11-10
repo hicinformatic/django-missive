@@ -1,13 +1,14 @@
 """
 Module pour envoyer des missives via différents providers avec fallback automatique.
 """
+
 import logging
-from typing import Dict, List, Optional
+from typing import List
 
 from django.conf import settings
 from django.utils.module_loading import import_string
 
-from .models import Missive, MissiveType
+from .models import Missive
 
 logger = logging.getLogger(__name__)
 
@@ -16,28 +17,30 @@ logger = logging.getLogger(__name__)
 DEFAULT_PROVIDERS = {
     "EMAIL": ["missive.providers.django_email.DjangoEmailProvider"],
     "SMS": ["missive.providers.twilio.TwilioProvider"],
-    "WHATSAPP": ["missive.providers.twilio.TwilioProvider"],
     "POSTAL": ["missive.providers.laposte.LaPosteProvider"],
     "NOTIFICATION": ["missive.providers.notification.InAppNotificationProvider"],
+    "BRANDED": [
+        "missive.providers.twilio.TwilioProvider"
+    ],  # Pour WhatsApp, Slack, Teams, etc.
 }
 
 
 class MissiveSender:
     """
     Classe pour envoyer des missives avec fallback automatique.
-    
+
     Usage:
         from missive.sender import MissiveSender
         from missive.models import Missive
-        
+
         missive = Missive.objects.get(id=123)
-        
+
         # Envoi avec fallback automatique
         success = MissiveSender.send(missive)
-        
+
         # Envoi sans fallback
         success = MissiveSender.send(missive, enable_fallback=False)
-        
+
         # Envoi sans health check
         success = MissiveSender.send(missive, skip_health_check=True)
     """
@@ -64,7 +67,9 @@ class MissiveSender:
         """
         # 1. Provider explicite sur la missive (priorité absolue, pas de fallback)
         if missive.provider:
-            logger.info(f"Missive {missive.id}: Provider explicite '{missive.provider}'")
+            logger.info(
+                f"Missive {missive.id}: Provider explicite '{missive.provider}'"
+            )
             return [missive.provider]
 
         # 2. Configuration dans MISSIVE_PROVIDERS (nouveau système)
@@ -106,10 +111,12 @@ class MissiveSender:
     def get_provider_class(missive: Missive):
         """
         DEPRECATED: Utilisez get_provider_classes() à la place.
-        
+
         Récupère le premier provider de la liste pour compatibilité.
         """
-        logger.warning("get_provider_class() est deprecated, utilisez send() directement")
+        logger.warning(
+            "get_provider_class() est deprecated, utilisez send() directement"
+        )
 
         provider_paths = MissiveSender.get_provider_classes(missive)
         return import_string(provider_paths[0])
@@ -128,23 +135,27 @@ class MissiveSender:
         try:
             provider_instance = provider_class()
             health = provider_instance.health_check()
-            
+
             is_healthy = health.get("is_healthy", False)
             status = health.get("status", "unknown")
-            
+
             if not is_healthy:
                 logger.warning(
                     f"Provider {provider_class.__name__} n'est pas healthy: "
                     f"status={status}, summary={health.get('summary')}"
                 )
-            
+
             return is_healthy
         except Exception as e:
-            logger.error(f"Erreur lors du health check de {provider_class.__name__}: {e}")
+            logger.error(
+                f"Erreur lors du health check de {provider_class.__name__}: {e}"
+            )
             return False
 
     @staticmethod
-    def send(missive: Missive, skip_health_check: bool = False, enable_fallback: bool = True) -> bool:
+    def send(
+        missive: Missive, skip_health_check: bool = False, enable_fallback: bool = True
+    ) -> bool:
         """
         Envoie une missive via le provider approprié avec fallback automatique.
 
@@ -168,25 +179,27 @@ class MissiveSender:
         Raises:
             ValueError: Si aucun provider n'est configuré
             RuntimeError: Si tous les providers ont échoué
-            
+
         Example:
             # Envoi standard avec fallback
             success = MissiveSender.send(missive)
-            
+
             # Envoi sans fallback (utilise uniquement le premier provider)
             success = MissiveSender.send(missive, enable_fallback=False)
-            
+
             # Envoi sans health check (plus rapide)
             success = MissiveSender.send(missive, skip_health_check=True)
         """
         # Vérifier que la missive peut être envoyée
         if not missive.can_send():
-            logger.warning(f"Missive {missive.id}: Ne peut pas être envoyée (can_send()=False)")
+            logger.warning(
+                f"Missive {missive.id}: Ne peut pas être envoyée (can_send()=False)"
+            )
             return False
 
         # Récupérer la liste des providers
         provider_paths = MissiveSender.get_provider_classes(missive)
-        
+
         if not provider_paths:
             raise ValueError(f"Aucun provider configuré pour {missive.missive_type}")
 
@@ -214,15 +227,17 @@ class MissiveSender:
                         logger.warning(
                             f"Missive {missive.id}: {provider_name} n'est pas healthy, skip"
                         )
-                        attempts.append({
-                            "provider": provider_name,
-                            "status": "skipped",
-                            "reason": "health_check_failed"
-                        })
-                        
+                        attempts.append(
+                            {
+                                "provider": provider_name,
+                                "status": "skipped",
+                                "reason": "health_check_failed",
+                            }
+                        )
+
                         if not enable_fallback:
                             raise RuntimeError(f"{provider_name} n'est pas disponible")
-                        
+
                         continue  # Essayer le suivant
 
                 # Instancier et envoyer
@@ -234,27 +249,31 @@ class MissiveSender:
                         f"Missive {missive.id}: ✅ Envoyé avec succès via {provider_name} "
                         f"(tentative {index}/{len(provider_paths)})"
                     )
-                    attempts.append({
-                        "provider": provider_name,
-                        "status": "success",
-                        "attempt": index
-                    })
-                    
+                    attempts.append(
+                        {
+                            "provider": provider_name,
+                            "status": "success",
+                            "attempt": index,
+                        }
+                    )
+
                     # Mettre à jour le provider utilisé sur la missive
                     missive.provider = provider_path
                     missive.save(update_fields=["provider"])
-                    
+
                     return True
                 else:
                     logger.warning(
                         f"Missive {missive.id}: ❌ Échec avec {provider_name}"
                     )
-                    attempts.append({
-                        "provider": provider_name,
-                        "status": "failed",
-                        "attempt": index
-                    })
-                    
+                    attempts.append(
+                        {
+                            "provider": provider_name,
+                            "status": "failed",
+                            "attempt": index,
+                        }
+                    )
+
                     if not enable_fallback:
                         raise RuntimeError(f"Échec d'envoi avec {provider_name}")
 
@@ -262,12 +281,14 @@ class MissiveSender:
                 error_msg = f"Provider '{provider_path}' introuvable: {e}"
                 logger.error(f"Missive {missive.id}: {error_msg}")
                 last_error = error_msg
-                attempts.append({
-                    "provider": provider_path,
-                    "status": "import_error",
-                    "error": str(e)
-                })
-                
+                attempts.append(
+                    {
+                        "provider": provider_path,
+                        "status": "import_error",
+                        "error": str(e),
+                    }
+                )
+
                 if not enable_fallback:
                     raise ValueError(error_msg)
 
@@ -275,12 +296,10 @@ class MissiveSender:
                 error_msg = f"Erreur lors de l'envoi avec {provider_path}: {e}"
                 logger.error(f"Missive {missive.id}: {error_msg}")
                 last_error = error_msg
-                attempts.append({
-                    "provider": provider_path,
-                    "status": "exception",
-                    "error": str(e)
-                })
-                
+                attempts.append(
+                    {"provider": provider_path, "status": "exception", "error": str(e)}
+                )
+
                 if not enable_fallback:
                     raise
 
@@ -320,10 +339,9 @@ class MissiveSender:
                     results["failed"] += 1
             except Exception as e:
                 results["failed"] += 1
-                results["errors"].append({
-                    "missive_id": missive.id,
-                    "error": str(e)
-                })
-                logger.error(f"Erreur lors de l'envoi en masse de missive {missive.id}: {e}")
+                results["errors"].append({"missive_id": missive.id, "error": str(e)})
+                logger.error(
+                    f"Erreur lors de l'envoi en masse de missive {missive.id}: {e}"
+                )
 
         return results

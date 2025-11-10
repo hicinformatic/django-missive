@@ -20,7 +20,11 @@ class SendGridProvider(BaseProvider):
     supported_types = ["EMAIL"]
     services = ["email", "email_transactional", "email_marketing"]
     config_keys = ["SENDGRID_API_KEY"]
-    required_package = "sendgrid"
+    required_packages = ["sendgrid"]
+    site_url = "https://sendgrid.com/"
+    status_url = "https://status.sendgrid.com/"
+    documentation_url = "https://docs.sendgrid.com/"
+    description_text = "Email transactionnel et marketing (Twilio SendGrid)"
 
     def send_email(self) -> bool:
         """Envoie un email via SendGrid API"""

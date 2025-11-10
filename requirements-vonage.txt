@@ -1,0 +1,9 @@
+# Provider Vonage (SMS, Voice)
+# Install avec: pip install -r requirements-vonage.txt
+
+# Dépendances core requises
+-r requirements.txt
+
+# Package Vonage
+vonage>=3.11
+

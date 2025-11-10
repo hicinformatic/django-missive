@@ -12,18 +12,22 @@ from .base import BaseProvider
 class MessengerProvider(BaseProvider):
     """
     Provider pour Facebook Messenger.
-    
+
     Configuration requise:
         MESSENGER_PAGE_ACCESS_TOKEN: Token d'accès de la page Facebook
         MESSENGER_APP_SECRET: Secret de l'application
-        
+
     Le destinataire doit avoir un PSID (Page-Scoped ID) Messenger stocké dans metadata.
     """
 
     name = "messenger"
     display_name = "Facebook Messenger"
+    supported_types = ["BRANDED"]
+    brands = ["messenger"]  # Facebook Messenger uniquement
     config_keys = ["MESSENGER_PAGE_ACCESS_TOKEN", "MESSENGER_VERIFY_TOKEN"]
-    required_package = "requests"
+    required_packages = ["requests"]
+    site_url = "https://www.messenger.com/"
+    description_text = "Facebook Messenger - Messagerie instantanée grand public (Meta)"
 
     def validate(self) -> Dict[str, Any]:
         """Valide que le destinataire a un PSID Messenger"""
@@ -34,7 +38,7 @@ class MessengerProvider(BaseProvider):
         if not recipient:
             return {"is_valid": False, "error": "Destinataire non défini"}
 
-        psid = recipient.metadata.get('messenger_psid') if recipient.metadata else None
+        psid = recipient.metadata.get("messenger_psid") if recipient.metadata else None
         if not psid:
             return {
                 "is_valid": False,
@@ -46,7 +50,7 @@ class MessengerProvider(BaseProvider):
     def send(self) -> Dict[str, Any]:
         """
         Envoie un message via Messenger Send API.
-        
+
         TODO: Implémenter l'envoi réel via:
         POST https://graph.facebook.com/v18.0/me/messages
         """
@@ -70,4 +74,3 @@ class MessengerProvider(BaseProvider):
         """Vérifie le statut via webhooks Messenger"""
         # TODO: Implémenter webhook handlers
         return None
-

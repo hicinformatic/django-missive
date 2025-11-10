@@ -1,6 +1,7 @@
 """
 Fonctionnalités communes à tous les providers.
 """
+
 from typing import Any, Dict, Optional
 
 from django.conf import settings
@@ -19,16 +20,25 @@ class BaseProviderCommon:
 
     # Types de missives supportés (à définir dans les sous-classes)
     supported_types = []
-    
+
     # Services disponibles (granularité plus fine que supported_types)
     # Format: ['service_name', ...]
     # Exemples:
     # - SendGrid: ['email']
     # - Brevo/SendinBlue: ['email', 'sms', 'email_transactional', 'email_marketing']
     # - La Poste: ['postal', 'postal_registered', 'postal_signature', 'email_ar']
-    # - Twilio: ['sms', 'whatsapp', 'voice']
+    # - Twilio: ['sms', 'voice', 'whatsapp']
     services = []
-    
+
+    # Marques de messagerie supportées (pour type BRANDED uniquement)
+    # Format: ['brand_name', ...]
+    # Exemples:
+    # - Twilio: ['whatsapp']  # Twilio propose WhatsApp Business API
+    # - Slack: ['slack']
+    # - Teams: ['teams']
+    # - Un provider multi-brand pourrait avoir: ['whatsapp', 'telegram', 'messenger']
+    brands = []
+
     # Variables de configuration requises (depuis settings.py ou .env)
     # Format: ['VARIABLE_NAME', ...]
     # Exemples:
@@ -36,14 +46,43 @@ class BaseProviderCommon:
     # - Twilio: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN']
     # - SMSPartner: ['SMSPARTNER_API_KEY', 'SMSPARTNER_SENDER']
     config_keys = []
-    
-    # Package Python requis (pour vérifier l'installation)
-    # Format: 'package_name' ou None si pas de dépendance externe
+
+    # Packages Python requis (pour vérifier l'installation)
+    # Format: ['package_name', ...] ou [] si pas de dépendance externe
     # Exemples:
-    # - SendGrid: 'sendgrid'
-    # - Twilio: 'twilio'
-    # - Django Email: None (toujours disponible)
-    required_package = None
+    # - SendGrid: ['sendgrid']
+    # - Twilio: ['twilio']
+    # - Teams: ['msgraph-core', 'msal']
+    # - Django Email: [] (toujours disponible)
+    required_packages = []
+
+    # URL de la page de statut/SLA du service (optionnel)
+    # Exemples:
+    # - SMSPartner: 'https://status.smspartner.fr/status/nda-media'
+    # - Twilio: 'https://status.twilio.com/'
+    # - SendGrid: 'https://status.sendgrid.com/'
+    status_url = None
+
+    # URL de la documentation API du service (optionnel)
+    # Exemples:
+    # - SMSPartner: 'https://www.docpartner.dev/'
+    # - Twilio: 'https://www.twilio.com/docs'
+    # - SendGrid: 'https://docs.sendgrid.com/'
+    documentation_url = None
+
+    # URL du site web officiel du provider (optionnel)
+    # Exemples:
+    # - SMSPartner: 'https://www.smspartner.fr/'
+    # - Twilio: 'https://www.twilio.com/'
+    # - SendGrid: 'https://sendgrid.com/'
+    site_url = None
+
+    # Description du provider (texte libre, optionnel)
+    # Affiché dans l'admin pour donner plus de contexte
+    # Exemples:
+    # - Twilio: "Plateforme cloud multi-canal (SMS, WhatsApp, Voice)"
+    # - LaPoste: "Envoi de courrier recommandé sur le territoire français"
+    description_text = None
 
     def __init__(self, missive: Optional[Missive] = None):
         """
@@ -66,7 +105,7 @@ class BaseProviderCommon:
             bool: True si supporté
         """
         return missive_type in self.supported_types
-    
+
     def has_service(self, service: str) -> bool:
         """
         Vérifie si ce provider offre un service spécifique.
@@ -174,17 +213,17 @@ class BaseProviderCommon:
     def get_proofs_of_delivery(self, service_type: Optional[str] = None) -> list:
         """
         Récupère toutes les preuves de dépôt/livraison selon le type de service.
-        
+
         Un envoi peut générer plusieurs preuves :
         - LRE : Certificat de dépôt + AR électronique + copie du document
         - Courrier recommandé : Preuve de dépôt + avis de passage + AR + copie scannée
         - Email AR : Accusé de réception + logs SMTP
         - SMS : Statut de livraison + logs opérateur
-        
+
         Args:
             service_type: Type de service spécifique (postal_registered, lre, email_ar, etc.)
                          Si None, déduit automatiquement depuis la missive.
-        
+
         Returns:
             Liste de Dict, chaque Dict contenant :
             {
@@ -197,7 +236,7 @@ class BaseProviderCommon:
                 "format": str,                  # Format (pdf, xml, json, etc.)
                 "metadata": dict,               # Métadonnées additionnelles
             }
-        
+
         Example:
             # Pour une LRE AR24
             provider = AR24Provider(missive)
@@ -208,27 +247,27 @@ class BaseProviderCommon:
         """
         if not self.missive:
             return []
-        
+
         # Déterminer automatiquement le type de service si non fourni
         if not service_type:
             service_type = self._detect_service_type()
-        
+
         # Par défaut, retourner une liste vide
         # Les providers concrets doivent override cette méthode
         return []
-    
+
     def _detect_service_type(self) -> str:
         """
         Détecte automatiquement le type de service selon la missive.
-        
+
         Returns:
             Type de service détecté (lre, postal_registered, email_ar, sms, etc.)
         """
         if not self.missive:
             return "unknown"
-        
+
         missive_type = self.missive.missive_type
-        
+
         # Mapping type de missive + options → service
         if missive_type == "LRE":
             return "lre"
@@ -242,20 +281,22 @@ class BaseProviderCommon:
             return "email"
         elif missive_type == "SMS":
             return "sms"
-        elif missive_type == "WHATSAPP":
-            return "whatsapp"
+        elif missive_type == "BRANDED":
+            # Pour le type BRANDED, utiliser le nom du provider comme service
+            # Ex: WhatsAppProvider (name="whatsapp") → service "whatsapp"
+            return self.name.lower() if hasattr(self, "name") else "branded"
         elif missive_type == "RCS":
             return "rcs"
-        
+
         return missive_type.lower()
-    
+
     def list_available_proofs(self) -> Dict[str, bool]:
         """
         Liste tous les types de preuves disponibles pour cette missive.
-        
+
         Returns:
             Dict {service_type: available}
-            
+
         Example:
             {
                 "lre": True,
@@ -265,9 +306,9 @@ class BaseProviderCommon:
         """
         if not self.missive:
             return {}
-        
+
         service_type = self._detect_service_type()
-        
+
         # Services qui génèrent des preuves
         proof_services = {
             "lre",
@@ -275,18 +316,16 @@ class BaseProviderCommon:
             "postal_signature",
             "email_ar",
         }
-        
-        return {
-            service_type: service_type in proof_services
-        }
+
+        return {service_type: service_type in proof_services}
 
     def get_service_status(self) -> Dict[str, Any]:
         """
         Récupère le statut du service provider.
-        
+
         Cette méthode doit être override par les providers concrets pour fournir
         des informations réelles (crédits, quotas, SLA, etc.).
-        
+
         Returns:
             Dict avec les informations de statut :
             {
@@ -309,7 +348,8 @@ class BaseProviderCommon:
             "rate_limits": {},
             "sla": {},
             "last_check": timezone.now(),
-            "warnings": ["Méthode get_service_status() non implémentée pour ce provider"],
+            "warnings": [
+                "Méthode get_service_status() non implémentée pour ce provider"
+            ],
             "details": {},
         }
-

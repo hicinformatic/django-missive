@@ -1,27 +1,40 @@
 """
 Mixin pour les fonctionnalités email des providers.
 """
-import re
-from typing import Any, Dict, List, Optional
 
-from django.utils import timezone
+import re
+from typing import Any, Dict, List
 
 
 class BaseEmailMixin:
     """
     Mixin fournissant les fonctionnalités spécifiques aux emails.
+
+    Kwargs standardisés pour send_email() :
+        cc (list|str): Destinataires en copie
+        bcc (list|str): Destinataires en copie cachée
+        reply_to (str): Adresse de réponse
+        headers (dict): Headers HTTP personnalisés
+        tags (list|dict): Tags pour tracking/analytics
+        template_id (str): ID de template email
+        template_vars (dict): Variables du template
+        track_opens (bool): Activer le tracking des ouvertures
+        track_clicks (bool): Activer le tracking des clics
+        send_at (datetime|str): Date/heure d'envoi programmé
+        unsubscribe_url (str): URL de désinscription
+        sandbox (bool): Mode test
     """
 
     def get_email_service_info(self) -> Dict[str, Any]:
         """
         Récupère les informations du compte/service Email.
-        
+
         Retourne les informations importantes pour le service Email :
         - Crédits disponibles (nombre d'emails ou montant)
         - Limites et quotas (emails/jour, taille max, etc.)
         - État du service (actif/inactif)
         - Réputation de l'expéditeur
-        
+
         Returns:
             Dict contenant :
                 - credits: Nombre d'emails ou montant disponible
@@ -31,7 +44,7 @@ class BaseEmailMixin:
                 - warnings: Liste des alertes
                 - reputation: Dict avec infos de réputation (score, bounces, etc.)
                 - details: Dict avec infos supplémentaires
-        
+
         À surcharger dans les providers concrets.
         """
         return {
@@ -39,14 +52,54 @@ class BaseEmailMixin:
             "credits_type": "unlimited",
             "is_available": None,
             "limits": {},
-            "warnings": ["Méthode get_email_service_info() non implémentée pour ce provider"],
+            "warnings": [
+                "Méthode get_email_service_info() non implémentée pour ce provider"
+            ],
             "reputation": {},
             "details": {},
         }
 
-    def send_email(self) -> bool:
+    def check_email_delivery_status(self, **kwargs) -> Dict[str, Any]:
+        """
+        Vérifie le statut de livraison d'un email spécifique.
+
+        Utilise l'external_id de la missive pour interroger l'API du provider
+        et récupérer le statut actuel, les ouvertures, clics, etc.
+
+        Returns:
+            Dict contenant :
+                - status: Statut actuel ('delivered', 'bounced', 'spam', 'opened', 'clicked', etc.)
+                - delivered_at: Date/heure de livraison
+                - opened_at: Date/heure de première ouverture
+                - clicked_at: Date/heure de premier clic
+                - opens_count: Nombre d'ouvertures
+                - clicks_count: Nombre de clics
+                - bounce_type: Type de bounce (hard/soft) si applicable
+                - error_code: Code d'erreur (si échec)
+                - error_message: Message d'erreur (si échec)
+                - details: Infos supplémentaires du provider
+
+        À surcharger dans les providers concrets.
+        """
+        return {
+            "status": "unknown",
+            "delivered_at": None,
+            "opened_at": None,
+            "clicked_at": None,
+            "opens_count": 0,
+            "clicks_count": 0,
+            "bounce_type": None,
+            "error_code": None,
+            "error_message": "Méthode check_email_delivery_status() non implémentée pour ce provider",
+            "details": {},
+        }
+
+    def send_email(self, **kwargs) -> bool:
         """
         Envoie un email. À surcharger dans les providers concrets.
+
+        Args:
+            **kwargs: Options propriétaires du provider
 
         Returns:
             bool: True si succès, False sinon
@@ -296,3 +349,17 @@ class BaseEmailMixin:
             "recommendations": recommendations,
         }
 
+    def cancel_email(self, **kwargs) -> bool:
+        """
+        Annule l'envoi d'un email programmé.
+
+        Args:
+            **kwargs: Options propriétaires du provider
+
+        Méthode de base qui retourne False. Les providers qui supportent
+        l'annulation doivent surcharger cette méthode avec leur implémentation API.
+
+        Returns:
+            bool: True si annulation réussie, False sinon
+        """
+        return False

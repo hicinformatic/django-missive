@@ -1,25 +1,39 @@
 """
 Mixin pour les fonctionnalités SMS des providers.
 """
+
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 
 class BaseSMSMixin:
     """
     Mixin fournissant les fonctionnalités spécifiques aux SMS.
+
+    Kwargs standardisés pour send_sms() :
+        sender (str): Nom de l'expéditeur (3-11 caractères)
+        tag (str): Tag de tracking
+        scheduled_delivery_date (str): Date d'envoi différé (format ISO ou provider-specific)
+        scheduled_time (int): Heure d'envoi (0-23)
+        scheduled_minute (int): Minute d'envoi (0-59)
+        webhook_url (str): URL de callback pour DLR
+        is_commercial (bool): True si SMS commercial (ajoute mention STOP)
+        is_unicode (bool): True pour activer Unicode
+        sandbox (bool): True pour mode test
+        ttl (int): Time to live en secondes
+        priority (str): 'low', 'normal', 'high'
     """
 
     def get_sms_service_info(self) -> Dict[str, Any]:
         """
         Récupère les informations du compte/service SMS.
-        
+
         Retourne les informations importantes pour le service SMS :
         - Crédits disponibles (nombre de SMS ou montant en euros)
         - Limites et quotas
         - État du service (actif/inactif)
         - Informations de facturation
-        
+
         Returns:
             Dict contenant :
                 - credits: Nombre de SMS ou montant disponible
@@ -28,7 +42,7 @@ class BaseSMSMixin:
                 - limits: Dict avec les limites (quotas journaliers, etc.)
                 - warnings: Liste des alertes (crédits bas, etc.)
                 - details: Dict avec infos supplémentaires
-        
+
         À surcharger dans les providers concrets.
         """
         return {
@@ -36,16 +50,57 @@ class BaseSMSMixin:
             "credits_type": "count",
             "is_available": None,
             "limits": {},
-            "warnings": ["Méthode get_sms_service_info() non implémentée pour ce provider"],
+            "warnings": [
+                "Méthode get_sms_service_info() non implémentée pour ce provider"
+            ],
             "details": {},
         }
 
-    def send_sms(self) -> bool:
+    def check_sms_delivery_status(self, **kwargs) -> Dict[str, Any]:
+        """
+        Vérifie le statut de livraison d'un SMS spécifique.
+
+        Utilise l'external_id de la missive pour interroger l'API du provider
+        et récupérer le statut actuel (delivered, failed, pending, etc.).
+
+        Returns:
+            Dict contenant :
+                - status: Statut actuel ('delivered', 'failed', 'pending', 'sent', etc.)
+                - delivered_at: Date/heure de livraison (si disponible)
+                - error_code: Code d'erreur (si échec)
+                - error_message: Message d'erreur (si échec)
+                - details: Infos supplémentaires du provider
+
+        À surcharger dans les providers concrets.
+        """
+        return {
+            "status": "unknown",
+            "delivered_at": None,
+            "error_code": None,
+            "error_message": "Méthode check_sms_delivery_status() non implémentée pour ce provider",
+            "details": {},
+        }
+
+    def send_sms(self, **kwargs) -> bool:
         """
         Envoie un SMS. À surcharger dans les providers concrets.
 
+        Args:
+            **kwargs: Options propriétaires du provider (sender, tag, scheduledDeliveryDate, etc.)
+
         Returns:
             bool: True si succès, False sinon
+
+        Example:
+            # Avec options SMSPartner
+            provider.send_sms(
+                sender="MonApp",
+                tag="campaign-01",
+                isStopSms=1,
+                scheduledDeliveryDate="15/12/2025",
+                time=14,
+                minute=30
+            )
         """
         from ...models import MissiveStatus
 
@@ -57,9 +112,7 @@ class BaseSMSMixin:
             return False
 
         # À implémenter dans les sous-classes
-        raise NotImplementedError(
-            f"{self.name} doit implémenter la méthode send_sms()"
-        )
+        raise NotImplementedError(f"{self.name} doit implémenter la méthode send_sms()")
 
     def validate_phone_number(
         self, phone: str, country_code: str = "FR"
@@ -230,3 +283,21 @@ class BaseSMSMixin:
 
         return "+" + cleaned
 
+    def cancel_sms(self, **kwargs) -> bool:
+        """
+        Annule l'envoi d'un SMS programmé.
+
+        Args:
+            **kwargs: Options propriétaires du provider
+
+        Méthode de base qui retourne False. Les providers qui supportent
+        l'annulation doivent surcharger cette méthode avec leur implémentation API.
+
+        Returns:
+            bool: True si annulation réussie, False sinon
+
+        Example:
+            if provider.cancel_sms():
+                print("SMS annulé avec succès")
+        """
+        return False

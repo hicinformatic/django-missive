@@ -1,0 +1,14 @@
+# Providers de messageries de marque (tous les providers branded groupés)
+# Install avec: pip install -r requirements-branded.txt
+
+# Providers Branded individuels
+-r requirements-slack.txt
+-r requirements-teams.txt
+-r requirements-telegram.txt
+
+# Notes:
+# - WhatsApp : via Twilio (requirements-twilio.txt)
+# - Signal : utilise requests (déjà dans requirements.txt)
+# - Messenger : utilise requests (déjà dans requirements.txt)
+# - Discord : utilise requests (déjà dans requirements.txt)
+

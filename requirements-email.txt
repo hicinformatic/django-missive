@@ -1,11 +1,9 @@
-# Providers Email
+# Providers Email (tous les providers email groupés)
 # Install avec: pip install -r requirements-email.txt
 
-# Dépendances core requises
--r requirements.txt
-
-# Providers Email
-sendgrid>=6.11
-mailgun>=0.1.1
-boto3>=1.28  # Amazon SES
+# Providers Email individuels
+-r requirements-sendgrid.txt
+-r requirements-mailgun.txt
+-r requirements-brevo.txt
+-r requirements-ses.txt
 

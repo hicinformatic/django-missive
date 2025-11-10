@@ -24,7 +24,7 @@
             optional: ['name', 'recipient_type', 'content_type', 'object_id', 'civility', 'notes', 'metadata', 'is_active'],
             hidden: ['email', 'address_line1', 'address_line2', 'address_line3', 'postal_code', 'city', 'state', 'country']
         },
-        'WHATSAPP': {
+        'BRANDED': {
             required: ['mobile'],
             optional: ['name', 'recipient_type', 'content_type', 'object_id', 'civility', 'notes', 'metadata', 'is_active'],
             hidden: ['email', 'address_line1', 'address_line2', 'address_line3', 'postal_code', 'city', 'state', 'country']
@@ -109,7 +109,7 @@
         var messages = {
             'EMAIL': '✉️ Mode Email : Seuls les champs liés à l\'email sont affichés',
             'SMS': '📱 Mode SMS : Seuls les champs liés au téléphone sont affichés',
-            'WHATSAPP': '💬 Mode WhatsApp : Seuls les champs liés au téléphone sont affichés',
+            'BRANDED': '💬 Mode Messagerie : Seuls les champs liés au téléphone/identifiant sont affichés',
             'POSTAL': '📮 Mode Courrier : Seuls les champs liés à l\'adresse postale sont affichés',
             'NOTIFICATION': '🔔 Mode Notification : Seuls les champs liés à l\'email sont affichés'
         };

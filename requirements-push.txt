@@ -1,10 +1,7 @@
-# Providers Notifications Push (FCM, APN)
+# Providers Notifications Push (tous les providers push groupés)
 # Install avec: pip install -r requirements-push.txt
 
-# Dépendances core requises
--r requirements.txt
-
-# Notifications Push
-firebase-admin>=6.3  # Firebase Cloud Messaging (Android/iOS)
-aioapns>=3.1  # Apple Push Notification (iOS)
+# Providers Push individuels
+-r requirements-fcm.txt
+-r requirements-apn.txt
 

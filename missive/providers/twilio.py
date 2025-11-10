@@ -11,12 +11,22 @@ from .base import BaseProvider
 class TwilioProvider(BaseProvider):
     """Provider pour Twilio (SMS ET WhatsApp)"""
 
-    name = "Twilio"
+    name = "twilio"  # Lowercase pour dispatch automatique
     display_name = "Twilio"
-    supported_types = ["SMS", "WHATSAPP"]
+    supported_types = ["SMS", "BRANDED"]  # BRANDED pour WhatsApp
     services = ["sms", "whatsapp", "voice", "verify"]
+    brands = ["whatsapp"]  # WhatsApp Business API via Twilio
     config_keys = ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER"]
-    required_package = "twilio"
+    required_packages = ["twilio"]
+    site_url = "https://www.twilio.com/"
+    status_url = "https://status.twilio.com/"
+    documentation_url = "https://www.twilio.com/docs"
+    description_text = "Plateforme cloud multi-canal mondiale (SMS, WhatsApp, Voice)"
+
+    # Pour le type BRANDED, dispatch vers send_twilio()
+    def send_twilio(self) -> bool:
+        """Dispatch pour le type BRANDED - envoie via WhatsApp"""
+        return self.send_whatsapp()
 
     def send_sms(self) -> bool:
         """Envoie un SMS via Twilio"""
@@ -157,9 +167,9 @@ class TwilioProvider(BaseProvider):
     def get_service_status(self) -> Dict:
         """
         Récupère le statut et les crédits Twilio.
-        
+
         Twilio fonctionne avec un système de prépaiement en USD.
-        
+
         Returns:
             Dict avec status, crédits en USD, etc.
         """
@@ -169,19 +179,19 @@ class TwilioProvider(BaseProvider):
         # try:
         #     account_sid = self.config.get("TWILIO_ACCOUNT_SID")
         #     auth_token = self.config.get("TWILIO_AUTH_TOKEN")
-        #     
+        #
         #     client = Client(account_sid, auth_token)
-        #     
+        #
         #     # Récupérer le solde du compte
         #     balance = client.api.v2010.balance.fetch()
         #     credits_remaining = float(balance.balance)
         #     currency = balance.currency
-        #     
+        #
         #     # Vérifier le statut du service
         #     # https://status.twilio.com/
         #     is_operational = credits_remaining > 0
         #     status = "operational" if is_operational else "critical"
-        #     
+        #
         #     warnings = []
         #     if credits_remaining < 5:
         #         warnings.append(f"Solde critique: {credits_remaining} {currency}")
@@ -247,3 +257,82 @@ class TwilioProvider(BaseProvider):
                 "api_docs": "https://www.twilio.com/docs/usage/api/usage-record",
             },
         }
+
+    def cancel_sms(self) -> bool:
+        """
+        Annule l'envoi d'un SMS via Twilio.
+
+        Twilio permet d'annuler les messages en statut 'queued' ou 'scheduled'.
+
+        Returns:
+            bool: True si l'annulation a réussi, False sinon
+        """
+        if not self.missive.external_id:
+            return False
+
+        try:
+            from twilio.rest import Client
+
+            account_sid = self.config.get("TWILIO_ACCOUNT_SID")
+            auth_token = self.config.get("TWILIO_AUTH_TOKEN")
+
+            if not account_sid or not auth_token:
+                return False
+
+            client = Client(account_sid, auth_token)
+
+            # Annuler le message (seuls les messages 'queued' ou 'scheduled' peuvent être annulés)
+            message = client.messages(self.missive.external_id).update(
+                status="canceled"
+            )
+
+            if message.status == "canceled":
+                self._create_event("cancelled", "SMS annulé via Twilio")
+                return True
+            else:
+                return False
+
+        except Exception:
+            return False
+
+    def cancel_twilio(self) -> bool:
+        """
+        Annule l'envoi d'un message de marque (WhatsApp) via Twilio.
+
+        Appelée automatiquement par cancel_branded() via dispatch.
+        Fonctionne de la même manière que cancel_sms() car Twilio utilise
+        la même API pour SMS et WhatsApp.
+
+        Returns:
+            bool: True si l'annulation a réussi, False sinon
+        """
+        return self.cancel_sms()
+
+    def cancel_whatsapp(self) -> bool:
+        """
+        Annule l'envoi d'un message WhatsApp via Twilio.
+
+        Appelée automatiquement par cancel_branded("whatsapp") via dispatch.
+
+        Returns:
+            bool: True si l'annulation a réussi, False sinon
+
+        Example:
+            provider.cancel_branded("whatsapp")  # → appelle cancel_whatsapp()
+        """
+        return self.cancel_sms()
+
+    def get_whatsapp_service_info(self) -> Dict:
+        """
+        Récupère les informations du service WhatsApp via Twilio.
+
+        Appelée automatiquement par get_branded_service_info("whatsapp") via dispatch.
+
+        Returns:
+            Dict avec status, crédits, etc.
+
+        Example:
+            info = provider.get_branded_service_info("whatsapp")  # → appelle get_whatsapp_service_info()
+        """
+        # WhatsApp via Twilio utilise le même système de crédits que SMS
+        return self.get_service_status()

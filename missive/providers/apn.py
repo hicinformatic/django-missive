@@ -12,21 +12,24 @@ from .base import BaseProvider
 class APNProvider(BaseProvider):
     """
     Provider pour Apple Push Notification Service.
-    
+
     Configuration requise:
         APN_CERTIFICATE_PATH: Chemin vers le certificat .pem
         APN_KEY_ID: Key ID (pour auth par token)
         APN_TEAM_ID: Team ID Apple
         APN_BUNDLE_ID: Bundle ID de l'app
         APN_USE_SANDBOX: True pour développement, False pour production
-        
+
     Le destinataire doit avoir un device_token APN stocké dans metadata.
     """
 
     name = "apn"
     display_name = "Apple Push Notification"
+    supported_types = ["PUSH_NOTIFICATION"]
     config_keys = ["APN_CERTIFICATE_PATH", "APN_KEY_ID", "APN_TEAM_ID"]
-    required_package = "aioapns"
+    required_packages = ["aioapns"]
+    site_url = "https://developer.apple.com/documentation/usernotifications"
+    description_text = "Notifications push iOS natives via APNs (Apple)"
 
     def validate(self) -> Dict[str, Any]:
         """Valide que le destinataire a un device token APN"""
@@ -37,7 +40,9 @@ class APNProvider(BaseProvider):
         if not recipient:
             return {"is_valid": False, "error": "Destinataire non défini"}
 
-        device_token = recipient.metadata.get('apn_device_token') if recipient.metadata else None
+        device_token = (
+            recipient.metadata.get("apn_device_token") if recipient.metadata else None
+        )
         if not device_token:
             return {
                 "is_valid": False,
@@ -49,7 +54,7 @@ class APNProvider(BaseProvider):
     def send(self) -> Dict[str, Any]:
         """
         Envoie une notification push via APN.
-        
+
         TODO: Implémenter l'envoi réel via aioapns ou PyAPNs
         """
         validation = self.validate()
@@ -87,4 +92,3 @@ class APNProvider(BaseProvider):
         """Vérifie le statut de livraison APN"""
         # APN ne fournit pas de confirmation de livraison par défaut
         return None
-

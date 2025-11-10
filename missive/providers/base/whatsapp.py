@@ -1,24 +1,32 @@
 """
 Mixin pour les fonctionnalités WhatsApp des providers.
+
+DÉPRÉCIÉ : Ce mixin est conservé pour compatibilité rétrograde.
+Utiliser BaseBrandedMixin avec brand_name='whatsapp' pour les nouvelles implémentations.
 """
-from typing import Any, Dict, Optional
+
+from typing import Any, Dict
 
 
 class BaseWhatsAppMixin:
     """
     Mixin fournissant les fonctionnalités spécifiques à WhatsApp.
+
+    DÉPRÉCIÉ : Ce mixin est conservé pour compatibilité rétrograde.
+    Les nouvelles implémentations doivent utiliser BaseBrandedMixin
+    avec missive_type=BRANDED et brand_name='whatsapp'.
     """
 
     def get_whatsapp_service_info(self) -> Dict[str, Any]:
         """
         Récupère les informations du compte/service WhatsApp.
-        
+
         Retourne les informations importantes pour le service WhatsApp :
         - Crédits disponibles (conversations ou montant)
         - Limites et quotas
         - État du service (actif/inactif)
         - Numéro WhatsApp Business enregistré
-        
+
         Returns:
             Dict contenant :
                 - credits: Nombre de conversations ou montant disponible
@@ -28,7 +36,7 @@ class BaseWhatsAppMixin:
                 - warnings: Liste des alertes
                 - phone_number: Numéro WhatsApp Business enregistré
                 - details: Dict avec infos supplémentaires
-        
+
         À surcharger dans les providers concrets.
         """
         return {
@@ -36,7 +44,9 @@ class BaseWhatsAppMixin:
             "credits_type": "conversations",
             "is_available": None,
             "limits": {},
-            "warnings": ["Méthode get_whatsapp_service_info() non implémentée pour ce provider"],
+            "warnings": [
+                "Méthode get_whatsapp_service_info() non implémentée pour ce provider"
+            ],
             "phone_number": None,
             "details": {},
         }
@@ -170,4 +180,3 @@ class BaseWhatsAppMixin:
             "size": attachment.file_size,
             "max_size": max_sizes.get(media_type, 100 * 1024 * 1024),
         }
-

@@ -12,17 +12,21 @@ from .base import BaseProvider
 class TelegramProvider(BaseProvider):
     """
     Provider pour Telegram.
-    
+
     Configuration requise:
         TELEGRAM_BOT_TOKEN: Token du bot Telegram
-        
+
     Le destinataire doit avoir un chat_id Telegram (stocker dans metadata du Recipient)
     """
 
     name = "telegram"
     display_name = "Telegram"
+    supported_types = ["BRANDED"]
+    brands = ["telegram"]  # Telegram uniquement
     config_keys = ["TELEGRAM_BOT_TOKEN"]
-    required_package = "telegram"
+    required_packages = ["python-telegram-bot"]
+    site_url = "https://telegram.org/"
+    description_text = "Messagerie instantanée sécurisée avec bots et API complète"
 
     def validate(self) -> Dict[str, Any]:
         """Valide que le destinataire a un chat_id Telegram"""
@@ -34,7 +38,9 @@ class TelegramProvider(BaseProvider):
         if not recipient:
             return {"is_valid": False, "error": "Destinataire non défini"}
 
-        chat_id = recipient.metadata.get('telegram_chat_id') if recipient.metadata else None
+        chat_id = (
+            recipient.metadata.get("telegram_chat_id") if recipient.metadata else None
+        )
         if not chat_id:
             return {
                 "is_valid": False,
@@ -46,7 +52,7 @@ class TelegramProvider(BaseProvider):
     def send(self) -> Dict[str, Any]:
         """
         Envoie un message via Telegram Bot API.
-        
+
         TODO: Implémenter l'envoi réel via requests vers:
         https://api.telegram.org/bot{token}/sendMessage
         """
@@ -70,10 +76,9 @@ class TelegramProvider(BaseProvider):
     def check_status(self, external_id: Optional[str] = None) -> Optional[str]:
         """
         Vérifie le statut d'un message Telegram.
-        
+
         Note: Telegram ne fournit pas de webhook automatique pour le statut de livraison.
         On ne peut savoir que si le message a été envoyé.
         """
         # TODO: Implémenter si besoin
         return None
-

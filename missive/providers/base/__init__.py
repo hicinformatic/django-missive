@@ -1,31 +1,43 @@
 """
 Provider de base avec toutes les fonctionnalités (composition de mixins).
 """
+
 from typing import Any, Dict, Optional, Tuple
 
 from django.utils import timezone
 
 from ...models import Missive
 
+# Architecture générique pour les messageries
+from .branded import BaseBrandedMixin
 from .common import BaseProviderCommon
 from .email import BaseEmailMixin
 from .monitoring import BaseMonitoringMixin
 from .notification import BaseNotificationMixin
 from .postal import BasePostalMixin
+from .slack import BaseSlackMixin
 from .sms import BaseSMSMixin
+from .teams import BaseTeamsMixin
 from .voice_call import BaseVoiceCallMixin
-from .whatsapp import BaseWhatsAppMixin
+
+# Mixins spécifiques (pour compatibilité et implémentations de référence)
+from .whatsapp import BaseWhatsAppMixin  # DÉPRÉCIÉ : utiliser BaseBrandedMixin
 
 
 class BaseProvider(
     BaseProviderCommon,
     BaseEmailMixin,
     BaseSMSMixin,
-    BaseWhatsAppMixin,
     BasePostalMixin,
     BaseNotificationMixin,
     BaseVoiceCallMixin,
     BaseMonitoringMixin,
+    # Mixin générique pour TOUTES les messageries d'applications
+    BaseBrandedMixin,
+    # Mixins spécifiques (compatibilité et référence)
+    BaseWhatsAppMixin,
+    BaseSlackMixin,
+    BaseTeamsMixin,
 ):
     """
     Classe de base pour tous les providers.
@@ -38,21 +50,63 @@ class BaseProvider(
     - BaseProviderCommon : Fonctions communes (config, status, events)
     - BaseEmailMixin : Validation email, spam score, attachments email
     - BaseSMSMixin : Validation phone, calcul segments, formatage
-    - BaseWhatsAppMixin : Formatage WhatsApp, attachments média
     - BasePostalMixin : Validation adresse, calcul coût postal
     - BaseNotificationMixin : Formatage notifications, préférences user
     - BaseVoiceCallMixin : Appels vocaux, TTS, messages vocaux
     - BaseMonitoringMixin : Monitoring, crédits, SLA, health check
+    - BaseBrandedMixin : TOUTES les messageries d'applications (WhatsApp, Slack, Teams, Discord, Telegram, etc.)
+    - BaseWhatsAppMixin : DÉPRÉCIÉ - utiliser BaseBrandedMixin
+    - BaseSlackMixin : Implémentation de référence pour Slack
+    - BaseTeamsMixin : Implémentation de référence pour Teams
+
+    Architecture ultra-simplifiée pour messageries :
+    Pour le type BRANDED, le nom du provider (self.name) détermine automatiquement
+    quelle méthode appeler. Le dispatch se fait vers send_{self.name}().
+
+    Plus besoin de brand_name ! Le provider sait ce qu'il fait via son nom.
 
     À implémenter dans les sous-classes :
+    - name : Nom du provider (ex: "whatsapp", "slack", "telegram")
     - supported_types : Liste des MissiveType supportés
-    - send_email() / send_sms() / send_whatsapp() / send_postal() / send_notification() / send_voice_call()
+    - send_email() / send_sms() / send_postal() / send_notification() / send_voice_call()
+    - send_{name}() pour le type BRANDED (ex: send_whatsapp, send_slack, send_telegram)
     - handle_webhook() : pour traiter les webhooks
+
+    Exemples d'utilisation :
+        # Provider WhatsApp
+        class WhatsAppProvider(BaseProvider):
+            name = "whatsapp"
+            supported_types = [MissiveType.BRANDED]
+
+            def send_whatsapp(self):  # ← Appelé automatiquement
+                pass
+
+        # Provider Slack
+        class SlackProvider(BaseProvider):
+            name = "slack"
+            supported_types = [MissiveType.BRANDED]
+
+            def send_slack(self):  # ← Appelé automatiquement
+                context = self._get_organization_context()
+                workspace_id = context.get('workspace_id')
+                # ...
+                pass
+
+        # Utilisation
+        missive = Missive.objects.create(
+            missive_type=MissiveType.BRANDED,
+            recipient=recipient,
+            body='Message',
+            metadata={'workspace_id': 'T123456'}  # ← Si contexte nécessaire
+        )
     """
 
     def send(self) -> bool:
         """
         Envoie la missive en dispatchant vers la bonne méthode selon le type.
+
+        Pour le type BRANDED, utilise self.name du provider pour dispatcher
+        automatiquement vers send_{self.name}().
 
         Returns:
             bool: True si succès, False sinon
@@ -77,14 +131,56 @@ class BaseProvider(
             return self.send_email()
         elif self.missive.missive_type == MissiveType.SMS:
             return self.send_sms()
-        elif self.missive.missive_type == MissiveType.WHATSAPP:
-            return self.send_whatsapp()
         elif self.missive.missive_type == MissiveType.POSTAL:
             return self.send_postal()
         elif self.missive.missive_type == MissiveType.NOTIFICATION:
             return self.send_notification()
         elif self.missive.missive_type == MissiveType.VOICE_CALL:
             return self.send_voice_call()
+        elif self.missive.missive_type == MissiveType.BRANDED:
+            # Dispatch automatique via self.name
+            return self.send_branded()
+
+        return False
+
+    def cancel(self) -> bool:
+        """
+        Annule l'envoi de la missive en dispatchant vers la bonne méthode selon le type.
+
+        Pour le type BRANDED, utilise self.name du provider pour dispatcher
+        automatiquement vers cancel_{self.name}().
+
+        Returns:
+            bool: True si l'annulation a réussi, False sinon
+
+        Example:
+            provider = TwilioProvider(missive=my_missive)
+            if provider.cancel():
+                print("Missive annulée avec succès")
+        """
+        if not self.missive:
+            return False
+
+        # Vérifier que la missive a un external_id (déjà envoyée au provider)
+        if not self.missive.external_id:
+            return False
+
+        # Dispatcher vers la bonne méthode
+        from ...models import MissiveType
+
+        if self.missive.missive_type == MissiveType.EMAIL:
+            return self.cancel_email()
+        elif self.missive.missive_type == MissiveType.SMS:
+            return self.cancel_sms()
+        elif self.missive.missive_type == MissiveType.POSTAL:
+            return self.cancel_postal()
+        elif self.missive.missive_type == MissiveType.NOTIFICATION:
+            return self.cancel_notification()
+        elif self.missive.missive_type == MissiveType.VOICE_CALL:
+            return self.cancel_voice_call()
+        elif self.missive.missive_type == MissiveType.BRANDED:
+            # Méthode générique pour toutes les messageries de marque
+            return self.cancel_branded()
 
         return False
 
@@ -247,7 +343,8 @@ class BaseProvider(
                 if email_validation["warnings"]:
                     recommendations.extend(email_validation["warnings"])
 
-        elif missive.missive_type in [MissiveType.SMS, MissiveType.WHATSAPP]:
+        elif missive.missive_type in [MissiveType.SMS, MissiveType.BRANDED]:
+            # SMS ou messagerie de marque (WhatsApp, Telegram, etc.) nécessitent un téléphone
             phone = missive.get_recipient_phone()
             if phone:
                 phone_validation = self.validate_phone_number(phone)
@@ -293,4 +390,3 @@ class BaseProvider(
 
 # Export pour compatibilité
 __all__ = ["BaseProvider"]
-

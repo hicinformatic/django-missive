@@ -13,7 +13,14 @@ class MissiveEventInline(admin.TabularInline):
 
     model = MissiveEvent
     extra = 0
-    readonly_fields = ["event_type", "provider", "status", "description", "metadata", "created_at"]
+    readonly_fields = [
+        "event_type",
+        "provider",
+        "status",
+        "description",
+        "metadata",
+        "created_at",
+    ]
     fields = ["event_type", "provider", "status", "description", "created_at"]
     can_delete = False
 
@@ -33,7 +40,15 @@ class MissiveEventAdmin(admin.ModelAdmin):
     list_display = ["event_type", "provider", "missive", "status", "created_at"]
     list_filter = ["event_type", "provider", "status", "created_at"]
     search_fields = ["missive__subject", "description", "provider"]
-    readonly_fields = ["missive", "event_type", "provider", "status", "description", "metadata", "created_at"]
+    readonly_fields = [
+        "missive",
+        "event_type",
+        "provider",
+        "status",
+        "description",
+        "metadata",
+        "created_at",
+    ]
 
     fieldsets = (
         (
@@ -54,6 +69,3 @@ class MissiveEventAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         """Les événements ne peuvent pas être modifiés"""
         return False
-
-
-

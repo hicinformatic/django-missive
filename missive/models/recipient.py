@@ -53,7 +53,9 @@ class Recipient(models.Model):
         max_length=255,
         default="",
         verbose_name=_("Nom"),
-        help_text=_("Nom complet (personne) ou dénomination (entreprise/administration)"),
+        help_text=_(
+            "Nom complet (personne) ou dénomination (entreprise/administration)"
+        ),
     )
 
     # Coordonnées
@@ -68,7 +70,9 @@ class Recipient(models.Model):
         blank=True,
         null=True,
         verbose_name=_("Téléphone mobile"),
-        help_text=_("Numéro de téléphone mobile au format international (ex: +33 6 12 34 56 78)"),
+        help_text=_(
+            "Numéro de téléphone mobile au format international (ex: +33 6 12 34 56 78)"
+        ),
     )
 
     # Adresse postale complète
@@ -127,12 +131,14 @@ class Recipient(models.Model):
         verbose_name=_("Actif"),
         help_text=_("Désactiver pour masquer ce destinataire sans le supprimer"),
     )
-    
+
     # Configuration expéditeur
     can_be_sender = models.BooleanField(
         default=False,
         verbose_name=_("Utilisable comme expéditeur"),
-        help_text=_("Cocher si ce destinataire peut être utilisé comme expéditeur de missives"),
+        help_text=_(
+            "Cocher si ce destinataire peut être utilisé comme expéditeur de missives"
+        ),
     )
     is_default_sender = models.BooleanField(
         default=False,
@@ -179,9 +185,12 @@ class Recipient(models.Model):
             # Une adresse postale complète ne peut être dupliquée
             models.UniqueConstraint(
                 fields=["name", "address_line1", "postal_code", "city"],
-                condition=models.Q(address_line1__isnull=False) & ~models.Q(address_line1=""),
+                condition=models.Q(address_line1__isnull=False)
+                & ~models.Q(address_line1=""),
                 name="unique_postal_address",
-                violation_error_message=_("Un destinataire avec cette adresse existe déjà"),
+                violation_error_message=_(
+                    "Un destinataire avec cette adresse existe déjà"
+                ),
             ),
         ]
 
@@ -203,12 +212,7 @@ class Recipient(models.Model):
     @property
     def display_name(self):
         """Nom d'affichage"""
-        return (
-            self.full_name
-            or self.email
-            or self.mobile
-            or f"Recipient #{self.id}"
-        )
+        return self.full_name or self.email or self.mobile or f"Recipient #{self.id}"
 
     @property
     def postal_address(self):
@@ -274,5 +278,5 @@ class Recipient(models.Model):
             )
             # Activer automatiquement can_be_sender si c'est l'expéditeur par défaut
             self.can_be_sender = True
-        
+
         super().save(*args, **kwargs)

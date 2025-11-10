@@ -32,7 +32,7 @@
                     PROVIDERS_BY_TYPE = {
                         'EMAIL': ['django_email', 'sendgrid', 'mailgun', 'custom'],
                         'SMS': ['twilio', 'custom'],
-                        'WHATSAPP': ['twilio', 'custom'],
+                        'BRANDED': ['twilio', 'slack', 'telegram', 'custom'],
                         'POSTAL': ['laposte', 'custom'],
                         'NOTIFICATION': ['custom']
                     };
@@ -92,7 +92,7 @@
                         $providerChoice.val('django_email');
                     } else if (selectedType === 'SMS' && compatibleProviders.includes('twilio')) {
                         $providerChoice.val('twilio');
-                    } else if (selectedType === 'WHATSAPP' && compatibleProviders.includes('twilio')) {
+                    } else if (selectedType === 'BRANDED' && compatibleProviders.includes('twilio')) {
                         $providerChoice.val('twilio');
                     } else if (selectedType === 'POSTAL' && compatibleProviders.includes('laposte')) {
                         $providerChoice.val('laposte');

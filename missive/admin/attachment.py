@@ -15,7 +15,13 @@ class MissiveAttachmentInline(admin.StackedInline):
 
     model = MissiveAttachment
     extra = 1
-    readonly_fields = ["created_at", "file_url_display", "attached_to_display", "file_size", "mime_type"]
+    readonly_fields = [
+        "created_at",
+        "file_url_display",
+        "attached_to_display",
+        "file_size",
+        "mime_type",
+    ]
 
     fieldsets = (
         (
@@ -70,7 +76,9 @@ class MissiveAttachmentInline(admin.StackedInline):
         try:
             if obj.content_object:
                 ct = obj.content_type
-                url = reverse(f"admin:{ct.app_label}_{ct.model}_change", args=[obj.object_id])
+                url = reverse(
+                    f"admin:{ct.app_label}_{ct.model}_change", args=[obj.object_id]
+                )
                 label = str(obj.content_object)
                 if len(label) > 40:
                     label = label[:37] + "..."
@@ -104,7 +112,13 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
         "content_type__model",
         "content_type__app_label",
     ]
-    readonly_fields = ["created_at", "file_url_display", "attached_to_display", "file_size", "mime_type"]
+    readonly_fields = [
+        "created_at",
+        "file_url_display",
+        "attached_to_display",
+        "file_size",
+        "mime_type",
+    ]
     list_editable = ["order"]
     list_display_links = ["id"]
 
@@ -122,12 +136,17 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
                     "attached_to_display",
                     "order",
                 ),
-                "description": _("Fournir soit un fichier local, soit une URL externe, éventuellement lié à un autre objet"),
+                "description": _(
+                    "Fournir soit un fichier local, soit une URL externe, éventuellement lié à un autre objet"
+                ),
             },
         ),
         (
             _("Métadonnées"),
-            {"fields": ("file_size", "mime_type", "created_at"), "classes": ("collapse",)},
+            {
+                "fields": ("file_size", "mime_type", "created_at"),
+                "classes": ("collapse",),
+            },
         ),
     )
 
@@ -155,10 +174,14 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
         try:
             if obj.missive:
                 url = reverse("admin:missive_missive_change", args=[obj.missive.id])
-                return format_html('<a href="{}">📧 Missive #{}</a>', url, obj.missive.id)
+                return format_html(
+                    '<a href="{}">📧 Missive #{}</a>', url, obj.missive.id
+                )
             elif obj.content_object:
                 ct = obj.content_type
-                url = reverse(f"admin:{ct.app_label}_{ct.model}_change", args=[obj.object_id])
+                url = reverse(
+                    f"admin:{ct.app_label}_{ct.model}_change", args=[obj.object_id]
+                )
                 label = str(obj.content_object)
                 if len(label) > 40:
                     label = label[:37] + "..."
@@ -195,4 +218,3 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
         return "-"
 
     file_url_display.short_description = _("Lien")
-

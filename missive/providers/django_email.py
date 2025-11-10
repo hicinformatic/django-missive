@@ -16,9 +16,12 @@ class DjangoEmailProvider(BaseProvider):
     supported_types = ["EMAIL"]
     services = ["email"]  # Email via SMTP configuré dans Django
     config_keys = ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_HOST_USER", "EMAIL_HOST_PASSWORD"]
-    required_package = None  # Toujours disponible avec Django
+    required_packages = []  # Toujours disponible avec Django
+    description_text = (
+        "Email SMTP Django natif (toujours disponible, aucune dépendance)"
+    )
 
-    def send_email(self) -> bool:
+    def send_email(self, **kwargs) -> bool:
         """Envoie via Django mail (SMTP)"""
         # Validation
         is_valid, error = self.validate()
@@ -66,10 +69,10 @@ class DjangoEmailProvider(BaseProvider):
     def get_service_status(self) -> Dict:
         """
         Récupère le statut du serveur SMTP Django.
-        
+
         Django Email utilise le serveur SMTP configuré dans settings.py.
         Pas de crédits, mais on peut tester la connexion SMTP.
-        
+
         Returns:
             Dict avec status, disponibilité SMTP, etc.
         """
@@ -82,7 +85,7 @@ class DjangoEmailProvider(BaseProvider):
         #     connection.open()
         #     is_available = connection.connection is not None
         #     connection.close()
-        #     
+        #
         #     status = "operational" if is_available else "down"
         #     warnings = [] if is_available else ["Impossible de se connecter au serveur SMTP"]
         #

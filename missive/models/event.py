@@ -28,7 +28,9 @@ class MissiveEvent(models.Model):
         blank=True,
         null=True,
         verbose_name=_("Provider"),
-        help_text=_("Provider qui a généré cet événement (sendgrid, twilio, laposte, etc.)"),
+        help_text=_(
+            "Provider qui a généré cet événement (sendgrid, twilio, laposte, etc.)"
+        ),
     )
     status = models.CharField(
         max_length=20,

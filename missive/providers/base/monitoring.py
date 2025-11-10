@@ -1,7 +1,8 @@
 """
 Mixin pour le monitoring et le statut des providers.
 """
-from typing import Any, Dict, List
+
+from typing import Any, Dict
 
 from django.utils import timezone
 
@@ -263,5 +264,3 @@ class BaseMonitoringMixin:
             "recommendations": recommendations,
             "summary": summary,
         }
-
-

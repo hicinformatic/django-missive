@@ -14,4 +14,3 @@ class MissiveConfig(AppConfig):
         """
         # Import signals here if needed
         # from . import signals
-        pass
