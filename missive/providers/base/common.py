@@ -118,11 +118,6 @@ class BaseProviderCommon:
         """
         return service in self.services
 
-    def _get_config(self) -> Dict[str, Any]:
-        """Récupère la configuration depuis Django settings"""
-        missive_config = getattr(settings, "MISSIVE_CONFIG", {})
-        return missive_config
-
     def _update_status(
         self,
         status: MissiveStatus,

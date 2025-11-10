@@ -192,14 +192,3 @@ EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@example.com")
-
-# Configuration globale pour les providers (legacy, peut être déprécié)
-MISSIVE_CONFIG = {
-    "SENDGRID_API_KEY": SENDGRID_API_KEY,
-    "MAILGUN_API_KEY": MAILGUN_API_KEY,
-    "TWILIO_ACCOUNT_SID": TWILIO_ACCOUNT_SID,
-    "SMSPARTNER_API_KEY": SMSPARTNER_API_KEY,
-    "LAPOSTE_API_KEY": LAPOSTE_API_KEY,
-    "AR24_API_TOKEN": AR24_API_TOKEN,
-    "CERTEUROPE_API_KEY": CERTEUROPE_API_KEY,
-}
