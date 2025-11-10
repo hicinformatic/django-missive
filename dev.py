@@ -539,7 +539,17 @@ def task_makemigrations():
 
 
 def task_runserver():
-    """Start Django development server"""
+    """Start Django development server
+    
+    Configuration via variables d'environnement :
+        DJANGO_PORT : Port d'écoute (défaut: 8000)
+        DJANGO_HOST : Adresse d'écoute (défaut: 127.0.0.1)
+    
+    Exemples :
+        python dev.py runserver
+        DJANGO_PORT=30080 python dev.py runserver
+        DJANGO_HOST=0.0.0.0 DJANGO_PORT=30080 python dev.py runserver
+    """
     if not venv_exists():
         print_error("Virtual environment not found. Run: python dev.py install-dev")
         return False
@@ -551,13 +561,19 @@ def task_runserver():
         if not task_migrate():
             return False
     
+    # Récupérer le port et l'hôte depuis les variables d'environnement
+    port = os.environ.get('DJANGO_PORT', '8000')
+    host = os.environ.get('DJANGO_HOST', '127.0.0.1')
+    bind_address = f"{host}:{port}"
+    
     print_success("Starting Django development server...")
-    print_info("Access admin at: http://127.0.0.1:8000/admin/")
+    print_info(f"Access server at: http://{host}:{port}/")
+    print_info(f"Access admin at: http://{host}:{port}/admin/")
     print_info("Login: admin / admin")
     print_warning("Press Ctrl+C to stop the server")
     
     manage_py = PROJECT_ROOT / 'manage.py'
-    run_command([str(PYTHON), str(manage_py), 'runserver'], check=False)
+    run_command([str(PYTHON), str(manage_py), 'runserver', bind_address], check=False)
     return True
 
 
