@@ -747,9 +747,18 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 ).format(var_name, var_name, var_name, actual_value)
             else:
                 # Variable manquante
-                icon = '<span style="color: #dc3545; font-weight: bold;">✗</span>'
-                status_text = '<span style="color: #dc3545;">Manquante</span>'
-                value_html = "<code>Non définie</code>"
+                # Cas spécial pour SMSPARTNER_WEBHOOK_IPS : afficher la valeur par défaut
+                if var_name == "SMSPARTNER_WEBHOOK_IPS":
+                    icon = '<span style="color: #0d6efd; font-weight: bold;">ℹ️</span>'
+                    status_text = '<span style="color: #0d6efd;">Par défaut</span>'
+                    value_html = (
+                        '<code style="color: #0d6efd;">185.66.232.0/24</code> '
+                        '<small style="color: #6c757d;">(plage officielle SMSPartner)</small>'
+                    )
+                else:
+                    icon = '<span style="color: #dc3545; font-weight: bold;">✗</span>'
+                    status_text = '<span style="color: #dc3545;">Manquante</span>'
+                    value_html = "<code>Non définie</code>"
 
             rows.append(
                 "<tr>"

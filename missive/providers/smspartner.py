@@ -35,7 +35,11 @@ class SMSPartnerProvider(BaseProvider):
         "voice_call",
         "email",
     ]
-    config_keys = ["SMSPARTNER_API_KEY", "SMSPARTNER_SENDER"]
+    config_keys = [
+        "SMSPARTNER_API_KEY",
+        "SMSPARTNER_SENDER",
+        "SMSPARTNER_WEBHOOK_IPS",
+    ]
     required_packages = ["requests"]
     site_url = "https://www.smspartner.fr/"
     status_url = "https://status.smspartner.fr/status/nda-media"
