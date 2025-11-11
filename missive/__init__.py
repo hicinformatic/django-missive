@@ -82,11 +82,41 @@ def __getattr__(name):
         from .shortcuts import send_telegram
 
         return send_telegram
+    # Exceptions
+    elif name == "MissiveError":
+        from .exceptions import MissiveError
+
+        return MissiveError
+    elif name == "MissiveValidationError":
+        from .exceptions import MissiveValidationError
+
+        return MissiveValidationError
+    elif name == "MissiveProviderError":
+        from .exceptions import MissiveProviderError
+
+        return MissiveProviderError
+    elif name == "MissiveConfigError":
+        from .exceptions import MissiveConfigError
+
+        return MissiveConfigError
+    elif name == "MissiveWebhookError":
+        from .exceptions import MissiveWebhookError
+
+        return MissiveWebhookError
+    elif name == "MissiveNotFoundError":
+        from .exceptions import MissiveNotFoundError
+
+        return MissiveNotFoundError
+    elif name == "MissiveProviderNotAvailableError":
+        from .exceptions import MissiveProviderNotAvailableError
+
+        return MissiveProviderNotAvailableError
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
 __all__ = [
     "__version__",
+    # Models
     "Missive",
     "MissiveType",
     "MissiveStatus",
@@ -96,6 +126,7 @@ __all__ = [
     "MissiveTemplate",
     "Recipient",
     "RecipientType",
+    # Sender
     "MissiveSender",
     "MissiveBuilder",
     "get_missives_stats_for_object",
@@ -106,4 +137,12 @@ __all__ = [
     "send_whatsapp",
     "send_slack",
     "send_telegram",
+    # Exceptions
+    "MissiveError",
+    "MissiveValidationError",
+    "MissiveProviderError",
+    "MissiveConfigError",
+    "MissiveWebhookError",
+    "MissiveNotFoundError",
+    "MissiveProviderNotAvailableError",
 ]
