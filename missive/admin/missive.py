@@ -1,23 +1,21 @@
-"""
-Administration pour le modèle Missive.
-"""
+"""Admin for Missive model."""
 
 import json
 
 from django import forms
-from django.conf import settings
 from django.contrib import admin
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
+from ..decorators import sandbox_warning
 from ..helpers import get_all_provider_choices, get_providers_from_config
 from ..models import Missive, Recipient
 
 
 class MissiveAdminForm(forms.ModelForm):
-    """Formulaire personnalisé pour l'admin des Missives"""
+    """Custom form for Missive admin"""
 
     # Mapping: type de missive → providers compatibles (depuis MISSIVE_PROVIDERS)
     PROVIDERS_BY_TYPE = get_providers_from_config()
@@ -110,9 +108,10 @@ class MissiveAdminForm(forms.ModelForm):
         return instance
 
 
+@sandbox_warning
 @admin.register(Missive)
 class MissiveAdmin(admin.ModelAdmin):
-    """Interface d'administration pour les Missives"""
+    """Admin interface for Missives"""
 
     form = MissiveAdminForm
     raw_id_fields = ["recipient_user"]
@@ -132,53 +131,6 @@ class MissiveAdmin(admin.ModelAdmin):
     ]
 
     list_display_links = ["recipient_display_short"]
-
-    def changelist_view(self, request, extra_context=None):
-        """Affiche un warning si le mode sandbox est actif"""
-        extra_context = extra_context or {}
-
-        # Vérifier si le mode sandbox est activé
-        if getattr(settings, "MISSIVE_SANDBOX", False):
-            from django.contrib import messages
-
-            messages.warning(
-                request,
-                _(
-                    "⚠️ MODE SANDBOX ACTIVÉ : Tous les envois utilisent le mode test. "
-                    "Les messages ne seront pas réellement envoyés. "
-                    "Désactivez MISSIVE_SANDBOX dans settings.py pour envoyer en production."
-                ),
-            )
-
-        return super().changelist_view(request, extra_context=extra_context)
-
-    def add_view(self, request, form_url="", extra_context=None):
-        """Affiche un warning si le mode sandbox est actif (création)"""
-        extra_context = extra_context or {}
-
-        if getattr(settings, "MISSIVE_SANDBOX", False):
-            from django.contrib import messages
-
-            messages.info(
-                request,
-                _("ℹ️ Mode sandbox actif : Cette missive sera envoyée en mode test."),
-            )
-
-        return super().add_view(request, form_url, extra_context)
-
-    def change_view(self, request, object_id, form_url="", extra_context=None):
-        """Affiche un warning si le mode sandbox est actif (modification)"""
-        extra_context = extra_context or {}
-
-        if getattr(settings, "MISSIVE_SANDBOX", False):
-            from django.contrib import messages
-
-            messages.info(
-                request,
-                _("ℹ️ Mode sandbox actif : Cette missive sera envoyée en mode test."),
-            )
-
-        return super().change_view(request, object_id, form_url, extra_context)
 
     list_filter = [
         "missive_type",
@@ -297,7 +249,7 @@ class MissiveAdmin(admin.ModelAdmin):
     ]
 
     def missive_type_badge(self, obj):
-        """Badge coloré pour le type de missive"""
+        """Colored badge for missive type"""
         colors = {
             # Courrier
             "POSTAL": "#6c757d",
@@ -326,7 +278,7 @@ class MissiveAdmin(admin.ModelAdmin):
     missive_type_badge.short_description = _("Type")
 
     def status_badge(self, obj):
-        """Badge coloré pour le statut"""
+        """Colored badge for status"""
         colors = {
             "DRAFT": "#6c757d",
             "PENDING": "#ffc107",
@@ -348,7 +300,7 @@ class MissiveAdmin(admin.ModelAdmin):
     status_badge.short_description = _("Statut")
 
     def priority_badge(self, obj):
-        """Badge pour la priorité"""
+        """Badge for priority"""
         colors = {
             "LOW": "#6c757d",
             "NORMAL": "#0d6efd",
@@ -375,7 +327,7 @@ class MissiveAdmin(admin.ModelAdmin):
     recipient_display_short.short_description = _("Destinataire")
 
     def related_object_display(self, obj):
-        """Affichage de l'objet lié"""
+        """Display related object"""
         if obj.content_object:
             try:
                 content_type = obj.content_type
@@ -397,7 +349,7 @@ class MissiveAdmin(admin.ModelAdmin):
     related_object_display.short_description = _("Objet lié")
 
     def proof_of_delivery_display(self, obj):
-        """Affiche tous les liens vers les preuves de dépôt disponibles"""
+        """Display all available proof of delivery links"""
         if not obj.pk:  # Nouvelle missive
             return "-"
 
@@ -467,7 +419,7 @@ class MissiveAdmin(admin.ModelAdmin):
     proof_of_delivery_display.short_description = _("Preuves de dépôt")
 
     def _get_provider_instance(self, obj):
-        """Récupère une instance du provider pour cette missive"""
+        """Get provider instance for this missive"""
         try:
             from django.utils.module_loading import import_string
 
@@ -498,7 +450,7 @@ class MissiveAdmin(admin.ModelAdmin):
 
     @admin.action(description=_("🚀 Envoyer maintenant"))
     def send_now_action(self, request, queryset):
-        """Action pour envoyer les missives sélectionnées immédiatement"""
+        """Action to send selected missives immediately"""
         from ..sender import MissiveSender
 
         sender = MissiveSender()
@@ -581,7 +533,7 @@ class MissiveAdmin(admin.ModelAdmin):
 
     @admin.action(description=_("🔍 Analyser le risque d'échec"))
     def check_delivery_risk_action(self, request, queryset):
-        """Action pour analyser le risque d'échec des missives sélectionnées"""
+        """Action to analyze delivery risk for selected missives"""
         from ..sender import MissiveSender
 
         low_risk = 0

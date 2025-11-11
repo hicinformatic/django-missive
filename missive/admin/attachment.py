@@ -1,17 +1,16 @@
-"""
-Administration pour le modèle MissiveAttachment.
-"""
+"""Admin for MissiveAttachment model."""
 
 from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
+from ..decorators import sandbox_warning
 from ..models import MissiveAttachment
 
 
 class MissiveAttachmentInline(admin.StackedInline):
-    """Inline pour les pièces jointes (affichage vertical)"""
+    """Inline for attachments (vertical display)"""
 
     model = MissiveAttachment
     extra = 1
@@ -39,7 +38,7 @@ class MissiveAttachmentInline(admin.StackedInline):
             },
         ),
         (
-            _("Métadonnées"),
+            _("Metadata"),
             {
                 "fields": (
                     "file_size",
@@ -52,20 +51,20 @@ class MissiveAttachmentInline(admin.StackedInline):
     )
 
     def file_url_display(self, obj):
-        """Affiche le lien vers le fichier"""
+        """Display link to file"""
         if obj and obj.file_url:
             icon = "🔗" if obj.is_external else "📎"
             return format_html(
-                '<a href="{}" target="_blank">{} Voir le fichier</a>',
+                '<a href="{}" target="_blank">{} View file</a>',
                 obj.file_url,
                 icon,
             )
         return "-"
 
-    file_url_display.short_description = _("Lien")
+    file_url_display.short_description = _("Link")
 
     def attached_to_display(self, obj):
-        """Affiche l'objet auquel le fichier est attaché"""
+        """Display object to which file is attached"""
         if not obj or not obj.pk:
             return "-"
 
@@ -88,12 +87,13 @@ class MissiveAttachmentInline(admin.StackedInline):
 
         return str(attached)
 
-    attached_to_display.short_description = _("Attaché à")
+    attached_to_display.short_description = _("Attached to")
 
 
+@sandbox_warning
 @admin.register(MissiveAttachment)
 class MissiveAttachmentAdmin(admin.ModelAdmin):
-    """Admin pour les pièces jointes"""
+    """Admin for attachments"""
 
     raw_id_fields = ["missive"]
 
@@ -137,12 +137,12 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
                     "order",
                 ),
                 "description": _(
-                    "Fournir soit un fichier local, soit une URL externe, éventuellement lié à un autre objet"
+                    "Provide either a local file or external URL, optionally linked to another object"
                 ),
             },
         ),
         (
-            _("Métadonnées"),
+            _("Metadata"),
             {
                 "fields": ("file_size", "mime_type", "created_at"),
                 "classes": ("collapse",),
@@ -151,11 +151,11 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
     )
 
     def storage_type_badge(self, obj):
-        """Badge pour le type de stockage"""
+        """Storage type badge"""
         if obj.is_external:
             return format_html(
                 '<span style="background-color: #0dcaf0; color: white; padding: 2px 8px; '
-                'border-radius: 3px; font-size: 10px; white-space: nowrap;">🔗 Externe</span>'
+                'border-radius: 3px; font-size: 10px; white-space: nowrap;">🔗 External</span>'
             )
         else:
             return format_html(
@@ -163,10 +163,10 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
                 'border-radius: 3px; font-size: 10px; white-space: nowrap;">📎 Local</span>'
             )
 
-    storage_type_badge.short_description = _("Stockage")
+    storage_type_badge.short_description = _("Storage")
 
     def attached_to_display(self, obj):
-        """Affiche l'objet auquel le fichier est attaché"""
+        """Display object to which file is attached"""
         attached = obj.attached_to
         if not attached:
             return "-"
@@ -191,10 +191,10 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
 
         return str(attached)
 
-    attached_to_display.short_description = _("Attaché à")
+    attached_to_display.short_description = _("Attached to")
 
     def file_size_display(self, obj):
-        """Affichage formaté de la taille"""
+        """Formatted size display"""
         if obj.file_size:
             if obj.file_size < 1024:
                 return f"{obj.file_size} B"
@@ -204,17 +204,17 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
                 return f"{obj.file_size / (1024 * 1024):.1f} MB"
         return "-"
 
-    file_size_display.short_description = _("Taille")
+    file_size_display.short_description = _("Size")
 
     def file_url_display(self, obj):
-        """Affiche le lien vers le fichier"""
+        """Display link to file"""
         if obj.file_url:
             icon = "🔗" if obj.is_external else "📎"
             return format_html(
-                '<a href="{}" target="_blank">{} Télécharger/Voir</a>',
+                '<a href="{}" target="_blank">{} Download/View</a>',
                 obj.file_url,
                 icon,
             )
         return "-"
 
-    file_url_display.short_description = _("Lien")
+    file_url_display.short_description = _("Link")

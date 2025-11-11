@@ -1,64 +1,61 @@
-"""
-Choix (enums) pour les modèles Django Missive.
-"""
+"""Choices (enums) for Django Missive models."""
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 
 class RecipientType(models.TextChoices):
-    """Types de destinataires"""
+    """Recipient types"""
 
-    INDIVIDUAL = "INDIVIDUAL", _("Particulier")
-    COMPANY = "COMPANY", _("Entreprise")
+    INDIVIDUAL = "INDIVIDUAL", _("Individual")
+    COMPANY = "COMPANY", _("Company")
     ADMINISTRATION = "ADMINISTRATION", _("Administration")
 
 
 class MissiveType(models.TextChoices):
-    """Types de missives disponibles"""
+    """Available missive types"""
 
-    # Courrier
-    POSTAL = "POSTAL", _("Courrier postal")
-    LRE = "LRE", _("Lettre recommandée électronique")
+    # Postal
+    POSTAL = "POSTAL", _("Postal mail")
+    LRE = "LRE", _("Electronic registered letter")
 
     # Email
     EMAIL = "EMAIL", _("Email")
 
-    # SMS et évolutions
+    # SMS
     SMS = "SMS", _("SMS")
-    RCS = "RCS", _("RCS (SMS enrichi)")
+    RCS = "RCS", _("RCS (Rich SMS)")
 
-    # Vocal
-    VOICE_CALL = "VOICE_CALL", _("Appel vocal automatisé")
+    # Voice
+    VOICE_CALL = "VOICE_CALL", _("Automated voice call")
 
     # Notifications
-    NOTIFICATION = "NOTIFICATION", _("Notification in-app")
-    PUSH_NOTIFICATION = "PUSH_NOTIFICATION", _("Notification push mobile")
+    NOTIFICATION = "NOTIFICATION", _("In-app notification")
+    PUSH_NOTIFICATION = "PUSH_NOTIFICATION", _("Mobile push notification")
 
-    # Messageries d'applications (type générique ultra-simplifié)
-    # Le nom du provider (self.name) détermine automatiquement quelle méthode appeler.
-    # Supporte TOUTES les messageries : WhatsApp, Slack, Teams, Discord, Telegram, Signal, etc.
-    # Exemple: un provider avec name="slack" appellera automatiquement send_slack()
-    BRANDED = "BRANDED", _("Messagerie d'application")
+    # App messaging (generic type, auto-dispatched by provider name)
+    # Supports ALL messengers: WhatsApp, Slack, Teams, Discord, Telegram, Signal, etc.
+    # Example: provider with name="slack" auto-calls send_slack()
+    BRANDED = "BRANDED", _("App messaging")
 
 
 class MissiveStatus(models.TextChoices):
-    """Statuts du cycle de vie d'une missive"""
+    """Missive lifecycle statuses"""
 
-    DRAFT = "DRAFT", _("Brouillon")
-    PENDING = "PENDING", _("En attente")
-    PROCESSING = "PROCESSING", _("En cours de traitement")
-    SENT = "SENT", _("Envoyé")
-    DELIVERED = "DELIVERED", _("Délivré")
-    READ = "READ", _("Lu")
-    FAILED = "FAILED", _("Échec")
-    CANCELLED = "CANCELLED", _("Annulé")
+    DRAFT = "DRAFT", _("Draft")
+    PENDING = "PENDING", _("Pending")
+    PROCESSING = "PROCESSING", _("Processing")
+    SENT = "SENT", _("Sent")
+    DELIVERED = "DELIVERED", _("Delivered")
+    READ = "READ", _("Read")
+    FAILED = "FAILED", _("Failed")
+    CANCELLED = "CANCELLED", _("Cancelled")
 
 
 class MissivePriority(models.TextChoices):
-    """Niveaux de priorité"""
+    """Priority levels"""
 
-    LOW = "LOW", _("Basse")
-    NORMAL = "NORMAL", _("Normale")
-    HIGH = "HIGH", _("Haute")
-    URGENT = "URGENT", _("Urgente")
+    LOW = "LOW", _("Low")
+    NORMAL = "NORMAL", _("Normal")
+    HIGH = "HIGH", _("High")
+    URGENT = "URGENT", _("Urgent")

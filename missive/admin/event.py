@@ -1,15 +1,14 @@
-"""
-Administration pour le modèle MissiveEvent.
-"""
+"""Admin for MissiveEvent model."""
 
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
+from ..decorators import sandbox_warning
 from ..models import MissiveEvent
 
 
 class MissiveEventInline(admin.TabularInline):
-    """Inline pour l'historique des événements"""
+    """Inline for event history"""
 
     model = MissiveEvent
     extra = 0
@@ -25,17 +24,18 @@ class MissiveEventInline(admin.TabularInline):
     can_delete = False
 
     def has_add_permission(self, request, obj=None):
-        """Empêche l'ajout d'événements via l'admin"""
+        """Prevent adding events via admin"""
         return False
 
     def has_delete_permission(self, request, obj=None):
-        """Empêche la suppression d'événements via l'admin"""
+        """Prevent deleting events via admin"""
         return False
 
 
+@sandbox_warning
 @admin.register(MissiveEvent)
 class MissiveEventAdmin(admin.ModelAdmin):
-    """Admin pour les événements (lecture seule)"""
+    """Admin for events (read-only)"""
 
     list_display = ["event_type", "provider", "missive", "status", "created_at"]
     list_filter = ["event_type", "provider", "status", "created_at"]
@@ -52,20 +52,20 @@ class MissiveEventAdmin(admin.ModelAdmin):
 
     fieldsets = (
         (
-            _("Événement"),
+            _("Event"),
             {"fields": ("missive", "event_type", "provider", "status")},
         ),
-        (_("Détails"), {"fields": ("description", "metadata", "created_at")}),
+        (_("Details"), {"fields": ("description", "metadata", "created_at")}),
     )
 
     def has_add_permission(self, request):
-        """Les événements ne peuvent pas être créés manuellement"""
+        """Events cannot be created manually"""
         return False
 
     def has_delete_permission(self, request, obj=None):
-        """Les événements ne peuvent pas être supprimés"""
+        """Events cannot be deleted"""
         return False
 
     def has_change_permission(self, request, obj=None):
-        """Les événements ne peuvent pas être modifiés"""
+        """Events cannot be modified"""
         return False

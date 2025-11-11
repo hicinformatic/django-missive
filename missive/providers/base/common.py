@@ -94,6 +94,20 @@ class BaseProviderCommon:
         self.missive = missive
         self.config = self._get_config()
 
+    def _get_config(self) -> Dict[str, Any]:
+        """
+        Récupère la configuration du provider depuis Django settings.
+
+        Returns:
+            Dict contenant toutes les clés de configuration du provider
+        """
+        config = {}
+        for key in self.config_keys:
+            value = getattr(settings, key, None)
+            if value is not None:
+                config[key] = value
+        return config
+
     def supports(self, missive_type: str) -> bool:
         """
         Vérifie si ce provider supporte un type de missive.

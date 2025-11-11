@@ -1,9 +1,10 @@
 """
-Administration des modèles Missive.
+Missive models administration.
 
-Ce module regroupe tous les fichiers d'administration des différents modèles.
+This module groups all admin files for different models.
 """
 
+from ..decorators import sandbox_warning
 from ..helpers import (
     get_all_provider_choices,
     get_provider_name_from_path,
@@ -12,16 +13,18 @@ from ..helpers import (
 from .attachment import MissiveAttachmentAdmin, MissiveAttachmentInline
 from .event import MissiveEventAdmin, MissiveEventInline
 
-# Importer tous les admins pour qu'ils soient enregistrés
+# Import all admins to register them
 from .missive import MissiveAdmin, MissiveAdminForm
 from .provider import ProviderInfoAdmin
 from .recipient import RecipientAdmin
 from .template import MissiveTemplateAdmin
 
-# Configurer les inlines pour MissiveAdmin (après toutes les imports)
+# Configure inlines for MissiveAdmin (after all imports)
 MissiveAdmin.inlines = [MissiveAttachmentInline, MissiveEventInline]
 
 __all__ = [
+    # Decorators
+    "sandbox_warning",
     # Missive
     "MissiveAdmin",
     "MissiveAdminForm",

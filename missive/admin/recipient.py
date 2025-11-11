@@ -1,23 +1,23 @@
-"""
-Administration pour le modèle Recipient.
-"""
+"""Admin for Recipient model."""
 
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
+from ..decorators import sandbox_warning
 from ..models import Recipient
 
 
+@sandbox_warning
 @admin.register(Recipient)
 class RecipientAdmin(admin.ModelAdmin):
-    """Admin pour les destinataires"""
+    """Admin for recipients"""
 
     class Media:
         js = ("admin/js/recipient_context_filter.js",)
 
     def get_search_results(self, request, queryset, search_term):
-        """Filtre les résultats de recherche selon le contexte (sender vs recipient)"""
+        """Filter search results based on context (sender vs recipient)"""
         queryset, use_distinct = super().get_search_results(
             request, queryset, search_term
         )
@@ -116,7 +116,7 @@ class RecipientAdmin(admin.ModelAdmin):
     )
 
     def name_display(self, obj):
-        """Affiche le nom avec civilité"""
+        """Display name with civility"""
         name = obj.full_name or f"Recipient #{obj.id}"
         if obj.is_active:
             return format_html('<strong style="white-space: nowrap;">{}</strong>', name)
@@ -144,7 +144,7 @@ class RecipientAdmin(admin.ModelAdmin):
     email_display.short_description = _("Email")
 
     def phone_display(self, obj):
-        """Affiche le numéro de téléphone mobile avec icône"""
+        """Display mobile phone number with icon"""
         if not obj.mobile:
             return format_html(
                 '<span style="color: #ccc; white-space: nowrap;">-</span>'
@@ -187,7 +187,7 @@ class RecipientAdmin(admin.ModelAdmin):
     address_display.short_description = _("Adresse")
 
     def postal_address_display(self, obj):
-        """Affiche l'adresse formatée"""
+        """Display formatted postal address"""
         if obj.postal_address:
             return format_html("<pre>{}</pre>", obj.postal_address)
         return "-"
@@ -196,7 +196,7 @@ class RecipientAdmin(admin.ModelAdmin):
 
     @admin.action(description=_("🔍 Valider les emails"))
     def validate_email_action(self, request, queryset):
-        """Action pour valider les emails des destinataires sélectionnés"""
+        """Action to validate emails of selected recipients"""
         from ..providers.base import BaseProvider
 
         provider = BaseProvider()
@@ -231,7 +231,7 @@ class RecipientAdmin(admin.ModelAdmin):
 
     @admin.action(description=_("📞 Valider les téléphones"))
     def validate_phone_action(self, request, queryset):
-        """Action pour valider les téléphones des destinataires sélectionnés"""
+        """Action to validate phones of selected recipients"""
         from ..providers.base import BaseProvider
 
         provider = BaseProvider()

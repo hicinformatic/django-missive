@@ -16,6 +16,17 @@ flake8>=6.0
 isort>=5.12
 mypy>=1.0
 
+# Security
+bandit>=1.7
+safety>=3.0
+pip-audit>=2.6
+
+# Code Quality & Cleanup
+vulture>=2.10
+autoflake>=2.2
+pylint>=3.0
+radon>=6.0
+
 # Django extensions pour dev
 django-extensions>=3.2
 django-debug-toolbar>=4.2

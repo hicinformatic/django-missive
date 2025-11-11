@@ -106,6 +106,13 @@ def task_help():
     print("  lint              Run flake8 and mypy linters")
     print("  format            Format code with black and isort")
     print("  check             Run all checks (lint + format check)")
+    print("  cleanup           Detect unused code, imports, and redundancies")
+    print("  fix-imports       Auto-remove unused imports with autoflake")
+    print("  complexity        Analyze code complexity with radon")
+    print("")
+    
+    print(f"{GREEN}Security:{NC}")
+    print("  security          Run security audit (bandit, safety, pip-audit)")
     print("")
     
     print(f"{GREEN}Building:{NC}")
@@ -375,6 +382,253 @@ def task_check():
     return success
 
 
+def task_cleanup():
+    """Detect unused code, imports, and redundancies"""
+    if not venv_exists():
+        print_error("Virtual environment not found. Run: python dev.py install-dev")
+        return False
+    
+    print_info("=" * 70)
+    print_info("CODE CLEANUP ANALYSIS - Django Missive")
+    print_info("=" * 70)
+    
+    vulture = VENV_BIN / ('vulture.exe' if platform.system() == 'Windows' else 'vulture')
+    autoflake = VENV_BIN / ('autoflake.exe' if platform.system() == 'Windows' else 'autoflake')
+    pylint = VENV_BIN / ('pylint.exe' if platform.system() == 'Windows' else 'pylint')
+    
+    results = {
+        'vulture': False,
+        'autoflake': False,
+        'pylint': False,
+    }
+    
+    # 1. Vulture - Dead code detection
+    print("\n" + "=" * 70)
+    print_info("1/3 - Running Vulture (Dead Code Detection)")
+    print_info("=" * 70)
+    
+    # Vulture retourne 0 si pas de dead code, 1 sinon
+    result = run_command([str(vulture), 'missive/', '--min-confidence', '80'], check=False)
+    if result:
+        print_success("✓ Vulture: No dead code found")
+        results['vulture'] = True
+    else:
+        print_warning("⚠ Vulture: Potential dead code detected (review above)")
+    
+    # 2. Autoflake - Unused imports check
+    print("\n" + "=" * 70)
+    print_info("2/3 - Running Autoflake (Unused Imports Check)")
+    print_info("=" * 70)
+    
+    # Check mode only (no modifications)
+    if run_command([str(autoflake), '--check', '--recursive', 
+                   '--remove-all-unused-imports', 
+                   '--remove-unused-variables', 
+                   'missive/'], check=False):
+        print_success("✓ Autoflake: No unused imports or variables")
+        results['autoflake'] = True
+    else:
+        print_warning("⚠ Autoflake: Unused imports/variables found (run 'fix-imports' to fix)")
+    
+    # 3. Pylint - Code quality and redundancies
+    print("\n" + "=" * 70)
+    print_info("3/3 - Running Pylint (Code Quality & Redundancies)")
+    print_info("=" * 70)
+    
+    # Pylint avec score minimum de 8/10
+    if run_command([str(pylint), 'missive/', '--fail-under=8.0', 
+                   '--disable=C0111,C0103,R0903'], check=False):
+        print_success("✓ Pylint: Code quality score >= 8.0/10")
+        results['pylint'] = True
+    else:
+        print_warning("⚠ Pylint: Code quality issues found (review above)")
+    
+    # Summary
+    print("\n" + "=" * 70)
+    print_info("CODE CLEANUP SUMMARY")
+    print_info("=" * 70)
+    
+    passed = sum(results.values())
+    total = len(results)
+    
+    for tool, success in results.items():
+        status = f"{GREEN}✓ PASS{NC}" if success else f"{RED}✗ FAIL{NC}"
+        print(f"  {tool.upper():15} {status}")
+    
+    print("\n" + "-" * 70)
+    score = int((passed / total) * 100)
+    
+    if score == 100:
+        print_success(f"CLEANUP SCORE: {score}/100 - EXCELLENT!")
+    elif score >= 66:
+        print_warning(f"CLEANUP SCORE: {score}/100 - GOOD")
+    else:
+        print_error(f"CLEANUP SCORE: {score}/100 - NEEDS ATTENTION")
+    
+    print("-" * 70)
+    
+    return score == 100
+
+
+def task_fix_imports():
+    """Auto-remove unused imports and variables with autoflake"""
+    if not venv_exists():
+        print_error("Virtual environment not found. Run: python dev.py install-dev")
+        return False
+    
+    print_info("Fixing unused imports and variables...")
+    autoflake = VENV_BIN / ('autoflake.exe' if platform.system() == 'Windows' else 'autoflake')
+    
+    # Apply fixes in-place
+    if run_command([
+        str(autoflake),
+        '--in-place',
+        '--recursive',
+        '--remove-all-unused-imports',
+        '--remove-unused-variables',
+        '--remove-duplicate-keys',
+        'missive/',
+        'tests/'
+    ]):
+        print_success("✓ Unused imports and variables removed!")
+        return True
+    else:
+        print_error("✗ Failed to fix imports")
+        return False
+
+
+def task_complexity():
+    """Analyze code complexity with radon"""
+    if not venv_exists():
+        print_error("Virtual environment not found. Run: python dev.py install-dev")
+        return False
+    
+    print_info("=" * 70)
+    print_info("CODE COMPLEXITY ANALYSIS - Django Missive")
+    print_info("=" * 70)
+    
+    radon = VENV_BIN / ('radon.exe' if platform.system() == 'Windows' else 'radon')
+    
+    # Cyclomatic Complexity
+    print("\n" + "=" * 70)
+    print_info("Cyclomatic Complexity (CC)")
+    print_info("=" * 70)
+    print_info("A = simple (1-5), B = moderate (6-10), C = complex (11-20)")
+    print_info("D = very complex (21-50), E/F = extremely complex (>50)")
+    print("")
+    
+    run_command([str(radon), 'cc', 'missive/', '-s', '-a'], check=False)
+    
+    # Maintainability Index
+    print("\n" + "=" * 70)
+    print_info("Maintainability Index (MI)")
+    print_info("=" * 70)
+    print_info("A = highly maintainable, B = good, C = moderate, D/F = hard to maintain")
+    print("")
+    
+    run_command([str(radon), 'mi', 'missive/', '-s'], check=False)
+    
+    # Raw metrics
+    print("\n" + "=" * 70)
+    print_info("Raw Metrics (LOC, LLOC, Comments)")
+    print_info("=" * 70)
+    
+    run_command([str(radon), 'raw', 'missive/', '-s'], check=False)
+    
+    print("\n" + "=" * 70)
+    print_success("Complexity analysis complete!")
+    print_info("Tip: Focus on reducing functions with CC > 10 (C or higher)")
+    print_info("=" * 70)
+    
+    return True
+
+
+def task_security():
+    """Run security audit with multiple tools"""
+    if not venv_exists():
+        print_error("Virtual environment not found. Run: python dev.py install-dev")
+        return False
+    
+    print_info("=" * 70)
+    print_info("SECURITY AUDIT - Django Missive")
+    print_info("=" * 70)
+    
+    bandit = VENV_BIN / ('bandit.exe' if platform.system() == 'Windows' else 'bandit')
+    safety = VENV_BIN / ('safety.exe' if platform.system() == 'Windows' else 'safety')
+    pip_audit = VENV_BIN / ('pip-audit.exe' if platform.system() == 'Windows' else 'pip-audit')
+    
+    results = {
+        'bandit': False,
+        'safety': False,
+        'pip_audit': False,
+    }
+    
+    # 1. Bandit - Static code analysis
+    print("\n" + "=" * 70)
+    print_info("1/3 - Running Bandit (Static Code Analysis)")
+    print_info("=" * 70)
+    
+    if run_command([str(bandit), '-r', 'missive/', '-ll', '-f', 'screen'], check=False):
+        print_success("✓ Bandit: No high/medium issues found")
+        results['bandit'] = True
+    else:
+        print_warning("⚠ Bandit: Issues found (review above)")
+    
+    # 2. Safety - Dependency vulnerability check
+    print("\n" + "=" * 70)
+    print_info("2/3 - Running Safety (Dependency Vulnerabilities)")
+    print_info("=" * 70)
+    
+    if run_command([str(safety), 'check', '--json'], check=False):
+        print_success("✓ Safety: No known vulnerabilities in dependencies")
+        results['safety'] = True
+    else:
+        print_warning("⚠ Safety: Vulnerabilities found (review above)")
+    
+    # 3. Pip-Audit - PyPI vulnerability audit
+    print("\n" + "=" * 70)
+    print_info("3/3 - Running Pip-Audit (PyPI Vulnerabilities)")
+    print_info("=" * 70)
+    
+    if run_command([str(pip_audit)], check=False):
+        print_success("✓ Pip-Audit: No vulnerabilities found")
+        results['pip_audit'] = True
+    else:
+        print_warning("⚠ Pip-Audit: Vulnerabilities found (review above)")
+    
+    # Summary
+    print("\n" + "=" * 70)
+    print_info("SECURITY AUDIT SUMMARY")
+    print_info("=" * 70)
+    
+    passed = sum(results.values())
+    total = len(results)
+    
+    for tool, success in results.items():
+        status = f"{GREEN}✓ PASS{NC}" if success else f"{RED}✗ FAIL{NC}"
+        print(f"  {tool.upper():15} {status}")
+    
+    print("\n" + "-" * 70)
+    score = int((passed / total) * 100)
+    
+    if score == 100:
+        print_success(f"SECURITY SCORE: {score}/100 - EXCELLENT!")
+    elif score >= 66:
+        print_warning(f"SECURITY SCORE: {score}/100 - GOOD")
+    else:
+        print_error(f"SECURITY SCORE: {score}/100 - NEEDS ATTENTION")
+    
+    print("-" * 70)
+    
+    # Additional tools info
+    print("\n" + BLUE + "Additional Security Tools (manual setup):" + NC)
+    print("  • SonarQube: https://sonarcloud.io/ (requires account)")
+    print("  • Snyk: https://snyk.io/ (requires account)")
+    print("  • OWASP Dependency-Check: https://owasp.org/www-project-dependency-check/")
+    
+    return score == 100
+
+
 def task_build():
     """Build package"""
     if not venv_exists() and not task_venv():
@@ -627,6 +881,11 @@ COMMANDS = {
     'lint': task_lint,
     'format': task_format,
     'check': task_check,
+    'cleanup': task_cleanup,
+    'fix-imports': task_fix_imports,
+    'complexity': task_complexity,
+    # Security
+    'security': task_security,
     # Building
     'build': task_build,
     'dist': task_dist,

@@ -120,7 +120,8 @@ MISSIVE_PROVIDERS = [
 # =============================================================================
 
 # Mode sandbox : si True, tous les envois sont en mode test (aucun envoi réel)
-MISSIVE_SANDBOX = os.getenv("MISSIVE_SANDBOX", "False").lower() == "true"
+MISSIVE_SANDBOX = bool(os.getenv("MISSIVE_SANDBOX"))
+MISSIVE_SANDBOX = True
 
 # Base URL pour les webhooks (domaine accessible par les providers)
 # Exemples :

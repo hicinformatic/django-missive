@@ -1,46 +1,29 @@
-"""
-Exceptions personnalisées pour django-missive.
-"""
+"""Custom exceptions for django-missive."""
 
 
 class MissiveError(Exception):
-    """Exception de base pour toutes les erreurs django-missive."""
-
-    pass
+    """Base exception for all django-missive errors."""
 
 
 class MissiveValidationError(MissiveError):
-    """Erreur de validation des données d'entrée."""
-
-    pass
+    """Input data validation error."""
 
 
 class MissiveProviderError(MissiveError):
-    """Erreur liée à un provider (configuration, envoi, etc.)."""
-
-    pass
+    """Provider-related error (config, sending, etc.)."""
 
 
 class MissiveConfigError(MissiveError):
-    """Erreur de configuration django-missive."""
-
-    pass
+    """Django-missive configuration error."""
 
 
 class MissiveWebhookError(MissiveError):
-    """Erreur lors du traitement d'un webhook."""
-
-    pass
+    """Webhook processing error."""
 
 
 class MissiveNotFoundError(MissiveError):
-    """Missive introuvable."""
-
-    pass
+    """Missive not found."""
 
 
 class MissiveProviderNotAvailableError(MissiveProviderError):
-    """Aucun provider disponible pour le type de missive."""
-
-    pass
-
+    """No provider available for this missive type."""

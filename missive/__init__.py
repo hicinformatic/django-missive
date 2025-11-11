@@ -4,8 +4,6 @@ Django Missive - A Django library for missive management
 
 __version__ = "0.1.0"
 
-default_app_config = "missive.apps.MissiveConfig"
-
 
 def __getattr__(name):
     """Lazy imports pour éviter les imports circulaires"""

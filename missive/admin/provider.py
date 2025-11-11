@@ -1,28 +1,26 @@
-"""
-Administration pour le modèle virtuel ProviderInfo.
-"""
+"""Admin for virtual ProviderInfo model."""
 
 from django.contrib import admin
-from django.utils.html import format_html
-from django.utils.safestring import mark_safe
+from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 
+from ..decorators import sandbox_warning
 from ..models import MissiveType, ProviderInfo
 from ..models.provider import ProviderInfoQuerySet
 
 
 class MissiveTypeFilter(admin.SimpleListFilter):
-    """Filtre personnalisé pour afficher les types avec leurs labels traduits"""
+    """Custom filter to display types with their translated labels"""
 
     title = _("Type de missive")
     parameter_name = "missive_type"
 
     def lookups(self, request, model_admin):
-        """Retourne les choix avec les labels traduits"""
+        """Return choices with translated labels"""
         return [(choice.value, choice.label) for choice in MissiveType]
 
     def queryset(self, request, queryset):
-        """Filtre le queryset selon le type sélectionné"""
+        """Filter queryset by selected type"""
         if self.value():
             # Filtrer les providers qui supportent ce type (cherche dans la liste CSV)
             filtered = []
@@ -39,9 +37,10 @@ class MissiveTypeFilter(admin.SimpleListFilter):
         return queryset
 
 
+@sandbox_warning
 @admin.register(ProviderInfo)
 class ProviderInfoAdmin(admin.ModelAdmin):
-    """Admin en lecture seule pour voir l'état des providers"""
+    """Read-only admin to view provider status"""
 
     class Media:
         js = ("admin/js/config_vars_toggle.js",)
@@ -78,7 +77,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
     ]
 
     def get_fieldsets(self, request, obj=None):
-        """Génère les fieldsets dynamiquement en fonction des types de missive"""
+        """Generate fieldsets dynamically based on missive types"""
         if obj is None:
             return [
                 (_("Informations générales"), {"fields": ("name",)}),
@@ -156,7 +155,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         return fieldsets
 
     def get_readonly_fields(self, request, obj=None):
-        """Ajoute dynamiquement les champs readonly pour chaque type de missive"""
+        """Dynamically add readonly fields for each missive type"""
         readonly = list(self.readonly_fields)
 
         if obj:
@@ -169,7 +168,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         return readonly
 
     def __getattr__(self, name):
-        """Génère dynamiquement les méthodes credits_{type}_display"""
+        """Dynamically generate credits_{type}_display methods"""
         if name.startswith("credits_") and name.endswith("_display"):
             # Extraire le type de missive
             missive_type = name[8:-8].upper()  # Enlever 'credits_' et '_display'
@@ -242,15 +241,15 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
                         # Ajouter les avertissements (toujours, même si credits est None)
                         if warnings:
-                            warnings_html = "<br>".join(
-                                [
-                                    f'<span style="color: #ffc107;">{w}</span>'
-                                    for w in warnings
-                                ]
+                            # Utiliser format_html_join pour sécuriser (pas de mark_safe)
+                            warnings_html = format_html_join(
+                                "<br>",
+                                '<span style="color: #ffc107;">{}</span>',
+                                ((w,) for w in warnings),
                             )
                             credits_html += format_html(
                                 '<p style="margin: 10px 0; font-size: 13px;">{}</p>',
-                                mark_safe(warnings_html),
+                                warnings_html,
                             )
 
                         return credits_html
@@ -272,15 +271,15 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         )
 
     def has_add_permission(self, request):
-        """Pas de création manuelle"""
+        """No manual creation"""
         return False
 
     def has_delete_permission(self, request, obj=None):
-        """Pas de suppression"""
+        """No deletion"""
         return False
 
     def has_change_permission(self, request, obj=None):
-        """Autoriser la visualisation mais pas la modification"""
+        """Allow viewing but not modification"""
         return True
 
     def get_search_results(self, request, queryset, search_term):
@@ -325,7 +324,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         return filtered_qs, False
 
     def name_display(self, obj):
-        """Affiche le nom du provider avec sa description"""
+        """Display provider name with description"""
         description = obj.description_text
         if description:
             return format_html(
@@ -339,7 +338,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
     name_display.short_description = _("Provider")
 
     def missive_type_display(self, obj):
-        """Badges colorés pour tous les types supportés"""
+        """Colored badges for all supported types"""
         colors = {
             "POSTAL": "#6c757d",
             "LRE": "#495057",
@@ -376,13 +375,13 @@ class ProviderInfoAdmin(admin.ModelAdmin):
     missive_type_display.short_description = _("Types supportés")
 
     def missive_type_display_detail(self, obj):
-        """Affiche les types de missive avec labels traduits dans la page de détail"""
+        """Display missive types with translated labels in detail page"""
         return self.missive_type_display(obj)
 
     missive_type_display_detail.short_description = _("Types supportés")
 
     def brands_display(self, obj):
-        """Affiche les marques de messagerie supportées (pour providers BRANDED)"""
+        """Display supported messaging brands (for BRANDED providers)"""
         brands = obj.brands
 
         if not brands:
@@ -401,23 +400,24 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             "discord": "#5865F2",
         }
 
-        badges = []
-        for brand in brands:
-            color = brand_colors.get(brand.lower(), "#6c757d")
-            badges.append(
-                f'<span style="background-color: {color}; color: white; padding: 3px 10px; '
-                f"border-radius: 3px; font-size: 11px; font-weight: bold; margin-right: 4px; "
-                f'white-space: nowrap;">{brand.upper()}</span>'
-            )
-
-        return format_html(
-            '<span style="white-space: nowrap;">{}</span>', mark_safe("".join(badges))
+        # Utiliser format_html_join pour sécuriser les badges
+        badges_html = format_html_join(
+            "",
+            '<span style="background-color: {}; color: white; padding: 3px 10px; '
+            "border-radius: 3px; font-size: 11px; font-weight: bold; margin-right: 4px; "
+            'white-space: nowrap;">{}</span>',
+            (
+                (brand_colors.get(brand.lower(), "#6c757d"), brand.upper())
+                for brand in brands
+            ),
         )
+
+        return format_html('<span style="white-space: nowrap;">{}</span>', badges_html)
 
     brands_display.short_description = _("Marques supportées")
 
     def status_display(self, obj):
-        """Badge pour le statut global"""
+        """Badge for overall status"""
         if obj.status == "ready":
             return format_html(
                 '<span style="background-color: #d1e7dd; color: #0f5132; padding: 5px 12px; '
@@ -437,7 +437,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
     status_display.short_description = _("Statut")
 
     def credits_display(self, obj):
-        """Affiche les crédits disponibles"""
+        """Display available credits"""
         credits_info = obj.credits_info
 
         if not credits_info:
@@ -516,10 +516,13 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                         f'<span style="color: #dc3545;">✗ <code style="color: #dc3545;">{package}</code></span>'
                     )
 
-            # Joindre tous les packages avec leur statut
+            # Joindre tous les packages avec leur statut (sécurisé)
+            packages_html = format_html_join(
+                ", ", "{}", ((status,) for status in package_statuses)
+            )
             return format_html(
                 '<span style="white-space: nowrap;">{}</span>',
-                mark_safe(", ".join(package_statuses)),
+                packages_html,
             )
         else:
             # Pas de package requis (toujours disponible)
@@ -530,7 +533,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
     installation_display.short_description = _("Packages")
 
     def configuration_display(self, obj):
-        """Indique si les credentials sont configurés"""
+        """Indicate if credentials are configured"""
         if obj.is_configured:
             return format_html(
                 '<span style="color: #198754; white-space: nowrap;">✓ Configuré</span>'
@@ -688,7 +691,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
     usage_display.short_description = _("Utilisation")
 
     def status_display_detail(self, obj):
-        """Affiche le statut détaillé dans la page de changement"""
+        """Display detailed status in change page"""
         return self.status_display(obj)
 
     status_display_detail.short_description = _("Statut")
@@ -703,13 +706,14 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             )
 
         # Créer une liste des variables dans des balises <code>
-        vars_list = []
-        for var in config_vars:
-            vars_list.append(format_html("<code>{}</code>", var))
+        # Utiliser format_html_join pour sécuriser les variables
+        vars_html = format_html_join(
+            ", ", "<code>{}</code>", ((var,) for var in config_vars)
+        )
 
         return format_html(
             '<span style="white-space: nowrap;">{}</span>',
-            mark_safe(", ".join(vars_list)),
+            vars_html,
         )
 
     config_vars_display.short_description = _("Variables")
@@ -793,7 +797,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
     config_vars_display_detail.short_description = _("Variables de configuration")
 
     def changelist_view(self, request, extra_context=None):
-        """Ajoute du contexte à la vue de liste"""
+        """Add context to list view"""
         extra_context = extra_context or {}
 
         # Ajouter des statistiques globales

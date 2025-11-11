@@ -1,16 +1,16 @@
-"""
-Administration pour le modèle MissiveTemplate.
-"""
+"""Admin for MissiveTemplate model."""
 
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
+from ..decorators import sandbox_warning
 from ..models import MissiveTemplate
 
 
+@sandbox_warning
 @admin.register(MissiveTemplate)
 class MissiveTemplateAdmin(admin.ModelAdmin):
-    """Admin pour les templates de missive"""
+    """Admin for missive templates"""
 
     list_display = ["name", "missive_type", "is_active", "created_at"]
     list_filter = ["missive_type", "is_active", "created_at"]

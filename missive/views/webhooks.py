@@ -1,6 +1,4 @@
-"""
-Vue webhook unifiée qui dispatch vers le bon provider.
-"""
+"""Unified webhook view that dispatches to the right provider."""
 
 import json
 import logging
@@ -15,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_client_ip(request):
-    """Récupère l'IP du client"""
+    """Get client IP address."""
     x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     if x_forwarded_for:
         ip = x_forwarded_for.split(",")[0]
@@ -27,38 +25,45 @@ def get_client_ip(request):
 @method_decorator(csrf_exempt, name="dispatch")
 class WebhookView(View):
     """
-    Vue webhook unifiée.
+    Unified webhook view.
 
-    Reçoit les webhooks de tous les providers sur une seule URL :
+    Receives webhooks from all providers on a single URL:
     /missive/webhook/{provider}/
 
-    Exemple :
+    Examples:
     - /missive/webhook/sendgrid/
     - /missive/webhook/twilio/
     - /missive/webhook/laposte/
     """
 
     def post(self, request, provider=None, *args, **kwargs):
-        """Reçoit et traite le webhook"""
+        """Receive and process webhook."""
         try:
-            # Logger la réception du webhook
-            logger.info(
-                f"🔔 Webhook reçu de {provider} depuis {get_client_ip(request)}"
-            )
+            logger.info(f"Webhook received from {provider} ({get_client_ip(request)})")
 
-            # Parser le payload
+            # Parse payload with size limit (DoS protection)
+            from django.conf import settings
+
+            MAX_BODY_SIZE = getattr(
+                settings, "MISSIVE_WEBHOOK_MAX_BODY_SIZE", 10 * 1024 * 1024
+            )
+            content_length = int(request.META.get("CONTENT_LENGTH", 0))
+            if content_length > MAX_BODY_SIZE:
+                logger.warning(f"Webhook payload too large: {content_length} bytes")
+                return JsonResponse({"error": "Payload too large"}, status=413)
+
             content_type = request.META.get("CONTENT_TYPE", "")
 
             if "application/json" in content_type:
                 payload = json.loads(request.body.decode("utf-8"))
             else:
-                # Form data (Twilio notamment)
+                # Form data (e.g. Twilio)
                 payload = dict(request.POST.items())
 
-            # Logger le payload pour debug
-            logger.debug(f"📦 Payload reçu: {json.dumps(payload, indent=2)}")
+            # Log only keys, not values (security)
+            logger.debug(f"Webhook keys: {list(payload.keys())}")
 
-            # Extraire les headers
+            # Extract headers
             headers = {
                 key: value
                 for key, value in request.META.items()
@@ -66,25 +71,21 @@ class WebhookView(View):
                 or key in ["CONTENT_TYPE", "CONTENT_LENGTH", "REMOTE_ADDR"]
             }
 
-            # Obtenir le provider depuis l'URL
+            # Get provider from URL
             if not provider:
-                return JsonResponse(
-                    {"error": "Provider manquant dans l'URL"}, status=400
-                )
+                return JsonResponse({"error": "Provider missing in URL"}, status=400)
 
-            # Charger dynamiquement le provider depuis la config
-
+            # Load provider from config
             from ..helpers import get_providers_from_config
 
             providers_config = get_providers_from_config()
             provider_path = None
 
-            # Chercher le provider dans la config
+            # Find provider in config
             for type_providers in providers_config.values():
                 for path in type_providers:
                     try:
                         provider_class = import_string(path)
-                        # Normaliser le nom du provider pour la comparaison
                         provider_name = (
                             provider_class.name.lower()
                             .replace(" ", "")
@@ -99,62 +100,59 @@ class WebhookView(View):
                     break
 
             if not provider_path:
-                logger.error(f"Provider inconnu : {provider}")
+                logger.error(f"Unknown provider: {provider}")
                 return JsonResponse(
-                    {"error": f"Provider inconnu: {provider}"}, status=400
+                    {"error": f"Unknown provider: {provider}"}, status=400
                 )
 
-            # Charger la classe du provider
+            # Load provider class
             provider_class = import_string(provider_path)
-
-            # Créer une instance du provider
             provider_instance = provider_class()
 
-            # SÉCURITÉ : Valider la signature du webhook
+            # SECURITY: Validate webhook signature
             is_valid, validation_error = provider_instance.validate_webhook_signature(
                 payload, headers
             )
             if not is_valid:
                 logger.warning(
-                    f"Signature invalide pour webhook {provider}: {validation_error}"
+                    f"Invalid signature for webhook {provider} from {get_client_ip(request)}"
                 )
-                # Retourner 200 pour ne pas révéler qu'on a rejeté
+                # Return 200 to avoid revealing rejection
                 return HttpResponse(status=200)
 
-            # Traiter le webhook
+            # Process webhook
             success, error, missive = provider_instance.handle_webhook(payload, headers)
 
             if success:
                 logger.info(
-                    f"Webhook {provider} traité avec succès pour missive #{missive.id if missive else 'N/A'}"
+                    f"Webhook {provider} processed successfully for missive #{missive.id if missive else 'N/A'}"
                 )
                 return HttpResponse(status=200)
-            else:
-                logger.error(f"Échec webhook {provider}: {error}")
-                # On retourne 200 quand même pour éviter les retry inutiles
-                # Le provider peut retry manuellement si nécessaire
-                return HttpResponse(status=200)
+
+            logger.error(f"Webhook {provider} failed: {error}")
+            # Return 200 anyway to avoid useless retries
+            return HttpResponse(status=200)
 
         except Exception as e:
-            logger.exception(f"Erreur webhook {provider}: {e}")
-            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+            logger.exception(f"Webhook error {provider}: {e}")
+            # Don't expose error details in production (security)
+            return JsonResponse(
+                {"status": "error", "message": "Error processing webhook"},
+                status=500,
+            )
 
 
-# Vue pour tester les webhooks (développement uniquement)
 @csrf_exempt
 def webhook_test_view(request):
     """
-    Endpoint de test pour simuler l'envoi de webhooks.
-    À utiliser uniquement en développement.
+    Test endpoint to simulate webhook sending.
+    Development only.
 
     Usage:
         POST /missive/webhook/test/
         {
             "provider": "sendgrid",
-            "payload": {
-                "missive_id": "sg_123",
-                "event": "delivered"
-            }
+            "payload": {"missive_id": "sg_123", "event": "delivered"}
         }
     """
     from django.conf import settings
@@ -170,7 +168,6 @@ def webhook_test_view(request):
             provider_name = data.get("provider", "sendgrid")
             payload = data.get("payload", {})
 
-            # Charger dynamiquement le provider
             providers_config = get_providers_from_config()
             provider_class = None
 
@@ -188,7 +185,7 @@ def webhook_test_view(request):
 
             if not provider_class:
                 return JsonResponse(
-                    {"error": f"Provider {provider_name} inconnu"}, status=400
+                    {"error": f"Unknown provider: {provider_name}"}, status=400
                 )
 
             provider = provider_class()
@@ -205,15 +202,26 @@ def webhook_test_view(request):
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
 
-    # GET : Afficher les providers disponibles
+    # GET: Show available providers
+    from ..helpers import get_providers_from_config
+
+    providers_config = get_providers_from_config()
+    all_providers = set()
+    for provider_list in providers_config.values():
+        for provider_path in provider_list:
+            try:
+                provider_class = import_string(provider_path)
+                all_providers.add(provider_class.name.lower())
+            except Exception:
+                continue
     return JsonResponse(
         {
             "message": "POST a webhook here",
-            "providers_available": list(PROVIDER_CLASSES.keys()),
+            "providers_available": sorted(list(all_providers)),
             "example": {
                 "provider": "sendgrid",
                 "payload": {
-                    "missive_id": "sg_123",  # external_id de la missive
+                    "missive_id": "sg_123",
                     "event": "delivered",
                     "email": "user@example.com",
                 },
@@ -225,52 +233,40 @@ def webhook_test_view(request):
 @csrf_exempt
 def webhook_status_view(request):
     """
-    Vue de vérification du statut des webhooks.
+    Webhook status check endpoint.
 
-    Répond toujours "ok" pour permettre aux providers de tester la connectivité.
-    Si l'utilisateur est admin, affiche la liste complète des providers et leurs URLs.
-
-    Usage:
-        GET /webhooks/status/
-        → {"status": "ok", "message": "Webhooks are ready..."}
-
-        GET /webhooks/status/ (en tant qu'admin)
-        → {"status": "ok", "admin": true, "providers": {...}, ...}
+    Always returns "ok" to allow providers to test connectivity.
+    If user is admin, shows full provider list and URLs.
     """
     from django.conf import settings
 
     from ..helpers import get_providers_from_config
 
-    # Réponse de base (toujours accessible)
     response_data = {
         "status": "ok",
         "message": "Webhooks are ready to receive notifications",
     }
 
-    # Si utilisateur admin, ajouter les détails
+    # If admin, add details
     if request.user.is_authenticated and request.user.is_staff:
         providers_by_type = get_providers_from_config()
         base_url = getattr(
             settings, "MISSIVE_WEBHOOK_BASE_URL", "https://example.com"
         ).rstrip("/")
 
-        # Récupérer tous les providers uniques
         all_providers = set()
         for provider_names in providers_by_type.values():
             all_providers.update(provider_names)
 
-        # Construire la liste des URLs de webhook
         webhook_urls = {}
         for provider_name in sorted(all_providers):
             provider_slug = provider_name.lower().replace(" ", "")
 
-            # Récupérer les types supportés pour ce provider
             provider_types = []
             for missive_type, provider_names in providers_by_type.items():
                 if provider_name in provider_names:
                     provider_types.append(missive_type)
 
-            # Générer les URLs pour chaque type
             urls = {}
             for missive_type in provider_types:
                 type_slug = missive_type.lower().replace("_", "-")

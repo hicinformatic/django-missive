@@ -48,6 +48,13 @@ dev = [
     "flake8>=6.0",
     "isort>=5.12",
     "mypy>=1.0",
+    "bandit>=1.7",  # Security linter
+    "safety>=3.0",  # Dependency vulnerability scanner
+    "pip-audit>=2.6",  # PyPI vulnerability auditor
+    "vulture>=2.10",  # Dead code detector
+    "autoflake>=2.2",  # Remove unused imports and variables
+    "pylint>=3.0",  # Code quality and redundancy checker
+    "radon>=6.0",  # Complexity metrics
 ]
 
 # Providers Email
