@@ -1,8 +1,4 @@
-"""
-Provider Vonage (ex-Nexmo) pour SMS et Voice.
-
-Documentation: https://developer.vonage.com/
-"""
+"""Vonage provider for SMS and Voice."""
 
 from typing import Dict
 
@@ -12,16 +8,16 @@ from .base import BaseProvider
 
 class VonageProvider(BaseProvider):
     """
-    Provider pour Vonage (ex-Nexmo).
+    Vonage (ex-Nexmo) provider.
 
-    Configuration requise:
-        VONAGE_API_KEY: Clé API Vonage
+    Required configuration:
+        VONAGE_API_KEY: Vonage API key
         VONAGE_API_SECRET: Secret API Vonage
-        VONAGE_FROM_NUMBER: Numéro expéditeur
+        VONAGE_FROM_NUMBER: Sender number
 
-    Supporte :
+    Supports:
     - SMS
-    - Voice (appels vocaux)
+    - Voice (voice calls)
     - Verify (vérification 2FA)
     """
 
@@ -34,10 +30,10 @@ class VonageProvider(BaseProvider):
     site_url = "https://www.vonage.com/"
     status_url = "https://vonage.statuspage.io/"
     documentation_url = "https://developer.vonage.com/"
-    description_text = "Plateforme SMS et Voice mondiale (ex-Nexmo)"
+    description_text = "Global SMS and Voice platform (formerly Nexmo)"
 
     def send_sms(self, **kwargs) -> bool:
-        """Envoie un SMS via Vonage API"""
+        """Send an SMS via Vonage API"""
         from vonage import Client, Sms
 
         # Validation
@@ -47,7 +43,7 @@ class VonageProvider(BaseProvider):
             return False
 
         if not self.missive.recipient_phone:
-            self._update_status(MissiveStatus.FAILED, error_message="Numéro manquant")
+            self._update_status(MissiveStatus.FAILED, error_message="Phone missing")
             return False
 
         try:
@@ -66,7 +62,7 @@ class VonageProvider(BaseProvider):
             client = Client(key=api_key, secret=api_secret)
             sms = Sms(client)
 
-            # Préparer le message avec valeurs par défaut
+            # Prepare message with default values
             message_params = {
                 "from": kwargs.get("sender", from_number),  # Standardisé: sender
                 "to": self.missive.recipient_phone,
@@ -102,11 +98,11 @@ class VonageProvider(BaseProvider):
                     else:
                         message_params[api_key] = value
 
-            # Demander DLR par défaut
+            # Request DLR by default
             if "status-report-req" not in message_params:
                 message_params["status-report-req"] = 1
 
-            # Envoyer le SMS
+            # Send the SMS
             response = sms.send_message(message_params)
 
             # Vérifier le statut
@@ -123,7 +119,7 @@ class VonageProvider(BaseProvider):
                 )
                 self._create_event(
                     "sent",
-                    f"SMS envoyé via Vonage (ID: {message_id}, Prix: {message_price}, Réseau: {network})",
+                    f"SMS sent via Vonage (ID: {message_id}, Price: {message_price}, Network: {network})",
                 )
 
                 return True
@@ -148,10 +144,10 @@ class VonageProvider(BaseProvider):
 
     def get_sms_service_info(self) -> Dict:
         """
-        Récupère les informations du service Vonage.
+        Gets Vonage service information.
 
         Returns:
-            Dict avec solde, limites, etc.
+            Dict with balance, limits, etc.
         """
         from vonage import Client
 

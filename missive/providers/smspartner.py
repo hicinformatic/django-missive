@@ -1,6 +1,4 @@
-"""
-Provider SMSPartner pour SMS (provider français).
-"""
+"""SMSPartner provider for SMS."""
 
 from __future__ import annotations
 
@@ -15,16 +13,8 @@ from .base import BaseProvider
 
 
 class SMSPartnerProvider(BaseProvider):
-    """
-    Provider pour SMSPartner / VoicePartner / MailPartner.
+    """SMSPartner provider (SMS, Voice, Email)."""
 
-    Supporte :
-    - SMS (classique, low-cost, premium)
-    - Messages vocaux (TTS)
-    - Email transactionnel
-    """
-
-    # Métadonnées du provider
     name = "SMS Partner"
     display_name = "SMS Partner (SMS/Email/Vocal)"
     supported_types = ["SMS", "EMAIL", "VOICE_CALL"]
@@ -46,32 +36,28 @@ class SMSPartnerProvider(BaseProvider):
     status_url = "https://status.smspartner.fr/status/nda-media"
     documentation_url = "https://www.docpartner.dev/"
     description_text = (
-        "Solution française multi-services (SMS, Email, Voice) avec API complète"
+        "French multi-service solution (SMS, Email, Voice)"
     )
 
-    # URLs des APIs
     API_BASE_SMS = "https://api.smspartner.fr/v1"
     API_BASE_VOICE = "http://api.voicepartner.fr/v1"
     API_BASE_EMAIL = "http://api.mailpartner.fr/v1"
 
-    # Plage IP officielle pour les webhooks SMSPartner
     WEBHOOK_IP_RANGE = "185.66.232.0/24"
 
-    # Mappings d'erreurs communes (codes d'erreur → messages)
     ERROR_CODES = {
-        1: "Clé API requise",
-        2: "Numéro de téléphone requis",
-        3: "ID du message requis",
-        4: "Message introuvable",
-        5: "L'envoi a déjà été annulé",
-        6: "Impossible d'annuler moins de 5 minutes avant l'envoi",
-        7: "Impossible d'annuler un message déjà envoyé",
-        9: "Contraintes non respectées",
-        10: "Clé API incorrecte",
-        11: "Manque de crédits",
+        1: "API key required",
+        2: "Phone number required",
+        3: "Message ID required",
+        4: "Message not found",
+        5: "Sending already cancelled",
+        6: "Cannot cancel less than 5 minutes before sending",
+        7: "Cannot cancel already sent message",
+        9: "Constraints not met",
+        10: "Incorrect API key",
+        11: "Low credits",
     }
 
-    # Mappings de statuts (statuts provider → statuts standardisés)
     STATUS_MAPPING_SMS = {
         "Delivered": "delivered",
         "Not delivered": "failed",
@@ -99,7 +85,7 @@ class SMSPartnerProvider(BaseProvider):
     # ===========================================================================
 
     def _get_api_key(self) -> Optional[str]:
-        """Récupère la clé API depuis la config."""
+        """Gets API key from config."""
         return self.config.get("SMSPARTNER_API_KEY")
 
     def _handle_api_response(
@@ -170,11 +156,11 @@ class SMSPartnerProvider(BaseProvider):
         return base_error
 
     def _get_error_message(self, code: int, default_message: str = "") -> str:
-        """Récupère le message d'erreur depuis ERROR_CODES ou retourne un message par défaut."""
-        return self.ERROR_CODES.get(code, default_message or f"Erreur {code}")
+        """Get error message from ERROR_CODES or return a default message."""
+        return self.ERROR_CODES.get(code, default_message or f"Error {code}")
 
     def _format_sms_errors(self, result: dict) -> str:
-        """Formate les erreurs d'envoi SMS depuis la réponse API."""
+        """Format SMS sending errors from API response."""
         errors = result.get("errors", [])
         if errors:
             return "; ".join([err.get("message", "") for err in errors])
@@ -197,7 +183,7 @@ class SMSPartnerProvider(BaseProvider):
 
     def send_sms(self, **kwargs) -> bool:
         """
-        Envoie un SMS via SMSPartner API.
+        Send an SMS via SMSPartner API.
 
         Args:
             **kwargs: Options standardisées Django (voir BaseSMSMixin pour la liste complète)
@@ -241,7 +227,7 @@ class SMSPartnerProvider(BaseProvider):
             return False
 
         if not self.missive.recipient_phone:
-            self._update_status(MissiveStatus.FAILED, error_message="Numéro manquant")
+            self._update_status(MissiveStatus.FAILED, error_message="Phone missing")
             return False
 
         try:
@@ -255,13 +241,13 @@ class SMSPartnerProvider(BaseProvider):
                 )
                 return False
 
-            # Préparer le payload avec valeurs par défaut
+            # Prepare payload with default values
             payload = {
                 "apiKey": api_key,
                 "phoneNumbers": self.missive.recipient_phone,
                 "message": self.missive.body_text or self.missive.body,
                 "sender": kwargs.get("sender", sender),
-                "gamme": 1,  # Par défaut: standard
+                "gamme": 1,  # Default: standard
             }
 
             # Ajouter le tag pour tracking
@@ -342,7 +328,7 @@ class SMSPartnerProvider(BaseProvider):
                 )
                 self._create_event(
                     "sent",
-                    f"SMS envoyé via SMSPartner ({nb_sms} segment(s), {cost}{currency})",
+                    f"SMS sent via SMSPartner ({nb_sms} segment(s), {cost}{currency})",
                 )
 
                 return True
@@ -371,10 +357,10 @@ class SMSPartnerProvider(BaseProvider):
         """
         Annule l'envoi d'un SMS programmé via l'API SMSPartner.
 
-        Utilise l'API DELETE /v1/message-cancel/{message_id}
+        Uses DELETE /v1/message-cancel/{message_id} API
 
         Returns:
-            bool: True si l'annulation a réussi, False sinon
+            bool: True if cancellation succeeded, False otherwise
         """
         if not self.missive.external_id:
             return False
@@ -397,7 +383,7 @@ class SMSPartnerProvider(BaseProvider):
 
             # Vérifier le succès
             if result.get("success") is True:
-                self._create_event("cancelled", "SMS annulé via SMSPartner")
+                self._create_event("cancelled", "SMS cancelled via SMSPartner")
                 return True
             else:
                 return False
@@ -407,7 +393,7 @@ class SMSPartnerProvider(BaseProvider):
 
     def send_email(self, **kwargs) -> bool:
         """
-        Envoie un email via Mail Partner API (SMSPartner).
+        Send an email via Mail Partner API (SMSPartner).
 
         Kwargs standardisés :
             cc (list|str): Destinataires en copie (non supporté par Mail Partner)
@@ -438,7 +424,7 @@ class SMSPartnerProvider(BaseProvider):
 
         email = self.missive.recipient_email
         if not email:
-            self._update_status(MissiveStatus.FAILED, error_message="Email manquant")
+            self._update_status(MissiveStatus.FAILED, error_message="Email missing")
             return False
 
         try:
@@ -552,7 +538,7 @@ class SMSPartnerProvider(BaseProvider):
                     external_id=str(message_id),
                 )
 
-                event_msg = f"Email envoyé via Mail Partner ({nb_mail} email(s), {cost}{currency})"
+                event_msg = f"Email sent via Mail Partner ({nb_mail} email(s), {cost}{currency})"
                 if scheduled_date:
                     event_msg += f" - Programmé pour {scheduled_date}"
 
@@ -594,10 +580,10 @@ class SMSPartnerProvider(BaseProvider):
         Attention : Il n'est pas possible d'annuler l'envoi d'un mail moins de
         5 minutes avant son envoi.
 
-        Utilise l'API GET /v1/message-cancel
+        Uses GET /v1/message-cancel API
 
         Returns:
-            bool: True si l'annulation a réussi, False sinon
+            bool: True if cancellation succeeded, False otherwise
         """
         if not self.missive.external_id:
             return False
@@ -619,22 +605,22 @@ class SMSPartnerProvider(BaseProvider):
 
             # Vérifier le succès
             if result.get("success") is True:
-                message = result.get("message", "Email annulé")
+                message = result.get("message", "Email cancelled")
                 self._create_event(
-                    "cancelled", f"Email annulé via Mail Partner: {message}"
+                    "cancelled", f"Email cancelled via Mail Partner: {message}"
                 )
                 return True
             else:
                 # Codes d'erreur spécifiques
                 code = result.get("code")
                 error_map = {
-                    1: "Clé API requise",
-                    3: "ID du message requis",
-                    4: "Message introuvable",
-                    5: "L'envoi a déjà été annulé",
-                    6: "Impossible d'annuler moins de 5 minutes avant l'envoi",
-                    7: "Impossible d'annuler un mail déjà envoyé",
-                    10: "Clé API incorrecte",
+                    1: "API key required",
+                    3: "Message ID required",
+                    4: "Message not found",
+                    5: "Sending already cancelled",
+                    6: "Cannot cancel less than 5 minutes before sending",
+                    7: "Cannot cancel already sent email",
+                    10: "Incorrect API key",
                 }
                 error_msg = error_map.get(
                     code, result.get("message", "Erreur d'annulation")
@@ -647,7 +633,7 @@ class SMSPartnerProvider(BaseProvider):
 
     def send_voice_call(self, **kwargs) -> bool:
         """
-        Envoie un message vocal via Voice Partner API (TTS - Text to Speech).
+        Send a voice message via Voice Partner API (TTS - Text to Speech).
 
         Kwargs standardisés :
             lang (str): Langue du message ('fr', 'en', etc.)
@@ -669,7 +655,7 @@ class SMSPartnerProvider(BaseProvider):
 
         phone = self.missive.recipient_phone
         if not phone:
-            self._update_status(MissiveStatus.FAILED, error_message="Numéro manquant")
+            self._update_status(MissiveStatus.FAILED, error_message="Phone missing")
             return False
 
         try:
@@ -689,7 +675,7 @@ class SMSPartnerProvider(BaseProvider):
             payload = {
                 "apiKey": api_key,
                 "phoneNumbers": phone,
-                "lang": options.get("lang", "fr"),  # Langue par défaut : français
+                "lang": options.get("lang", "fr"),  # Default language: French
             }
 
             # Texte ou audio
@@ -740,7 +726,7 @@ class SMSPartnerProvider(BaseProvider):
                 )
                 self._create_event(
                     "sent",
-                    f"Message vocal envoyé via Voice Partner ({duration}s, {nb_sms} segment(s), {cost}{currency})",
+                    f"Voice message sent via Voice Partner ({duration}s, {nb_sms} segment(s), {cost}{currency})",
                 )
 
                 return True
@@ -766,10 +752,10 @@ class SMSPartnerProvider(BaseProvider):
         """
         Annule l'envoi d'un message vocal programmé via Voice Partner API.
 
-        Utilise l'API DELETE /v1/campaign/cancel/{apiKey}/{campaignId}
+        Uses DELETE /v1/campaign/cancel/{apiKey}/{campaignId} API
 
         Returns:
-            bool: True si l'annulation a réussi, False sinon
+            bool: True if cancellation succeeded, False otherwise
         """
         if not self.missive.external_id:
             return False
@@ -795,7 +781,7 @@ class SMSPartnerProvider(BaseProvider):
                 assigned_credit = result.get("assignedCredit", 0)
                 self._create_event(
                     "cancelled",
-                    f"Message vocal annulé via Voice Partner (crédit remboursé: {assigned_credit} EUR)",
+                    f"Voice message cancelled via Voice Partner (refunded credit: {assigned_credit} EUR)",
                 )
                 return True
             else:
@@ -818,8 +804,8 @@ class SMSPartnerProvider(BaseProvider):
 
         Configuration:
             SMSPARTNER_WEBHOOK_IPS: IPs autorisées (séparées par virgules)
-                                   ou CIDR range (ex: "185.66.232.0/24")
-                                   Par défaut: utilise WEBHOOK_IP_RANGE (185.66.232.0/24)
+                                   or CIDR range (e.g., "185.66.232.0/24")
+                                   Default: uses WEBHOOK_IP_RANGE (185.66.232.0/24)
 
         Args:
             payload: Données du webhook
@@ -843,7 +829,7 @@ class SMSPartnerProvider(BaseProvider):
             # 🔧 MODE TEST : Accepter sans IP (temporaire)
             import logging
 
-            logging.warning(f"⚠️ IP client introuvable. Headers: {list(headers.keys())}")
+            logging.warning(f"⚠️ Client IP not found. Headers: {list(headers.keys())}")
             return True, "✅ Mode test - IP non vérifiée"
 
         # Vérification par IP (utilise WEBHOOK_IP_RANGE par défaut)
@@ -880,8 +866,8 @@ class SMSPartnerProvider(BaseProvider):
         #     if not exists:
         #         return False, f"Message ID inconnu: {message_id}"
 
-        # Par défaut, accepter le webhook (mode test)
-        # Note: SMSPartner ne fournit pas de signature HMAC dans leur API standard
+        # By default, accept the webhook (test mode)
+        # Note: SMSPartner doesn't provide HMAC signature in their standard API
         return True, "✅ Mode test - validation messageId désactivée"
 
     def extract_missive_id(self, payload: Dict) -> Optional[str]:
@@ -921,7 +907,7 @@ class SMSPartnerProvider(BaseProvider):
             # Extraire le message_id
             message_id = self.extract_missive_id(payload)
             if not message_id:
-                error_msg = "messageId manquant dans le webhook"
+                error_msg = "messageId missing in webhook"
                 logger.warning(f"⚠️ {error_msg}")
                 return False, error_msg, None
 
@@ -931,7 +917,7 @@ class SMSPartnerProvider(BaseProvider):
             try:
                 missive = Missive.objects.get(external_id=str(message_id))
             except Missive.DoesNotExist:
-                error_msg = f"Missive avec external_id={message_id} introuvable"
+                error_msg = f"Missive with external_id={message_id} not found"
                 logger.warning(f"⚠️ {error_msg}. Payload: {payload}")
                 # 🔧 MODE TEST : Accepter quand même pour logger le payload
                 return True, error_msg, None
@@ -978,12 +964,12 @@ class SMSPartnerProvider(BaseProvider):
 
     def check_sms_delivery_status(self, **kwargs) -> dict:
         """
-        Vérifie le statut de livraison d'un SMS spécifique via SMSPartner API.
+        Check delivery status of a specific SMS via SMSPartner API.
 
-        Utilise l'API GET /v1/message-status
+        Uses GET /v1/message-status API
 
         Returns:
-            Dict contenant :
+            Dict containing:
                 - status: 'delivered', 'failed', 'pending', 'sent'
                 - delivered_at: Date/heure de livraison
                 - error_code: Code d'erreur (si échec)
@@ -995,7 +981,7 @@ class SMSPartnerProvider(BaseProvider):
 
         phone = self.missive.recipient_phone
         if not phone:
-            return self._build_delivery_status_error("Numéro de téléphone manquant")
+            return self._build_delivery_status_error("Phone number missing")
 
         try:
             api_key = self._get_api_key()
@@ -1062,12 +1048,12 @@ class SMSPartnerProvider(BaseProvider):
 
     def get_sms_service_info(self) -> dict:
         """
-        Récupère les informations du service SMS de SMSPartner.
+        Gets SMSPartner SMS service information.
 
-        Utilise l'API SMSPartner pour récupérer le solde et les crédits SMS.
+        Uses SMSPartner API to retrieve balance and SMS credits.
 
         Returns:
-            Dict avec les crédits SMS, limites, et informations du compte
+            Dict with SMS credits, limits, and account information
         """
         import requests
 
@@ -1143,12 +1129,12 @@ class SMSPartnerProvider(BaseProvider):
 
     def check_email_delivery_status(self, **kwargs) -> dict:
         """
-        Vérifie le statut de livraison d'un email spécifique via Mail Partner API.
+        Check delivery status of a specific email via Mail Partner API.
 
-        Utilise l'API GET /v1/bulk-status
+        Uses GET /v1/bulk-status API
 
         Returns:
-            Dict contenant :
+            Dict containing:
                 - status: 'delivered', 'bounced', 'opened', 'clicked', 'failed'
                 - delivered_at: Date/heure de livraison (timestamp)
                 - opened_at: Non supporté par Mail Partner
@@ -1168,7 +1154,7 @@ class SMSPartnerProvider(BaseProvider):
         email = self.missive.recipient_email
         if not email:
             return self._build_delivery_status_error(
-                "Email destinataire manquant", include_email_fields=True
+                "Recipient email missing", include_email_fields=True
             )
 
         try:
@@ -1265,9 +1251,9 @@ class SMSPartnerProvider(BaseProvider):
 
     def check_voice_call_delivery_status(self, **kwargs) -> dict:
         """
-        Vérifie le statut de livraison d'un appel vocal.
+        Check delivery status of a voice call.
 
-        Note : Voice Partner API ne fournit pas d'endpoint pour vérifier
+        Note: Voice Partner API does not provide an endpoint to check
         le statut de livraison d'un appel vocal après son envoi.
         Utiliser les webhooks (notifyUrl) pour recevoir les notifications de statut.
 
@@ -1287,12 +1273,12 @@ class SMSPartnerProvider(BaseProvider):
 
     def get_email_service_info(self) -> dict:
         """
-        Récupère les informations du service Email de SMSPartner (MailPartner).
+        Gets SMSPartner Email service information (MailPartner).
 
-        Utilise l'API MailPartner pour récupérer le solde et les crédits email.
+        Uses MailPartner API to retrieve balance and email credits.
 
         Returns:
-            Dict avec les crédits email, limites, et informations du compte
+            Dict with email credits, limits, and account information
         """
         import requests
 
@@ -1367,12 +1353,12 @@ class SMSPartnerProvider(BaseProvider):
 
     def get_voice_call_service_info(self) -> dict:
         """
-        Récupère les informations du service Appel Vocal de VoicePartner (SMSPartner).
+        Gets VoicePartner (SMSPartner) Voice Call service information.
 
-        Utilise l'API VoicePartner pour récupérer le solde et les crédits d'appels vocaux.
+        Uses VoicePartner API to retrieve balance and voice call credits.
 
         Returns:
-            Dict avec les crédits appels vocaux, limites, et informations du compte
+            Dict with voice call credits, limits, and account information
         """
         import requests
 
@@ -1480,12 +1466,12 @@ class SMSPartnerProvider(BaseProvider):
 
     def get_service_status(self) -> Dict:
         """
-        Récupère le statut et les crédits SMSPartner (VoicePartner API).
+        Gets SMSPartner status and credits (VoicePartner API).
 
-        SMSPartner fonctionne avec un système de prépaiement en euros.
+        SMSPartner uses a prepaid system in euros.
 
         Returns:
-            Dict avec status, crédits en euros, etc.
+            Dict with status, credits in euros, etc.
         """
         import requests
         from django.utils import timezone
@@ -1529,7 +1515,7 @@ class SMSPartnerProvider(BaseProvider):
                         "type": "money",
                         "remaining": credits_remaining,
                         "currency": "EUR",
-                        "limit": None,  # Pas de limite, système prépayé
+                        "limit": None,  # No limit, prepaid system
                         "percentage": None,
                     },
                     "rate_limits": {

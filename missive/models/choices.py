@@ -1,11 +1,11 @@
-"""Choices (enums) for Django Missive models."""
+"""Missive model choices."""
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 
 class RecipientType(models.TextChoices):
-    """Recipient types"""
+    """Recipient types."""
 
     INDIVIDUAL = "INDIVIDUAL", _("Individual")
     COMPANY = "COMPANY", _("Company")
@@ -13,34 +13,21 @@ class RecipientType(models.TextChoices):
 
 
 class MissiveType(models.TextChoices):
-    """Available missive types"""
+    """Missive types."""
 
-    # Postal
     POSTAL = "POSTAL", _("Postal mail")
     LRE = "LRE", _("Electronic registered letter")
-
-    # Email
     EMAIL = "EMAIL", _("Email")
-
-    # SMS
     SMS = "SMS", _("SMS")
     RCS = "RCS", _("RCS (Rich SMS)")
-
-    # Voice
     VOICE_CALL = "VOICE_CALL", _("Automated voice call")
-
-    # Notifications
     NOTIFICATION = "NOTIFICATION", _("In-app notification")
     PUSH_NOTIFICATION = "PUSH_NOTIFICATION", _("Mobile push notification")
-
-    # App messaging (generic type, auto-dispatched by provider name)
-    # Supports ALL messengers: WhatsApp, Slack, Teams, Discord, Telegram, Signal, etc.
-    # Example: provider with name="slack" auto-calls send_slack()
     BRANDED = "BRANDED", _("App messaging")
 
 
 class MissiveStatus(models.TextChoices):
-    """Missive lifecycle statuses"""
+    """Missive status."""
 
     DRAFT = "DRAFT", _("Draft")
     PENDING = "PENDING", _("Pending")
@@ -53,7 +40,7 @@ class MissiveStatus(models.TextChoices):
 
 
 class MissivePriority(models.TextChoices):
-    """Priority levels"""
+    """Priority levels."""
 
     LOW = "LOW", _("Low")
     NORMAL = "NORMAL", _("Normal")

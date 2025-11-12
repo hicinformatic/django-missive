@@ -1,4 +1,4 @@
-"""Admin for Missive model."""
+"""Administration du modèle Missive."""
 
 import json
 
@@ -15,12 +15,9 @@ from ..models import Missive, Recipient
 
 
 class MissiveAdminForm(forms.ModelForm):
-    """Custom form for Missive admin"""
+    """Formulaire personnalisé pour l'admin Missive."""
 
-    # Mapping: type de missive → providers compatibles (depuis MISSIVE_PROVIDERS)
     PROVIDERS_BY_TYPE = get_providers_from_config()
-
-    # Tous les providers disponibles (générés depuis MISSIVE_PROVIDERS)
     PROVIDER_CHOICES = get_all_provider_choices()
 
     provider_choice = forms.ChoiceField(
@@ -29,7 +26,7 @@ class MissiveAdminForm(forms.ModelForm):
         initial="django_email",
         label=_("Provider"),
         help_text=_(
-            "Provider à utiliser pour l'envoi (filtré selon le type de missive)"
+            "Provider to use for sending (filtered according to missive type)"
         ),
     )
 
@@ -41,34 +38,26 @@ class MissiveAdminForm(forms.ModelForm):
         js = ("admin/js/missive_provider_filter.js",)
 
     def __init__(self, *args, **kwargs):
-        # Supprimer la request non utilisée
         kwargs.pop("request", None)
         super().__init__(*args, **kwargs)
 
-        # Ajouter le mapping des providers au widget pour le JavaScript
         self.fields["provider_choice"].widget.attrs["data-providers-config"] = (
             json.dumps(self.PROVIDERS_BY_TYPE)
         )
 
-        # Si on édite une missive existante, pré-remplir le provider depuis les événements
         if self.instance.pk:
             current_provider = self.instance.provider or "django_email"
-            # Vérifier si le provider actuel est dans la liste
             provider_values = [choice[0] for choice in self.PROVIDER_CHOICES]
             if current_provider not in provider_values:
-                # Ajouter le provider actuel s'il n'est pas dans la liste
                 self.fields["provider_choice"].choices = self.PROVIDER_CHOICES + [
-                    (current_provider, f"{current_provider} (personnalisé)")
+                    (current_provider, f"{current_provider} (custom)")
                 ]
             self.fields["provider_choice"].initial = current_provider
-            # Permettre la modification du provider
             self.fields["provider_choice"].help_text = _(
-                "Provider utilisé pour l'envoi. Changez-le si nécessaire avant l'envoi."
+                "Provider used for sending. Change it if necessary before sending."
             )
-            # Rendre sender readonly en modification
             self.fields["sender"].disabled = True
         else:
-            # En création, pré-remplir avec l'expéditeur par défaut
             if not self.instance.sender_id:
                 default_sender = Recipient.objects.filter(
                     is_default_sender=True
@@ -76,7 +65,6 @@ class MissiveAdminForm(forms.ModelForm):
                 if default_sender:
                     self.fields["sender"].initial = default_sender
 
-            # Filtrer les providers selon le type de missive si un type est déjà sélectionné
             if self.instance.missive_type:
                 compatible_providers = self.PROVIDERS_BY_TYPE.get(
                     self.instance.missive_type, []
@@ -86,23 +74,19 @@ class MissiveAdminForm(forms.ModelForm):
                     for choice in self.PROVIDER_CHOICES
                     if choice[0] in compatible_providers
                 ]
-                # Ajuster l'initial si le provider par défaut n'est pas compatible
                 if "django_email" not in compatible_providers and compatible_providers:
                     self.fields["provider_choice"].initial = compatible_providers[0]
 
     def save(self, commit=True):
-        # Vérifier si c'est une création (avant le save)
         is_new = self.instance.pk is None
-
         instance = super().save(commit=commit)
 
-        # Si c'est une nouvelle missive, créer l'événement d'envoi initial
         if commit and is_new:
             provider = self.cleaned_data.get("provider_choice") or "django_email"
             instance.create_send_event(
                 provider=provider,
                 status=instance.status,
-                description=f"Missive créée avec le provider {provider}",
+                description=f"Missive created with provider {provider}",
             )
 
         return instance
@@ -111,7 +95,7 @@ class MissiveAdminForm(forms.ModelForm):
 @sandbox_warning
 @admin.register(Missive)
 class MissiveAdmin(admin.ModelAdmin):
-    """Admin interface for Missives"""
+    """Interface d'administration pour les Missives."""
 
     form = MissiveAdminForm
     raw_id_fields = ["recipient_user"]
@@ -167,7 +151,7 @@ class MissiveAdmin(admin.ModelAdmin):
 
     fieldsets = (
         (
-            _("Informations générales"),
+            _("General Information"),
             {
                 "fields": (
                     "sender",
@@ -181,7 +165,7 @@ class MissiveAdmin(admin.ModelAdmin):
             },
         ),
         (
-            _("Type et configuration"),
+            _("Type and Configuration"),
             {
                 "fields": (
                     "missive_type",
@@ -192,13 +176,13 @@ class MissiveAdmin(admin.ModelAdmin):
                     "requires_signature",
                 ),
                 "description": _(
-                    "Le provider disponible est automatiquement filtré selon le type de missive sélectionné. "
-                    "Les options du provider permettent de personnaliser l'envoi (scheduled_time, track_clicks, etc.)"
+                    "The available provider is automatically filtered according to the selected missive type. "
+                    "Provider options allow you to customize the sending (scheduled_time, track_clicks, etc.)"
                 ),
             },
         ),
         (
-            _("Statut et tracking"),
+            _("Status and Tracking"),
             {
                 "fields": (
                     "status",
@@ -209,7 +193,7 @@ class MissiveAdmin(admin.ModelAdmin):
                     "error_message",
                 ),
                 "description": _(
-                    "Objet source optionnel pour lier cette missive à une Commande, Participant, etc."
+                    "Optional source object to link this missive to an Order, Participant, etc."
                 ),
             },
         ),
@@ -228,7 +212,7 @@ class MissiveAdmin(admin.ModelAdmin):
             },
         ),
         (
-            _("Métadonnées"),
+            _("Metadata"),
             {
                 "fields": (
                     "attachments_count",
@@ -249,22 +233,22 @@ class MissiveAdmin(admin.ModelAdmin):
     ]
 
     def missive_type_badge(self, obj):
-        """Colored badge for missive type"""
+        """Badge coloré pour le type de missive."""
         colors = {
-            # Courrier
+            # Postal
             "POSTAL": "#6c757d",
             "LRE": "#495057",
             # Email
             "EMAIL": "#0d6efd",
-            # SMS et évolutions
+            # SMS and evolutions
             "SMS": "#198754",
             "RCS": "#20c997",
-            # Vocal
+            # Voice
             "VOICE_CALL": "#6f42c1",
             # Notifications
             "NOTIFICATION": "#fd7e14",
             "PUSH_NOTIFICATION": "#dc3545",
-            # Messageries d'applications (type générique)
+            # Branded messaging apps (generic type)
             "BRANDED": "#9b59b6",
         }
         color = colors.get(obj.missive_type, "#6c757d")
@@ -278,7 +262,7 @@ class MissiveAdmin(admin.ModelAdmin):
     missive_type_badge.short_description = _("Type")
 
     def status_badge(self, obj):
-        """Colored badge for status"""
+        """Badge coloré pour le statut."""
         colors = {
             "DRAFT": "#6c757d",
             "PENDING": "#ffc107",
@@ -297,10 +281,10 @@ class MissiveAdmin(admin.ModelAdmin):
             obj.get_status_display(),
         )
 
-    status_badge.short_description = _("Statut")
+    status_badge.short_description = _("Status")
 
     def priority_badge(self, obj):
-        """Badge for priority"""
+        """Badge pour la priorité."""
         colors = {
             "LOW": "#6c757d",
             "NORMAL": "#0d6efd",
@@ -315,19 +299,19 @@ class MissiveAdmin(admin.ModelAdmin):
             obj.get_priority_display(),
         )
 
-    priority_badge.short_description = _("Priorité")
+    priority_badge.short_description = _("Priority")
 
     def recipient_display_short(self, obj):
-        """Affichage court du destinataire"""
+        """Affichage court du destinataire."""
         display = obj.recipient_display
         if len(display) > 30:
             return display[:27] + "..."
         return display
 
-    recipient_display_short.short_description = _("Destinataire")
+    recipient_display_short.short_description = _("Recipient")
 
     def related_object_display(self, obj):
-        """Display related object"""
+        """Displays related object."""
         if obj.content_object:
             try:
                 content_type = obj.content_type
@@ -346,18 +330,17 @@ class MissiveAdmin(admin.ModelAdmin):
                 return label
         return "-"
 
-    related_object_display.short_description = _("Objet lié")
+    related_object_display.short_description = _("Related Object")
 
     def proof_of_delivery_display(self, obj):
-        """Display all available proof of delivery links"""
-        if not obj.pk:  # Nouvelle missive
+        """Displays all proof of delivery links."""
+        if not obj.pk:
             return "-"
 
         try:
             proofs = obj.get_proofs_of_delivery()
 
             if not proofs:
-                # Vérifier si le service génère des preuves
                 provider_instance = self._get_provider_instance(obj)
                 if provider_instance:
                     available_proofs = provider_instance.list_available_proofs()
@@ -365,23 +348,21 @@ class MissiveAdmin(admin.ModelAdmin):
 
                     if available_proofs.get(service_type):
                         return format_html(
-                            '<span style="color: #ffc107; white-space: nowrap;">⏳ En attente</span>'
+                            '<span style="color: #ffc107; white-space: nowrap;">⏳ Pending</span>'
                         )
 
                 return format_html(
-                    '<span style="color: #ccc; white-space: nowrap;">Non disponible</span>'
+                    '<span style="color: #ccc; white-space: nowrap;">Not available</span>'
                 )
 
-            # Afficher toutes les preuves
             proof_badges = []
             for proof in proofs:
-                proof_label = proof.get("label", proof.get("type", "Preuve"))
+                proof_label = proof.get("label", proof.get("type", "Proof"))
                 proof_format = proof.get("format", "pdf").upper()
                 url = proof.get("url")
                 available = proof.get("available", False)
 
                 if available and url:
-                    # Badge vert cliquable
                     proof_badges.append(
                         '<a href="{}" target="_blank" style="display: inline-block; margin: 2px;">'
                         '<span style="background-color: #198754; color: white; padding: 3px 8px; '
@@ -389,7 +370,6 @@ class MissiveAdmin(admin.ModelAdmin):
                         "📄 {} ({})</span></a>".format(url, proof_label, proof_format)
                     )
                 elif available:
-                    # Disponible mais sans URL
                     proof_badges.append(
                         '<span style="background-color: #198754; color: white; padding: 3px 8px; '
                         "border-radius: 3px; font-size: 10px; font-weight: bold; white-space: nowrap; "
@@ -398,8 +378,7 @@ class MissiveAdmin(admin.ModelAdmin):
                         )
                     )
                 else:
-                    # En attente
-                    message = proof.get("metadata", {}).get("message", "En attente")
+                    message = proof.get("metadata", {}).get("message", "Pending")
                     proof_badges.append(
                         '<span style="background-color: #ffc107; color: black; padding: 3px 8px; '
                         "border-radius: 3px; font-size: 10px; font-weight: bold; white-space: nowrap; "
@@ -412,14 +391,14 @@ class MissiveAdmin(admin.ModelAdmin):
 
         except Exception as e:
             return format_html(
-                '<span style="color: #dc3545; white-space: nowrap;" title="{}">❌ Erreur</span>',
+                '<span style="color: #dc3545; white-space: nowrap;" title="{}">❌ Error</span>',
                 str(e),
             )
 
-    proof_of_delivery_display.short_description = _("Preuves de dépôt")
+    proof_of_delivery_display.short_description = _("Proof of Delivery")
 
     def _get_provider_instance(self, obj):
-        """Get provider instance for this missive"""
+        """Gets provider instance for this missive."""
         try:
             from django.utils.module_loading import import_string
 
@@ -427,7 +406,6 @@ class MissiveAdmin(admin.ModelAdmin):
             if not provider_name:
                 return None
 
-            # Chercher le provider dans la config
             providers_config = getattr(settings, "MISSIVE_PROVIDERS", {})
             provider_path = None
 
@@ -448,9 +426,9 @@ class MissiveAdmin(admin.ModelAdmin):
         except Exception:
             return None
 
-    @admin.action(description=_("🚀 Envoyer maintenant"))
+    @admin.action(description=_("🚀 Send Now"))
     def send_now_action(self, request, queryset):
-        """Action to send selected missives immediately"""
+        """Action pour envoyer les missives sélectionnées immédiatement."""
         from ..sender import MissiveSender
 
         sender = MissiveSender()
@@ -459,43 +437,40 @@ class MissiveAdmin(admin.ModelAdmin):
         errors = []
 
         for missive in queryset:
-            # Vérifier que la missive peut être envoyée
             if missive.status in ["SENT", "DELIVERED", "READ"]:
                 error_count += 1
                 errors.append(
-                    f"Missive #{missive.id} déjà envoyée (statut: {missive.get_status_display()})"
+                    f"Missive #{missive.id} already sent (status: {missive.get_status_display()})"
                 )
                 continue
 
             if missive.status == "CANCELLED":
                 error_count += 1
                 errors.append(
-                    f"Missive #{missive.id} annulée, ne peut pas être envoyée"
+                    f"Missive #{missive.id} cancelled, cannot be sent"
                 )
                 continue
 
-            # Envoyer la missive
             try:
                 if sender.send(missive):
                     success_count += 1
                     self.message_user(
                         request,
-                        _(f"✅ Missive #{missive.id} envoyée avec succès !"),
+                        _(f"✅ Missive #{missive.id} sent successfully!"),
                         level="success",
                     )
                 else:
                     error_count += 1
-                    error_msg = missive.error_message or "Erreur inconnue"
+                    error_msg = missive.error_message or "Unknown error"
                     errors.append(f"Missive #{missive.id}: {error_msg}")
             except Exception as e:
                 error_count += 1
                 errors.append(f"Missive #{missive.id}: {str(e)}")
 
-        # Message récapitulatif
         if success_count > 0:
             self.message_user(
                 request,
-                _(f"🎉 {success_count} missive(s) envoyée(s) avec succès !"),
+                _(f"🎉 {success_count} missive(s) sent successfully!"),
                 level="success",
             )
 
@@ -503,37 +478,37 @@ class MissiveAdmin(admin.ModelAdmin):
             self.message_user(
                 request,
                 _(
-                    f"⚠️ {error_count} erreur(s) : "
+                    f"⚠️ {error_count} error(s): "
                     + " | ".join(errors[:5])
                     + ("..." if len(errors) > 5 else "")
                 ),
                 level="warning",
             )
 
-    @admin.action(description=_("Marquer comme envoyé"))
+    @admin.action(description=_("Mark as Sent"))
     def mark_as_sent(self, request, queryset):
         updated = queryset.update(status="SENT", sent_at=timezone.now())
         self.message_user(
-            request, _(f"{updated} missive(s) marquée(s) comme envoyée(s).")
+            request, _(f"{updated} missive(s) marked as sent.")
         )
 
-    @admin.action(description=_("Marquer comme délivré"))
+    @admin.action(description=_("Mark as Delivered"))
     def mark_as_delivered(self, request, queryset):
         updated = queryset.update(status="DELIVERED", delivered_at=timezone.now())
         self.message_user(
-            request, _(f"{updated} missive(s) marquée(s) comme délivrée(s).")
+            request, _(f"{updated} missive(s) marked as delivered.")
         )
 
-    @admin.action(description=_("Marquer comme échoué"))
+    @admin.action(description=_("Mark as Failed"))
     def mark_as_failed(self, request, queryset):
         updated = queryset.update(status="FAILED")
         self.message_user(
-            request, _(f"{updated} missive(s) marquée(s) comme échouée(s).")
+            request, _(f"{updated} missive(s) marked as failed.")
         )
 
-    @admin.action(description=_("🔍 Analyser le risque d'échec"))
+    @admin.action(description=_("🔍 Analyze Delivery Risk"))
     def check_delivery_risk_action(self, request, queryset):
-        """Action to analyze delivery risk for selected missives"""
+        """Action pour analyser le risque de livraison des missives sélectionnées."""
         from ..sender import MissiveSender
 
         low_risk = 0
@@ -557,11 +532,11 @@ class MissiveAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             format_html(
-                "🔍 <strong>Analyse de risque terminée</strong><br>"
-                "✅ {} missive(s) à risque <strong>faible</strong><br>"
-                "⚠️ {} missive(s) à risque <strong>moyen</strong><br>"
-                "⚠️ {} missive(s) à risque <strong>élevé</strong><br>"
-                "🔴 {} missive(s) à risque <strong>critique</strong>",
+                "🔍 <strong>Risk analysis complete</strong><br>"
+                "✅ {} missive(s) with <strong>low</strong> risk<br>"
+                "⚠️ {} missive(s) with <strong>medium</strong> risk<br>"
+                "⚠️ {} missive(s) with <strong>high</strong> risk<br>"
+                "🔴 {} missive(s) with <strong>critical</strong> risk",
                 low_risk,
                 medium_risk,
                 high_risk,

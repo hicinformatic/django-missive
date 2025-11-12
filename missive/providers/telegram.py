@@ -1,8 +1,4 @@
-"""
-Provider Telegram pour l'envoi de messages via Telegram Bot API.
-
-Documentation: https://core.telegram.org/bots/api
-"""
+"""Telegram Bot API provider."""
 
 from typing import Any, Dict, Optional
 
@@ -10,33 +6,25 @@ from .base import BaseProvider
 
 
 class TelegramProvider(BaseProvider):
-    """
-    Provider pour Telegram.
-
-    Configuration requise:
-        TELEGRAM_BOT_TOKEN: Token du bot Telegram
-
-    Le destinataire doit avoir un chat_id Telegram (stocker dans metadata du Recipient)
-    """
+    """Telegram provider."""
 
     name = "telegram"
     display_name = "Telegram"
     supported_types = ["BRANDED"]
-    brands = ["telegram"]  # Telegram uniquement
+    brands = ["telegram"]
     config_keys = ["TELEGRAM_BOT_TOKEN"]
     required_packages = ["python-telegram-bot"]
     site_url = "https://telegram.org/"
-    description_text = "Messagerie instantanée sécurisée avec bots et API complète"
+    description_text = "Secure instant messaging with bots"
 
     def validate(self) -> Dict[str, Any]:
-        """Valide que le destinataire a un chat_id Telegram"""
+        """Validates recipient has Telegram chat_id."""
         if not self.missive:
-            return {"is_valid": False, "error": "Missive non définie"}
+            return {"is_valid": False, "error": "Missive not defined"}
 
-        # Vérifier que le recipient a un chat_id dans metadata
         recipient = self.missive.recipient
         if not recipient:
-            return {"is_valid": False, "error": "Destinataire non défini"}
+            return {"is_valid": False, "error": "Recipient not defined"}
 
         chat_id = (
             recipient.metadata.get("telegram_chat_id") if recipient.metadata else None
@@ -44,24 +32,19 @@ class TelegramProvider(BaseProvider):
         if not chat_id:
             return {
                 "is_valid": False,
-                "error": "Le destinataire n'a pas de chat_id Telegram (ajouter dans metadata)",
+                "error": "Recipient has no telegram_chat_id in metadata",
             }
 
         return {"is_valid": True}
 
     def send(self) -> Dict[str, Any]:
-        """
-        Envoie un message via Telegram Bot API.
-
-        TODO: Implémenter l'envoi réel via requests vers:
-        https://api.telegram.org/bot{token}/sendMessage
-        """
+        """Sends message via Telegram Bot API."""
         validation = self.validate()
         if not validation["is_valid"]:
             self._update_status("FAILED", error_message=validation["error"])
             return {"success": False, "error": validation["error"]}
 
-        # TODO: Implémenter l'envoi réel
+        # TODO: Implement actual sending
         # Pour l'instant, simuler l'envoi
         self._update_status(
             "SENT",
@@ -75,10 +58,10 @@ class TelegramProvider(BaseProvider):
 
     def check_status(self, external_id: Optional[str] = None) -> Optional[str]:
         """
-        Vérifie le statut d'un message Telegram.
+        Check status of a Telegram message.
 
-        Note: Telegram ne fournit pas de webhook automatique pour le statut de livraison.
-        On ne peut savoir que si le message a été envoyé.
+        Note: Telegram does not provide automatic webhooks for delivery status.
+        Can only know if message was sent.
         """
-        # TODO: Implémenter si besoin
+        # TODO: Implement if needed
         return None

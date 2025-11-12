@@ -1,6 +1,4 @@
-"""
-Commande pour nettoyer les destinataires en double avant d'appliquer les contraintes d'unicité.
-"""
+"""Commande pour nettoyer les destinataires en double."""
 
 from django.core.management.base import BaseCommand
 from django.db.models import Count
@@ -9,13 +7,12 @@ from missive.models import Recipient
 
 
 class Command(BaseCommand):
-    help = "Nettoie les destinataires en double (garde le plus ancien)"
+    help = "Clean duplicate recipients (keeps the oldest)"
 
     def handle(self, *args, **options):
         removed_count = 0
 
-        # 1. Nettoyer les doublons d'email
-        self.stdout.write("\n🔍 Recherche de doublons d'email...")
+        self.stdout.write("\n🔍 Searching for email duplicates...")
         emails = (
             Recipient.objects.exclude(email="")
             .exclude(email__isnull=True)
@@ -27,9 +24,8 @@ class Command(BaseCommand):
         for item in emails:
             email = item["email"]
             duplicates = Recipient.objects.filter(email=email).order_by("created_at")
-            self.stdout.write(f"  📧 {email}: {duplicates.count()} doublons")
+            self.stdout.write(f"  📧 {email}: {duplicates.count()} duplicates")
 
-            # Garder le premier (le plus ancien), supprimer les autres
             to_keep = duplicates.first()
             to_delete = duplicates.exclude(pk=to_keep.pk)
 
@@ -40,8 +36,7 @@ class Command(BaseCommand):
                 dup.delete()
                 removed_count += 1
 
-        # 2. Nettoyer les doublons de mobile
-        self.stdout.write("\n🔍 Recherche de doublons de mobile...")
+        self.stdout.write("\n🔍 Searching for mobile duplicates...")
         mobiles = (
             Recipient.objects.exclude(mobile="")
             .exclude(mobile__isnull=True)
@@ -53,9 +48,8 @@ class Command(BaseCommand):
         for item in mobiles:
             mobile = item["mobile"]
             duplicates = Recipient.objects.filter(mobile=mobile).order_by("created_at")
-            self.stdout.write(f"  📱 {mobile}: {duplicates.count()} doublons")
+            self.stdout.write(f"  📱 {mobile}: {duplicates.count()} duplicates")
 
-            # Garder le premier (le plus ancien), supprimer les autres
             to_keep = duplicates.first()
             to_delete = duplicates.exclude(pk=to_keep.pk)
 
@@ -66,8 +60,7 @@ class Command(BaseCommand):
                 dup.delete()
                 removed_count += 1
 
-        # 3. Nettoyer les doublons d'adresse
-        self.stdout.write("\n🔍 Recherche de doublons d'adresse...")
+        self.stdout.write("\n🔍 Searching for address duplicates...")
         addresses = (
             Recipient.objects.exclude(address_line1="")
             .exclude(address_line1__isnull=True)
@@ -84,10 +77,9 @@ class Command(BaseCommand):
                 city=item["city"],
             ).order_by("created_at")
             self.stdout.write(
-                f'  📍 {item["name"]} - {item["address_line1"]}: {duplicates.count()} doublons'
+                f'  📍 {item["name"]} - {item["address_line1"]}: {duplicates.count()} duplicates'
             )
 
-            # Garder le premier (le plus ancien), supprimer les autres
             to_keep = duplicates.first()
             to_delete = duplicates.exclude(pk=to_keep.pk)
 
@@ -100,11 +92,11 @@ class Command(BaseCommand):
 
         if removed_count > 0:
             self.stdout.write(
-                self.style.SUCCESS(f"\n✓ {removed_count} doublons supprimés")
+                self.style.SUCCESS(f"\n✓ {removed_count} duplicates removed")
             )
         else:
-            self.stdout.write(self.style.SUCCESS("\n✓ Aucun doublon trouvé"))
+            self.stdout.write(self.style.SUCCESS("\n✓ No duplicates found"))
 
         self.stdout.write(
-            self.style.SUCCESS(f"✓ Total: {Recipient.objects.count()} destinataires")
+            self.style.SUCCESS(f"✓ Total: {Recipient.objects.count()} recipients")
         )

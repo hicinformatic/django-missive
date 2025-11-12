@@ -1,7 +1,7 @@
 # Provider SendGrid (Email)
-# Install avec: pip install -r requirements-sendgrid.txt
+# Install with: pip install -r requirements-sendgrid.txt
 
-# Dépendances core requises
+# Required core dependencies
 -r requirements.txt
 
 # Package SendGrid

@@ -1,4 +1,4 @@
-"""Admin for MissiveAttachment model."""
+"""Administration du modèle MissiveAttachment."""
 
 from django.contrib import admin
 from django.urls import reverse
@@ -10,7 +10,7 @@ from ..models import MissiveAttachment
 
 
 class MissiveAttachmentInline(admin.StackedInline):
-    """Inline for attachments (vertical display)"""
+    """Inline des pièces jointes."""
 
     model = MissiveAttachment
     extra = 1
@@ -51,7 +51,7 @@ class MissiveAttachmentInline(admin.StackedInline):
     )
 
     def file_url_display(self, obj):
-        """Display link to file"""
+        """Displays file link."""
         if obj and obj.file_url:
             icon = "🔗" if obj.is_external else "📎"
             return format_html(
@@ -64,7 +64,7 @@ class MissiveAttachmentInline(admin.StackedInline):
     file_url_display.short_description = _("Link")
 
     def attached_to_display(self, obj):
-        """Display object to which file is attached"""
+        """Displays attached object."""
         if not obj or not obj.pk:
             return "-"
 
@@ -93,7 +93,7 @@ class MissiveAttachmentInline(admin.StackedInline):
 @sandbox_warning
 @admin.register(MissiveAttachment)
 class MissiveAttachmentAdmin(admin.ModelAdmin):
-    """Admin for attachments"""
+    """Administration des pièces jointes."""
 
     raw_id_fields = ["missive"]
 
@@ -151,7 +151,7 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
     )
 
     def storage_type_badge(self, obj):
-        """Storage type badge"""
+        """Badge du type de stockage."""
         if obj.is_external:
             return format_html(
                 '<span style="background-color: #0dcaf0; color: white; padding: 2px 8px; '
@@ -166,7 +166,7 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
     storage_type_badge.short_description = _("Storage")
 
     def attached_to_display(self, obj):
-        """Display object to which file is attached"""
+        """Displays attached object."""
         attached = obj.attached_to
         if not attached:
             return "-"
@@ -194,7 +194,7 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
     attached_to_display.short_description = _("Attached to")
 
     def file_size_display(self, obj):
-        """Formatted size display"""
+        """Displays formatted size."""
         if obj.file_size:
             if obj.file_size < 1024:
                 return f"{obj.file_size} B"
@@ -207,7 +207,7 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
     file_size_display.short_description = _("Size")
 
     def file_url_display(self, obj):
-        """Display link to file"""
+        """Displays file link."""
         if obj.file_url:
             icon = "🔗" if obj.is_external else "📎"
             return format_html(

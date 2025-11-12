@@ -1,6 +1,4 @@
-"""
-Provider pour les notifications in-app.
-"""
+"""In-app notification provider."""
 
 from typing import Dict, Tuple
 
@@ -11,7 +9,7 @@ from .base import BaseProvider
 
 
 class InAppNotificationProvider(BaseProvider):
-    """Provider pour les notifications in-app"""
+    """In-app notification provider."""
 
     name = "notification"
     display_name = "Notification In-App"
@@ -19,11 +17,11 @@ class InAppNotificationProvider(BaseProvider):
     services = ["notification", "push_notification", "badge"]
     required_packages = []
     description_text = (
-        "Notifications dans l'application (in-app) sans dépendance externe"
+        "In-app notifications without external dependency"
     )
 
     def send_notification(self, **kwargs) -> bool:
-        """Crée une notification in-app"""
+        """Create an in-app notification"""
         # Validation
         is_valid, error = self.validate()
         if not is_valid:
@@ -32,7 +30,7 @@ class InAppNotificationProvider(BaseProvider):
 
         if not self.missive.recipient_user:
             self._update_status(
-                MissiveStatus.FAILED, error_message="Utilisateur manquant"
+                MissiveStatus.FAILED, error_message="User missing"
             )
             return False
 
@@ -63,8 +61,8 @@ class InAppNotificationProvider(BaseProvider):
                 delivered_at=timezone.now(),
             )
 
-            self._create_event("sent", "Notification créée")
-            self._create_event("delivered", "Notification délivrée")
+            self._create_event("sent", "Notification created")
+            self._create_event("delivered", "Notification delivered")
 
             return True
 
@@ -76,21 +74,21 @@ class InAppNotificationProvider(BaseProvider):
     def validate_webhook_signature(
         self, payload: Dict, headers: Dict
     ) -> Tuple[bool, str]:
-        """Pas de webhooks pour les notifications in-app"""
-        return False, "Les notifications in-app n'utilisent pas de webhooks"
+        """No webhooks for in-app notifications"""
+        return False, "In-app notifications do not use webhooks"
 
     def get_service_status(self) -> Dict:
         """
-        Récupère le statut du système de notification in-app.
+        Gets in-app notification system status.
 
-        Les notifications in-app sont gérées en local, pas de limitation.
+        In-app notifications are managed locally, no limits.
 
         Returns:
-            Dict avec status, disponibilité, etc.
+            Dict with status, availability, etc.
         """
         from django.utils import timezone
 
-        # Système local, toujours disponible
+        # Local system, always available
         return {
             "status": "operational",
             "is_available": True,
@@ -103,7 +101,7 @@ class InAppNotificationProvider(BaseProvider):
                 "percentage": None,
             },
             "rate_limits": {
-                "per_second": None,  # Pas de limite
+                "per_second": None,  # No limit
             },
             "sla": {
                 "uptime_percentage": 100.0,  # Local

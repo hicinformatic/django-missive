@@ -1,108 +1,72 @@
-"""
-Mixin pour les fonctionnalités notification in-app des providers.
-"""
+"""In-app notification provider mixin."""
 
 from typing import Any, Dict
 
 
 class BaseNotificationMixin:
-    """
-    Mixin fournissant les fonctionnalités spécifiques aux notifications in-app.
-    """
+    """In-app notification-specific functionality mixin."""
 
     def get_notification_service_info(self) -> Dict[str, Any]:
-        """
-        Récupère les informations du compte/service Notification.
-
-        Retourne les informations importantes pour le service de notifications :
-        - Nombre de notifications envoyées/limites
-        - État du service (actif/inactif)
-        - Channels disponibles (in-app, push, etc.)
-
-        Returns:
-            Dict contenant :
-                - credits: Généralement 'unlimited' pour les notifications in-app
-                - credits_type: 'unlimited' ou 'count'
-                - is_available: bool, service accessible
-                - limits: Dict avec les limites (notifications/jour, etc.)
-                - warnings: Liste des alertes
-                - channels: Liste des canaux disponibles
-                - details: Dict avec infos supplémentaires
-
-        À surcharger dans les providers concrets.
-        """
+        """Returns notification service info. Override in subclasses."""
         return {
             "credits": None,
             "credits_type": "unlimited",
             "is_available": None,
             "limits": {},
             "warnings": [
-                "Méthode get_notification_service_info() non implémentée pour ce provider"
+                "get_notification_service_info() method not implemented for this provider"
             ],
             "channels": [],
             "details": {},
         }
 
     def check_notification_delivery_status(self, **kwargs) -> Dict[str, Any]:
-        """
-        Vérifie le statut de livraison d'une notification spécifique.
-
-        Returns:
-            Dict contenant :
-                - status: Statut actuel ('delivered', 'read', 'dismissed', etc.)
-                - delivered_at: Date/heure de livraison
-                - read_at: Date/heure de lecture
-                - error_code: Code d'erreur (si échec)
-                - error_message: Message d'erreur (si échec)
-                - details: Infos supplémentaires du provider
-
-        À surcharger dans les providers concrets.
-        """
+        """Checks notification delivery status. Override in subclasses."""
         return {
             "status": "unknown",
             "delivered_at": None,
             "read_at": None,
             "error_code": None,
-            "error_message": "Méthode check_notification_delivery_status() non implémentée pour ce provider",
+            "error_message": "check_notification_delivery_status() method not implemented for this provider",
             "details": {},
         }
 
     def send_notification(self, **kwargs) -> bool:
         """
-        Envoie une notification in-app. À surcharger dans les providers concrets.
+        Send an in-app notification. To be overridden in concrete providers.
 
         Args:
-            **kwargs: Options propriétaires du provider
+            **kwargs: Provider-specific options
 
         Returns:
-            bool: True si succès, False sinon
+            bool: True if successful, False otherwise
         """
         from ...models import MissiveStatus
 
-        # Vérifier qu'on a un utilisateur destinataire
+        # Check that we have a recipient user
         if not self.missive.recipient_user:
             self._update_status(
-                MissiveStatus.FAILED, error_message="Pas d'utilisateur destinataire"
+                MissiveStatus.FAILED, error_message="No recipient user"
             )
             return False
 
-        # À implémenter dans les sous-classes
+        # To be implemented in subclasses
         raise NotImplementedError(
-            f"{self.name} doit implémenter la méthode send_notification()"
+            f"{self.name} must implement the send_notification() method"
         )
 
     def format_notification_data(self) -> Dict[str, Any]:
         """
-        Formate les données de notification pour le frontend.
+        Format notification data for frontend.
 
         Returns:
-            Dict contenant :
-            - title (str): Titre de la notification
-            - body (str): Corps du message
-            - icon (str): Icône à afficher
-            - url (str): URL de redirection au clic
-            - priority (str): Priorité d'affichage
-            - metadata (Dict): Données additionnelles
+            Dict containing:
+            - title (str): Notification title
+            - body (str): Message body
+            - icon (str): Icon to display
+            - url (str): Redirect URL on click
+            - priority (str): Display priority
+            - metadata (Dict): Additional data
 
         Example:
             data = provider.format_notification_data()
@@ -125,7 +89,7 @@ class BaseNotificationMixin:
         notification_type = self.missive.metadata.get("notification_type", "message")
         icon = icon_map.get(notification_type, "🔔")
 
-        # URL de redirection (depuis content_object si disponible)
+        # Redirect URL (from content_object if available)
         redirect_url = ""
         if self.missive.content_object:
             # TODO: Générer l'URL selon le type d'objet
@@ -151,8 +115,8 @@ class BaseNotificationMixin:
             user: Utilisateur Django
 
         Returns:
-            Dict contenant :
-            - accepts_notifications (bool): Accepte les notifications
+            Dict containing:
+            - accepts_notifications (bool): Accepts notifications
             - channels (List[str]): Canaux activés (web, mobile, email)
             - quiet_hours (bool): En période de silence
             - preferences (Dict): Préférences détaillées
@@ -162,7 +126,7 @@ class BaseNotificationMixin:
             if not prefs['accepts_notifications']:
                 print("Utilisateur a désactivé les notifications")
         """
-        # TODO: Implémenter selon votre modèle de préférences
+        # TODO: Implement according to your preferences model
         # from myapp.models import UserNotificationPreferences
         # prefs = UserNotificationPreferences.objects.get(user=user)
 
@@ -175,15 +139,15 @@ class BaseNotificationMixin:
 
     def cancel_notification(self, **kwargs) -> bool:
         """
-        Annule une notification programmée.
+        Cancel a scheduled notification.
 
         Args:
-            **kwargs: Options propriétaires du provider
+            **kwargs: Provider-specific options
 
-        Méthode de base qui retourne False. Les providers qui supportent
-        l'annulation doivent surcharger cette méthode avec leur implémentation API.
+        Base method that returns False. Providers that support
+        cancellation must override this method with their API implementation.
 
         Returns:
-            bool: True si annulation réussie, False sinon
+            bool: True if cancellation succeeded, False otherwise
         """
         return False

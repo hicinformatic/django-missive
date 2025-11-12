@@ -1,8 +1,4 @@
-"""
-Provider Amazon SES (Simple Email Service) pour l'envoi d'emails.
-
-Documentation: https://docs.aws.amazon.com/ses/
-"""
+"""Amazon SES email provider."""
 
 from typing import Dict
 
@@ -12,18 +8,18 @@ from .base import BaseProvider
 
 class SESProvider(BaseProvider):
     """
-    Provider pour Amazon SES (Simple Email Service).
+    Amazon SES (Simple Email Service) provider.
 
-    Configuration requise:
+    Required configuration:
         AWS_ACCESS_KEY_ID: Clé d'accès AWS
         AWS_SECRET_ACCESS_KEY: Clé secrète AWS
         AWS_REGION: Région AWS (ex: eu-west-1, us-east-1)
         SES_FROM_EMAIL: Email expéditeur vérifié dans SES
 
-    Supporte :
+    Supports:
     - Email transactionnel
     - Email marketing (avec SES v2)
-    - Gestion de réputation
+    - Reputation management
     """
 
     name = "ses"
@@ -40,10 +36,10 @@ class SESProvider(BaseProvider):
     site_url = "https://aws.amazon.com/ses/"
     status_url = "https://health.aws.amazon.com/health/status"
     documentation_url = "https://docs.aws.amazon.com/ses/"
-    description_text = "Amazon Simple Email Service - Email transactionnel AWS"
+    description_text = "Amazon Simple Email Service - AWS transactional email"
 
     def send_email(self, **kwargs) -> bool:
-        """Envoie un email via Amazon SES"""
+        """Send an email via Amazon SES"""
         import boto3
         from botocore.exceptions import ClientError
 
@@ -54,7 +50,7 @@ class SESProvider(BaseProvider):
             return False
 
         if not self.missive.recipient_email:
-            self._update_status(MissiveStatus.FAILED, error_message="Email manquant")
+            self._update_status(MissiveStatus.FAILED, error_message="Email missing")
             return False
 
         try:
@@ -142,7 +138,7 @@ class SESProvider(BaseProvider):
                 external_id=message_id,
             )
             self._create_event(
-                "sent", f"Email envoyé via Amazon SES (ID: {message_id})"
+                "sent", f"Email sent via Amazon SES (ID: {message_id})"
             )
 
             return True
@@ -159,10 +155,10 @@ class SESProvider(BaseProvider):
 
     def get_email_service_info(self) -> Dict:
         """
-        Récupère les informations du service Amazon SES.
+        Gets Amazon SES service information.
 
         Returns:
-            Dict avec quotas, crédits, réputation, etc.
+            Dict with quotas, credits, reputation, etc.
         """
         import boto3
         from botocore.exceptions import ClientError

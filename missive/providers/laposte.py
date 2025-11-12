@@ -1,6 +1,4 @@
-"""
-Provider La Poste pour courrier postal.
-"""
+"""La Poste provider for postal mail."""
 
 from typing import Dict, Optional, Tuple
 
@@ -10,11 +8,11 @@ from .base import BaseProvider
 
 class LaPosteProvider(BaseProvider):
     """
-    Provider pour La Poste.
+    La Poste provider.
 
-    Supporte :
-    - Courrier postal (simple, recommandé, avec signature)
-    - Email AR (Email avec accusé de réception électronique)
+    Supports:
+    - Postal mail (simple, registered, with signature)
+    - AR Email (Email with electronic acknowledgment of receipt)
     """
 
     name = "La Poste"
@@ -24,18 +22,18 @@ class LaPosteProvider(BaseProvider):
         "postal",  # Courrier simple
         "postal_registered",  # Recommandé R1
         "postal_signature",  # Recommandé R2/R3 avec signature
-        "email_ar",  # Email avec AR électronique
+        "email_ar",  # Email with electronic AR
         "colissimo",  # Colis (future extension)
     ]
     config_keys = ["LAPOSTE_API_KEY"]
     required_packages = ["requests"]
     site_url = "https://www.laposte.fr/"
     description_text = (
-        "Envoi de courrier recommandé et email AR sur le territoire français"
+        "Registered mail and AR email sending on French territory"
     )
 
     def send_postal(self, **kwargs) -> bool:
-        """Envoie du courrier postal via La Poste API"""
+        """Send postal mail via La Poste API"""
         # Validation
         is_valid, error = self.validate()
         if not is_valid:
@@ -43,11 +41,11 @@ class LaPosteProvider(BaseProvider):
             return False
 
         if not self.missive.recipient_address:
-            self._update_status(MissiveStatus.FAILED, error_message="Adresse manquante")
+            self._update_status(MissiveStatus.FAILED, error_message="Address missing")
             return False
 
         try:
-            # TODO: Intégrer avec La Poste API
+            # TODO: Integrate with La Poste API
             # import requests
             #
             # api_key = self.config.get('LAPOSTE_API_KEY')
@@ -83,7 +81,7 @@ class LaPosteProvider(BaseProvider):
             self._update_status(
                 MissiveStatus.SENT, provider=self.name, external_id=external_id
             )
-            self._create_event("sent", f"Courrier {letter_type} envoyé via La Poste")
+            self._create_event("sent", f"{letter_type} letter sent via La Poste")
 
             return True
 
@@ -94,8 +92,8 @@ class LaPosteProvider(BaseProvider):
 
     def send_email(self) -> bool:
         """
-        Envoie un email AR (avec accusé de réception) via La Poste.
-        La Poste propose un service d'email recommandé électronique.
+        Send an AR email (with acknowledgement of receipt) via La Poste.
+        La Poste offers an electronic registered email service.
         """
         # Validation
         is_valid, error = self.validate()
@@ -104,11 +102,11 @@ class LaPosteProvider(BaseProvider):
             return False
 
         if not self.missive.recipient_email:
-            self._update_status(MissiveStatus.FAILED, error_message="Email manquant")
+            self._update_status(MissiveStatus.FAILED, error_message="Email missing")
             return False
 
         try:
-            # TODO: Intégrer avec La Poste Email AR
+            # TODO: Integrate with La Poste Email AR
             # import requests
             #
             # api_key = self.config.get('LAPOSTE_API_KEY')
@@ -136,7 +134,7 @@ class LaPosteProvider(BaseProvider):
                 provider=f"{self.name} Email AR",
                 external_id=external_id,
             )
-            self._create_event("sent", "Email AR envoyé via La Poste")
+            self._create_event("sent", "AR email sent via La Poste")
 
             return True
 
@@ -162,15 +160,15 @@ class LaPosteProvider(BaseProvider):
 
     def get_proofs_of_delivery(self, service_type: Optional[str] = None) -> list:
         """
-        Récupère toutes les preuves La Poste.
+        Get all La Poste proofs.
 
-        La Poste génère plusieurs documents selon le service :
-        - Courrier simple : Preuve de dépôt
-        - Courrier recommandé R1 : Preuve de dépôt + AR + avis de passage
-        - Courrier recommandé R2/R3 : Preuve de dépôt + AR + signature + copie scannée
-        - Email AR : Accusé de réception électronique
+        La Poste generates several documents according to service:
+        - Simple mail: Deposit proof
+        - Registered mail R1: Deposit proof + AR + delivery notice
+        - Registered mail R2/R3: Deposit proof + AR + signature + scanned copy
+        - AR Email: Electronic acknowledgement of receipt
 
-        TODO: Implémenter via l'API La Poste
+        TODO: Implement via La Poste API
         GET https://api.laposte.fr/sls/v2/suivi/{tracking_number}/proofs
         """
         if not self.missive:
@@ -200,11 +198,11 @@ class LaPosteProvider(BaseProvider):
         tracking_number = external_id.replace("laposte_", "")
         proofs = []
 
-        # 1. Preuve de dépôt (toujours disponible)
+        # 1. Deposit proof (always available)
         proofs.append(
             {
                 "type": "deposit_receipt",
-                "label": "Preuve de dépôt",
+                "label": "Deposit Proof",
                 "available": True,
                 "url": f"https://www.laposte.fr/suivi/proof/deposit/{tracking_number}.pdf",
                 "generated_at": sent_at,
@@ -218,12 +216,12 @@ class LaPosteProvider(BaseProvider):
             }
         )
 
-        # 2. Copie du document (si courrier postal)
+        # 2. Document copy (if postal mail)
         if "postal" in service_type:
             proofs.append(
                 {
                     "type": "document_copy",
-                    "label": "Copie du courrier",
+                    "label": "Mail Copy",
                     "available": True,
                     "url": f"https://www.laposte.fr/suivi/document/{tracking_number}.pdf",
                     "generated_at": sent_at,
@@ -236,12 +234,12 @@ class LaPosteProvider(BaseProvider):
                 }
             )
 
-        # 3. Avis de passage (si recommandé et non livré)
+        # 3. Delivery notice (if registered and not delivered)
         if self.missive.is_registered and not self.missive.delivered_at:
             proofs.append(
                 {
                     "type": "delivery_notice",
-                    "label": "Avis de passage",
+                    "label": "Delivery Notice",
                     "available": False,
                     "url": None,
                     "generated_at": None,
@@ -261,7 +259,7 @@ class LaPosteProvider(BaseProvider):
                 proofs.append(
                     {
                         "type": "acknowledgment_receipt",
-                        "label": "Accusé de réception",
+                        "label": "Acknowledgement of Receipt",
                         "available": True,
                         "url": f"https://www.laposte.fr/suivi/ar/{tracking_number}.pdf",
                         "generated_at": self.missive.delivered_at,
@@ -284,7 +282,7 @@ class LaPosteProvider(BaseProvider):
                 proofs.append(
                     {
                         "type": "acknowledgment_receipt",
-                        "label": "Accusé de réception",
+                        "label": "Acknowledgement of Receipt",
                         "available": False,
                         "url": None,
                         "generated_at": None,
@@ -321,14 +319,14 @@ class LaPosteProvider(BaseProvider):
 
     def get_service_status(self) -> Dict:
         """
-        Récupère le statut et les crédits La Poste.
+        Gets La Poste status and credits.
 
-        La Poste fonctionne avec des crédits prépayés.
+        La Poste uses prepaid credits.
 
         Returns:
-            Dict avec status, crédits, etc.
+            Dict with status, credits, etc.
         """
-        # TODO: Implémenter l'appel à l'API La Poste
+        # TODO: Implement La Poste API call
         # import requests
         #
         # try:

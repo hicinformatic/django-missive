@@ -1,8 +1,4 @@
-"""
-Provider Certeurope pour l'envoi de Lettres Recommandées Électroniques (LRE).
-
-Documentation: https://www.certeurope.fr/services/lettre-recommandee-electronique
-"""
+"""Certeurope provider for electronic registered letters (LRE)."""
 
 from typing import Any, Dict, Optional
 
@@ -11,15 +7,15 @@ from .base import BaseProvider
 
 class CerteuropeProvider(BaseProvider):
     """
-    Provider pour Certeurope (Lettre Recommandée Électronique).
+    Certeurope provider (Electronic Registered Letter).
 
-    Configuration requise:
-        CERTEUROPE_API_KEY: Clé API Certeurope
-        CERTEUROPE_API_SECRET: Secret API
-        CERTEUROPE_API_URL: URL de l'API
-        CERTEUROPE_SENDER_EMAIL: Email de l'expéditeur enregistré
+    Required configuration:
+        CERTEUROPE_API_KEY: Certeurope API key
+        CERTEUROPE_API_SECRET: API Secret
+        CERTEUROPE_API_URL: API URL
+        CERTEUROPE_SENDER_EMAIL: Registered sender email
 
-    Le destinataire doit avoir un email et une adresse postale complète.
+    Recipient must have an email and complete postal address.
     """
 
     name = "certeurope"
@@ -33,28 +29,28 @@ class CerteuropeProvider(BaseProvider):
     ]
     required_packages = ["requests"]
     site_url = "https://www.certeurope.fr/"
-    description_text = "Email recommandé électronique avec valeur juridique (LRE)"
+    description_text = "Electronic registered email with legal value (LRE)"
 
     def validate(self) -> Dict[str, Any]:
-        """Valide que le destinataire a un email et une adresse"""
+        """Validate that the recipient has an email and address"""
         if not self.missive:
-            return {"is_valid": False, "error": "Missive non définie"}
+            return {"is_valid": False, "error": "Missive not defined"}
 
         recipient = self.missive.recipient
         if not recipient or not recipient.email:
             return {
                 "is_valid": False,
-                "error": "Le destinataire doit avoir un email pour une LRE Certeurope",
+                "error": "Recipient must have an email for Certeurope ERL",
             }
 
-        # Vérifier l'adresse postale (souvent requise)
+        # Check postal address (often required)
         warnings = []
         if not recipient.address_line1:
-            warnings.append("Adresse postale manquante")
+            warnings.append("Postal address missing")
         if not recipient.postal_code or not recipient.city:
-            warnings.append("Code postal et ville requis")
+            warnings.append("Postal code and city required")
         if not recipient.name:
-            warnings.append("Nom du destinataire requis")
+            warnings.append("Recipient name required")
 
         if warnings:
             return {"is_valid": False, "error": "; ".join(warnings)}
@@ -63,16 +59,16 @@ class CerteuropeProvider(BaseProvider):
 
     def send(self) -> Dict[str, Any]:
         """
-        Envoie une LRE via Certeurope.
+        Send an LRE via Certeurope.
 
-        TODO: Implémenter l'envoi réel via l'API Certeurope
+        TODO: Implement actual sending via Certeurope API
         """
         validation = self.validate()
         if not validation["is_valid"]:
             self._update_status("FAILED", error_message=validation["error"])
             return {"success": False, "error": validation["error"]}
 
-        # TODO: Implémenter l'envoi réel
+        # TODO: Implement actual sending
         # 1. Générer le PDF du courrier
         # 2. Créer la requête SOAP/REST Certeurope
         # 3. Envoyer le document signé
@@ -86,29 +82,29 @@ class CerteuropeProvider(BaseProvider):
         return {
             "success": True,
             "tracking_id": f"certeurope_sim_{self.missive.id}",
-            "deposit_certificate": "Certificat de dépôt Certeurope (simulation)",
+            "deposit_certificate": "Certeurope deposit certificate (simulation)",
         }
 
     def check_status(self, external_id: Optional[str] = None) -> Optional[str]:
         """
-        Vérifie le statut de la LRE (envoi, réception, AR).
+        Check the LRE status (sending, reception, AR).
 
-        TODO: Implémenter la vérification via API Certeurope
+        TODO: Implement verification via Certeurope API
         """
         return None
 
     def get_proofs_of_delivery(self, service_type: Optional[str] = None) -> list:
         """
-        Récupère toutes les preuves Certeurope.
+        Get all Certeurope proofs.
 
-        Certeurope génère plusieurs documents :
-        1. Certificat de dépôt (preuve d'envoi)
-        2. Copie du document envoyé (archivé)
-        3. Accusé de réception (preuve de lecture)
-        4. Certificat de présentation (si recommandé)
-        5. Horodatage qualifié
+        Certeurope generates several documents:
+        1. Deposit certificate (proof of sending)
+        2. Copy of sent document (archived)
+        3. Acknowledgement of receipt (proof of reading)
+        4. Presentation certificate (if registered)
+        5. Qualified timestamp
 
-        TODO: Implémenter via l'API Certeurope
+        TODO: Implement via Certeurope API
         """
         if not self.missive:
             return []
@@ -128,11 +124,11 @@ class CerteuropeProvider(BaseProvider):
         expiration = sent_at + timedelta(days=3650)  # 10 ans
         proofs = []
 
-        # 1. Certificat de dépôt (toujours disponible)
+        # 1. Deposit certificate (always available)
         proofs.append(
             {
                 "type": "deposit_certificate",
-                "label": "Certificat de dépôt",
+                "label": "Deposit Certificate",
                 "available": True,
                 "url": f"https://www.certeurope.fr/lre/deposit/{external_id}.pdf",
                 "generated_at": sent_at,
@@ -163,11 +159,11 @@ class CerteuropeProvider(BaseProvider):
             }
         )
 
-        # 3. Horodatage qualifié
+        # 3. Qualified timestamp
         proofs.append(
             {
                 "type": "qualified_timestamp",
-                "label": "Horodatage qualifié",
+                "label": "Qualified Timestamp",
                 "available": True,
                 "url": f"https://www.certeurope.fr/lre/timestamp/{external_id}.xml",
                 "generated_at": sent_at,
@@ -185,7 +181,7 @@ class CerteuropeProvider(BaseProvider):
             proofs.append(
                 {
                     "type": "acknowledgment_receipt",
-                    "label": "Accusé de réception",
+                    "label": "Acknowledgement of Receipt",
                     "available": True,
                     "url": f"https://www.certeurope.fr/lre/ar/{external_id}.pdf",
                     "generated_at": self.missive.read_at,
@@ -206,7 +202,7 @@ class CerteuropeProvider(BaseProvider):
             proofs.append(
                 {
                     "type": "acknowledgment_receipt",
-                    "label": "Accusé de réception",
+                    "label": "Acknowledgement of Receipt",
                     "available": False,
                     "url": None,
                     "generated_at": None,

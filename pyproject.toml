@@ -70,31 +70,31 @@ sms = [
     "vonage>=3.11",
 ]
 
-# Providers Messageries instantanées
+# Instant messaging providers
 messaging = [
     "python-telegram-bot>=20.7",
-    "requests>=2.31",  # Pour Signal, Messenger
+    "requests>=2.31",  # For Signal, Messenger
 ]
 
-# Providers Notifications push
+# Push notification providers
 push = [
     "firebase-admin>=6.3",  # FCM
     "aioapns>=3.1",  # Apple Push Notification
 ]
 
-# Providers Messageries professionnelles
+# Professional messaging providers
 professional = [
     "slack-sdk>=3.26",
     "msgraph-core>=1.0",  # Microsoft Teams/Graph API
 ]
 
-# Providers Courrier
+# Postal providers
 postal = [
     "requests>=2.31",  # La Poste, LRE (AR24)
-    "reportlab>=4.0",  # Génération PDF pour courrier
+    "reportlab>=4.0",  # PDF generation for mail
 ]
 
-# Toutes les dépendances optionnelles
+# All optional dependencies
 all = [
     "sendgrid>=6.11",
     "mailgun>=0.1.1",

@@ -1,18 +1,18 @@
-# Toutes les dépendances (core + tous les providers)
-# Install avec: pip install -r requirements-all.txt
+# All dependencies (core + all providers)
+# Install with: pip install -r requirements-all.txt
 
 # Core
 -r requirements.txt
 
-# Tous les providers par catégorie
+# All providers by category
 -r requirements-email.txt
 -r requirements-sms.txt
 -r requirements-branded.txt
 -r requirements-push.txt
 -r requirements-postal.txt
 
-# Note: Les providers suivants utilisent uniquement 'requests' (déjà dans requirements.txt)
+# Note: The following providers use only 'requests' (already in requirements.txt)
 # - SMSPartner (SMS, Email, Voice)
 # - LaPoste, AR24, CertEurope (Postal)
 # - Signal, Messenger (Branded)
-# - Django Email (toujours disponible)
+# - Django Email (always available)

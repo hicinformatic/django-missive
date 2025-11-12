@@ -1,7 +1,7 @@
 # Provider Amazon SES (Email)
-# Install avec: pip install -r requirements-ses.txt
+# Install with: pip install -r requirements-ses.txt
 
-# Dépendances core requises
+# Required core dependencies
 -r requirements.txt
 
 # Package Amazon SES

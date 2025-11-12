@@ -1,8 +1,4 @@
-"""
-Provider Microsoft Teams pour l'envoi de messages.
-
-Documentation: https://learn.microsoft.com/en-us/graph/api/chat-post-messages
-"""
+"""Microsoft Teams provider."""
 
 from typing import Any, Dict, Optional
 
@@ -11,21 +7,21 @@ from .base import BaseProvider
 
 class TeamsProvider(BaseProvider):
     """
-    Provider pour Microsoft Teams.
+    Microsoft Teams provider.
 
-    Configuration requise:
-        TEAMS_CLIENT_ID: Client ID de l'app Azure AD
+    Required configuration:
+        TEAMS_CLIENT_ID: Azure AD app Client ID
         TEAMS_CLIENT_SECRET: Client Secret
         TEAMS_TENANT_ID: Tenant ID
 
-    Le destinataire doit avoir:
+    Recipient must have:
     - Un user_id Microsoft (dans metadata.teams_user_id)
     - OU un channel_id Teams (dans metadata.teams_channel_id)
     """
 
     name = "teams"
     display_name = "Microsoft Teams"
-    supported_types = ["BRANDED"]  # Utilise le type générique BRANDED
+    supported_types = ["BRANDED"]  # Uses generic BRANDED type
     services = ["teams", "messaging"]
     brands = ["teams"]  # Microsoft Teams uniquement
     config_keys = ["TEAMS_CLIENT_ID", "TEAMS_CLIENT_SECRET", "TEAMS_TENANT_ID"]
@@ -33,16 +29,16 @@ class TeamsProvider(BaseProvider):
     site_url = "https://www.microsoft.com/microsoft-teams/"
     status_url = "https://status.azure.com/en-us/status"
     documentation_url = "https://learn.microsoft.com/en-us/microsoftteams/"
-    description_text = "Microsoft Teams - Communication d'entreprise (Microsoft 365)"
+    description_text = "Microsoft Teams - Enterprise communication (Microsoft 365)"
 
     def validate(self) -> Dict[str, Any]:
-        """Valide que le destinataire a un user_id ou channel_id Teams"""
+        """Validate that the recipient has a Teams user_id or channel_id"""
         if not self.missive:
-            return {"is_valid": False, "error": "Missive non définie"}
+            return {"is_valid": False, "error": "Missive not defined"}
 
         recipient = self.missive.recipient
         if not recipient:
-            return {"is_valid": False, "error": "Destinataire non défini"}
+            return {"is_valid": False, "error": "Recipient not defined"}
 
         metadata = recipient.metadata or {}
         user_id = metadata.get("teams_user_id")
@@ -51,16 +47,16 @@ class TeamsProvider(BaseProvider):
         if not user_id and not channel_id:
             return {
                 "is_valid": False,
-                "error": "Le destinataire doit avoir un teams_user_id ou teams_channel_id dans metadata",
+                "error": "Recipient must have a teams_user_id or teams_channel_id in metadata",
             }
 
         return {"is_valid": True}
 
     def send_teams(self) -> bool:
         """
-        Envoie un message Teams via Microsoft Graph API.
+        Send a Teams message via Microsoft Graph API.
 
-        TODO: Implémenter l'envoi réel via:
+        TODO: Implement actual sending via:
         POST https://graph.microsoft.com/v1.0/chats/{chat-id}/messages
         """
         from ..models import MissiveStatus
@@ -70,7 +66,7 @@ class TeamsProvider(BaseProvider):
             self._update_status(MissiveStatus.FAILED, error_message=validation["error"])
             return False
 
-        # TODO: Implémenter l'envoi réel
+        # TODO: Implement actual sending
         # 1. Obtenir un access token OAuth
         # 2. Envoyer le message via Graph API
         # 3. Gérer les adaptive cards pour rich content
@@ -83,6 +79,6 @@ class TeamsProvider(BaseProvider):
         return True
 
     def check_status(self, external_id: Optional[str] = None) -> Optional[str]:
-        """Vérifie le statut via Graph API"""
-        # TODO: Implémenter via Microsoft Graph API
+        """Check status via Graph API"""
+        # TODO: Implement via Microsoft Graph API
         return None

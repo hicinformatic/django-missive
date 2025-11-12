@@ -1,7 +1,7 @@
 # Provider Slack (Messaging)
-# Install avec: pip install -r requirements-slack.txt
+# Install with: pip install -r requirements-slack.txt
 
-# Dépendances core requises
+# Required core dependencies
 -r requirements.txt
 
 # Package Slack

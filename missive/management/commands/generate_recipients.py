@@ -1,6 +1,4 @@
-"""
-Commande pour générer des destinataires d'exemple.
-"""
+"""Commande pour générer des destinataires d'exemple."""
 
 from django.core.management.base import BaseCommand
 
@@ -8,24 +6,22 @@ from missive.models import Recipient
 
 
 class Command(BaseCommand):
-    help = "Génère des destinataires d'exemple pour tester les différents types de missives"
+    help = "Generate sample recipients to test different missive types"
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--clear",
             action="store_true",
-            help="Supprimer tous les destinataires existants avant de générer",
+            help="Delete all existing recipients before generating",
         )
 
     def handle(self, *args, **options):
         if options["clear"]:
             count = Recipient.objects.count()
             Recipient.objects.all().delete()
-            self.stdout.write(self.style.WARNING(f"✓ {count} destinataires supprimés"))
+            self.stdout.write(self.style.WARNING(f"✓ {count} recipients deleted"))
 
-        # Liste des destinataires d'exemple
         recipients = [
-            # EXPÉDITEURS (avec tous les moyens de contact)
             {
                 "name": "MonEntreprise SAS",
                 "recipient_type": "COMPANY",
@@ -52,7 +48,6 @@ class Command(BaseCommand):
                 "can_be_sender": True,
                 "is_active": True,
             },
-            # DESTINATAIRES EMAIL (email uniquement)
             {
                 "civility": "M.",
                 "name": "Jean Dupont",
@@ -73,7 +68,6 @@ class Command(BaseCommand):
                 "email": "contact@techcorp.fr",
                 "is_active": True,
             },
-            # DESTINATAIRES SMS/WHATSAPP (téléphone uniquement)
             {
                 "civility": "M.",
                 "name": "Luc Bernard",
@@ -94,7 +88,6 @@ class Command(BaseCommand):
                 "mobile": "+33 6 99 88 77 66",
                 "is_active": True,
             },
-            # DESTINATAIRES POSTAL (adresse complète)
             {
                 "civility": "M.",
                 "name": "François Dubois",
@@ -135,7 +128,6 @@ class Command(BaseCommand):
                 "country": "FR",
                 "is_active": True,
             },
-            # DESTINATAIRES COMPLETS (tous les moyens de contact)
             {
                 "civility": "M.",
                 "name": "Thomas Petit",
@@ -159,7 +151,6 @@ class Command(BaseCommand):
                 "country": "FR",
                 "is_active": True,
             },
-            # DESTINATAIRES INACTIFS
             {
                 "civility": "M.",
                 "name": "Ancien Client",
@@ -171,19 +162,15 @@ class Command(BaseCommand):
 
         created_count = 0
         for recipient_data in recipients:
-            # Déterminer la clé unique pour get_or_create
             if recipient_data.get("email"):
-                # Utiliser l'email comme clé unique
                 recipient, created = Recipient.objects.get_or_create(
                     email=recipient_data["email"], defaults=recipient_data
                 )
             elif recipient_data.get("mobile"):
-                # Utiliser le mobile comme clé unique
                 recipient, created = Recipient.objects.get_or_create(
                     mobile=recipient_data["mobile"], defaults=recipient_data
                 )
             elif recipient_data.get("address_line1") and recipient_data.get("name"):
-                # Utiliser l'adresse comme clé unique
                 recipient, created = Recipient.objects.get_or_create(
                     name=recipient_data["name"],
                     address_line1=recipient_data["address_line1"],
@@ -192,12 +179,10 @@ class Command(BaseCommand):
                     defaults=recipient_data,
                 )
             else:
-                # Si aucune clé unique, créer directement
                 recipient, created = Recipient.objects.create(**recipient_data), True
 
             if created:
                 created_count += 1
-                # Afficher avec icône selon le type de contact
                 if recipient.email:
                     icon = "✉️"
                 elif recipient.mobile:
@@ -209,31 +194,30 @@ class Command(BaseCommand):
 
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f'  {icon} {recipient.full_name} - {recipient.primary_contact or "Pas de contact"}'
+                        f'  {icon} {recipient.full_name} - {recipient.primary_contact or "No contact"}'
                     )
                 )
 
         self.stdout.write(
-            self.style.SUCCESS(f"\n✓ {created_count} destinataires créés")
+            self.style.SUCCESS(f"\n✓ {created_count} recipients created")
         )
         self.stdout.write(
-            self.style.SUCCESS(f"✓ Total: {Recipient.objects.count()} destinataires")
+            self.style.SUCCESS(f"✓ Total: {Recipient.objects.count()} recipients")
         )
 
-        # Statistiques
-        self.stdout.write("\n📊 Statistiques:")
+        self.stdout.write("\n📊 Statistics:")
         self.stdout.write(
-            f"  - Expéditeurs: {Recipient.objects.filter(can_be_sender=True).count()}"
+            f"  - Senders: {Recipient.objects.filter(can_be_sender=True).count()}"
         )
         self.stdout.write(
-            f'  - Avec email: {Recipient.objects.exclude(email="").exclude(email__isnull=True).count()}'
+            f'  - With email: {Recipient.objects.exclude(email="").exclude(email__isnull=True).count()}'
         )
         self.stdout.write(
-            f'  - Avec mobile: {Recipient.objects.exclude(mobile="").exclude(mobile__isnull=True).count()}'
+            f'  - With mobile: {Recipient.objects.exclude(mobile="").exclude(email__isnull=True).count()}'
         )
         self.stdout.write(
-            f'  - Avec adresse: {Recipient.objects.exclude(address_line1="").exclude(address_line1__isnull=True).count()}'
+            f'  - With address: {Recipient.objects.exclude(address_line1="").exclude(address_line1__isnull=True).count()}'
         )
         self.stdout.write(
-            f"  - Actifs: {Recipient.objects.filter(is_active=True).count()}"
+            f"  - Active: {Recipient.objects.filter(is_active=True).count()}"
         )

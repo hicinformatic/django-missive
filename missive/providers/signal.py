@@ -1,8 +1,4 @@
-"""
-Provider Signal pour l'envoi de messages via Signal Messenger.
-
-Documentation: https://github.com/bbernhard/signal-cli-rest-api
-"""
+"""Signal Messenger provider."""
 
 from typing import Any, Dict, Optional
 
@@ -11,13 +7,13 @@ from .base import BaseProvider
 
 class SignalProvider(BaseProvider):
     """
-    Provider pour Signal Messenger.
+    Signal Messenger provider.
 
-    Configuration requise:
-        SIGNAL_CLI_REST_API_URL: URL de l'API signal-cli-rest-api
-        SIGNAL_SENDER_NUMBER: Numéro expéditeur enregistré
+    Required configuration:
+        SIGNAL_CLI_REST_API_URL: signal-cli-rest-api URL
+        SIGNAL_SENDER_NUMBER: Registered sender number
 
-    Le destinataire doit avoir un numéro de téléphone mobile.
+    Recipient must have a mobile phone number.
     """
 
     name = "signal"
@@ -27,34 +23,34 @@ class SignalProvider(BaseProvider):
     config_keys = ["SIGNAL_API_KEY"]
     required_packages = ["requests"]
     site_url = "https://signal.org/"
-    description_text = "Messagerie sécurisée et chiffrée de bout en bout"
+    description_text = "Secure end-to-end encrypted messaging"
 
     def validate(self) -> Dict[str, Any]:
-        """Valide que le destinataire a un numéro mobile"""
+        """Validate that the recipient has a mobile number"""
         if not self.missive:
-            return {"is_valid": False, "error": "Missive non définie"}
+            return {"is_valid": False, "error": "Missive not defined"}
 
         recipient = self.missive.recipient
         if not recipient or not recipient.mobile:
             return {
                 "is_valid": False,
-                "error": "Le destinataire doit avoir un numéro de mobile pour Signal",
+                "error": "Recipient must have a mobile number for Signal",
             }
 
         return {"is_valid": True}
 
     def send(self) -> Dict[str, Any]:
         """
-        Envoie un message via Signal.
+        Send a message via Signal.
 
-        TODO: Implémenter l'envoi réel via signal-cli-rest-api
+        TODO: Implement actual sending via signal-cli-rest-api
         """
         validation = self.validate()
         if not validation["is_valid"]:
             self._update_status("FAILED", error_message=validation["error"])
             return {"success": False, "error": validation["error"]}
 
-        # TODO: Implémenter l'envoi réel
+        # TODO: Implement actual sending
         self._update_status(
             "SENT",
             external_id=f"signal_sim_{self.missive.id}",
@@ -66,6 +62,6 @@ class SignalProvider(BaseProvider):
         }
 
     def check_status(self, external_id: Optional[str] = None) -> Optional[str]:
-        """Vérifie le statut d'un message Signal"""
-        # TODO: Implémenter si besoin
+        """Check status of a Signal message"""
+        # TODO: Implement if needed
         return None

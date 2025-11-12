@@ -1,17 +1,5 @@
 #!/usr/bin/env python3
-"""
-Django Missive - Development Tool
-Cross-platform script for building, testing, and managing the project.
-
-Usage:
-    python dev.py <command>
-    ./dev.py <command>  (on Linux/macOS with chmod +x)
-    
-Examples:
-    python dev.py install-dev
-    python dev.py test
-    python dev.py build
-"""
+"""Django Missive development tool for building, testing, and managing."""
 
 import os
 import sys
@@ -20,18 +8,15 @@ import subprocess
 import platform
 from pathlib import Path
 
-# Colors for terminal output
 BLUE = '\033[94m'
 GREEN = '\033[92m'
 RED = '\033[91m'
 YELLOW = '\033[93m'
-NC = '\033[0m'  # No Color
+NC = '\033[0m'
 
-# Disable colors on Windows if not supported
 if platform.system() == 'Windows' and not os.environ.get('ANSICON'):
     BLUE = GREEN = RED = YELLOW = NC = ''
 
-# Project paths
 PROJECT_ROOT = Path(__file__).parent
 VENV_DIR = PROJECT_ROOT / 'venv'
 VENV_BIN = VENV_DIR / ('Scripts' if platform.system() == 'Windows' else 'bin')
@@ -40,27 +25,27 @@ PIP = VENV_BIN / ('pip.exe' if platform.system() == 'Windows' else 'pip')
 
 
 def print_info(message):
-    """Print info message in blue"""
+    """Prints info message in blue."""
     print(f"{BLUE}{message}{NC}")
 
 
 def print_success(message):
-    """Print success message in green"""
+    """Prints success message in green."""
     print(f"{GREEN}{message}{NC}")
 
 
 def print_error(message):
-    """Print error message in red"""
+    """Prints error message in red."""
     print(f"{RED}{message}{NC}", file=sys.stderr)
 
 
 def print_warning(message):
-    """Print warning message in yellow"""
+    """Prints warning message in yellow."""
     print(f"{YELLOW}{message}{NC}")
 
 
 def run_command(cmd, check=True, **kwargs):
-    """Run a command and handle errors"""
+    """Runs command and handles errors."""
     print_info(f"Running: {' '.join(cmd) if isinstance(cmd, list) else cmd}")
     try:
         result = subprocess.run(cmd, check=check, **kwargs)
@@ -74,12 +59,12 @@ def run_command(cmd, check=True, **kwargs):
 
 
 def venv_exists():
-    """Check if virtual environment exists"""
+    """Checks if virtual environment exists."""
     return VENV_DIR.exists() and PYTHON.exists()
 
 
 def task_help():
-    """Show available commands"""
+    """Shows available commands."""
     print(f"{BLUE}Django Missive - Available Commands{NC}\n")
     
     print(f"{GREEN}Development:{NC}")
@@ -140,13 +125,12 @@ def task_help():
 
 
 def task_venv():
-    """Create virtual environment"""
+    """Creates virtual environment."""
     if venv_exists():
         print_warning("Virtual environment already exists")
         return True
     
     print_info("Creating virtual environment...")
-    # Use python3 directly instead of sys.executable (which may be Cursor)
     python_cmd = 'python3' if platform.system() != 'Windows' else 'python'
     if not run_command([python_cmd, '-m', 'venv', str(VENV_DIR)]):
         return False
@@ -160,7 +144,7 @@ def task_venv():
 
 
 def task_install():
-    """Install package in production mode"""
+    """Installs package in production mode."""
     if not venv_exists() and not task_venv():
         return False
     
@@ -179,7 +163,7 @@ def task_install():
 
 
 def task_install_dev():
-    """Install package in development mode"""
+    """Installs package in development mode."""
     if not venv_exists() and not task_venv():
         return False
     
@@ -198,7 +182,7 @@ def task_install_dev():
 
 
 def task_clean_build():
-    """Remove build artifacts"""
+    """Removes build artifacts."""
     print_info("Cleaning build artifacts...")
     dirs_to_remove = ['build', 'dist', '.eggs']
     
@@ -222,7 +206,7 @@ def task_clean_build():
 
 
 def task_clean_pyc():
-    """Remove Python file artifacts"""
+    """Removes Python file artifacts."""
     print_info("Cleaning Python file artifacts...")
     
     # Remove __pycache__ directories
@@ -240,7 +224,7 @@ def task_clean_pyc():
 
 
 def task_clean_test():
-    """Remove test artifacts"""
+    """Removes test artifacts."""
     print_info("Cleaning test artifacts...")
     artifacts = ['.pytest_cache', '.coverage', 'htmlcov', '.mypy_cache', '.tox', 'coverage.xml']
     
@@ -264,7 +248,7 @@ def task_clean_test():
 
 
 def task_clean():
-    """Remove all build, test, and Python artifacts"""
+    """Removes all build, test, and Python artifacts."""
     task_clean_build()
     task_clean_pyc()
     task_clean_test()
@@ -273,7 +257,7 @@ def task_clean():
 
 
 def task_test():
-    """Run tests with pytest"""
+    """Runs tests with pytest."""
     if not venv_exists():
         print_error("Virtual environment not found. Run: python dev.py install-dev")
         return False
@@ -288,7 +272,7 @@ def task_test():
 
 
 def task_test_verbose():
-    """Run tests with verbose output"""
+    """Runs tests with verbose output."""
     if not venv_exists():
         print_error("Virtual environment not found. Run: python dev.py install-dev")
         return False
@@ -303,7 +287,7 @@ def task_test_verbose():
 
 
 def task_coverage():
-    """Run tests with coverage report"""
+    """Runs tests with coverage report."""
     if not venv_exists():
         print_error("Virtual environment not found. Run: python dev.py install-dev")
         return False
@@ -318,7 +302,7 @@ def task_coverage():
 
 
 def task_lint():
-    """Run linters"""
+    """Runs linters."""
     if not venv_exists():
         print_error("Virtual environment not found. Run: python dev.py install-dev")
         return False
@@ -340,7 +324,7 @@ def task_lint():
 
 
 def task_format():
-    """Format code with black and isort"""
+    """Formats code with black and isort."""
     if not venv_exists():
         print_error("Virtual environment not found. Run: python dev.py install-dev")
         return False
@@ -362,7 +346,7 @@ def task_format():
 
 
 def task_check():
-    """Run all checks"""
+    """Runs all checks."""
     if not task_lint():
         return False
     
@@ -383,7 +367,7 @@ def task_check():
 
 
 def task_cleanup():
-    """Detect unused code, imports, and redundancies"""
+    """Detects unused code, imports, and redundancies."""
     if not venv_exists():
         print_error("Virtual environment not found. Run: python dev.py install-dev")
         return False
@@ -471,7 +455,7 @@ def task_cleanup():
 
 
 def task_fix_imports():
-    """Auto-remove unused imports and variables with autoflake"""
+    """Auto-removes unused imports and variables with autoflake."""
     if not venv_exists():
         print_error("Virtual environment not found. Run: python dev.py install-dev")
         return False
@@ -498,7 +482,7 @@ def task_fix_imports():
 
 
 def task_complexity():
-    """Analyze code complexity with radon"""
+    """Analyzes code complexity with radon."""
     if not venv_exists():
         print_error("Virtual environment not found. Run: python dev.py install-dev")
         return False
@@ -544,7 +528,7 @@ def task_complexity():
 
 
 def task_security():
-    """Run security audit with multiple tools"""
+    """Runs security audit with multiple tools."""
     if not venv_exists():
         print_error("Virtual environment not found. Run: python dev.py install-dev")
         return False

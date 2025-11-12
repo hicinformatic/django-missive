@@ -1,4 +1,4 @@
-"""Admin for Recipient model."""
+"""Administration du modèle Recipient."""
 
 from django.contrib import admin
 from django.utils.html import format_html
@@ -11,18 +11,17 @@ from ..models import Recipient
 @sandbox_warning
 @admin.register(Recipient)
 class RecipientAdmin(admin.ModelAdmin):
-    """Admin for recipients"""
+    """Administration des destinataires."""
 
     class Media:
         js = ("admin/js/recipient_context_filter.js",)
 
     def get_search_results(self, request, queryset, search_term):
-        """Filter search results based on context (sender vs recipient)"""
+        """Filtre les résultats de recherche selon le contexte (expéditeur vs destinataire)."""
         queryset, use_distinct = super().get_search_results(
             request, queryset, search_term
         )
 
-        # Si on cherche pour le champ sender, filtrer sur can_be_sender
         if "field_name=sender" in request.get_full_path():
             queryset = queryset.filter(can_be_sender=True)
 
@@ -60,7 +59,7 @@ class RecipientAdmin(admin.ModelAdmin):
 
     fieldsets = (
         (
-            _("Type et lien"),
+            _("Type and Link"),
             {
                 "fields": (
                     "recipient_type",
@@ -71,27 +70,27 @@ class RecipientAdmin(admin.ModelAdmin):
             },
         ),
         (
-            _("Configuration expéditeur"),
+            _("Sender Configuration"),
             {
                 "fields": (
                     "can_be_sender",
                     "is_default_sender",
                 ),
                 "description": _(
-                    "Configurer si ce destinataire peut être utilisé comme expéditeur"
+                    "Configure whether this recipient can be used as a sender"
                 ),
             },
         ),
         (
-            _("Identité"),
+            _("Identity"),
             {"fields": ("civility", "name")},
         ),
         (
-            _("Coordonnées"),
+            _("Contact Details"),
             {"fields": ("email", "mobile")},
         ),
         (
-            _("Adresse postale"),
+            _("Postal Address"),
             {
                 "fields": (
                     "address_line1",
@@ -116,7 +115,7 @@ class RecipientAdmin(admin.ModelAdmin):
     )
 
     def name_display(self, obj):
-        """Display name with civility"""
+        """Displays name with title."""
         name = obj.full_name or f"Recipient #{obj.id}"
         if obj.is_active:
             return format_html('<strong style="white-space: nowrap;">{}</strong>', name)
@@ -126,10 +125,10 @@ class RecipientAdmin(admin.ModelAdmin):
                 name,
             )
 
-    name_display.short_description = _("Nom")
+    name_display.short_description = _("Name")
 
     def email_display(self, obj):
-        """Affiche l'email avec icône"""
+        """Displays email with icon."""
         if not obj.email:
             return format_html(
                 '<span style="color: #ccc; white-space: nowrap;">-</span>'
@@ -144,7 +143,7 @@ class RecipientAdmin(admin.ModelAdmin):
     email_display.short_description = _("Email")
 
     def phone_display(self, obj):
-        """Display mobile phone number with icon"""
+        """Displays mobile number with icon."""
         if not obj.mobile:
             return format_html(
                 '<span style="color: #ccc; white-space: nowrap;">-</span>'
@@ -159,13 +158,12 @@ class RecipientAdmin(admin.ModelAdmin):
     phone_display.short_description = _("Mobile")
 
     def address_display(self, obj):
-        """Affiche l'adresse courte sur une ligne avec truncation"""
+        """Displays short address on one line with truncation."""
         if not obj.address_line1:
             return format_html(
                 '<span style="color: #ccc; white-space: nowrap;">-</span>'
             )
 
-        # Adresse courte : ligne1, code postal ville (tout sur une ligne)
         parts = [obj.address_line1]
         if obj.postal_code and obj.city:
             parts.append(f"{obj.postal_code} {obj.city}")
@@ -174,29 +172,28 @@ class RecipientAdmin(admin.ModelAdmin):
 
         address_text = ", ".join(parts)
 
-        # Tronquer si trop long (max 50 caractères)
         if len(address_text) > 50:
             address_text = address_text[:47] + "..."
 
         return format_html(
             '<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; max-width: 300px;" title="{}">📍 {}</span>'.format(
-                ", ".join(parts), address_text  # Tooltip avec adresse complète
+                ", ".join(parts), address_text
             )
         )
 
-    address_display.short_description = _("Adresse")
+    address_display.short_description = _("Address")
 
     def postal_address_display(self, obj):
-        """Display formatted postal address"""
+        """Displays formatted postal address."""
         if obj.postal_address:
             return format_html("<pre>{}</pre>", obj.postal_address)
         return "-"
 
-    postal_address_display.short_description = _("Adresse formatée")
+    postal_address_display.short_description = _("Formatted Address")
 
-    @admin.action(description=_("🔍 Valider les emails"))
+    @admin.action(description=_("🔍 Validate Emails"))
     def validate_email_action(self, request, queryset):
-        """Action to validate emails of selected recipients"""
+        """Action pour valider les emails des destinataires sélectionnés."""
         from ..providers.base import BaseProvider
 
         provider = BaseProvider()
@@ -209,29 +206,29 @@ class RecipientAdmin(admin.ModelAdmin):
 
                 if not validation["is_valid"]:
                     invalid_count += 1
-                    recipient.notes = f"❌ Email invalide: {', '.join(validation['warnings'])}\n{recipient.notes}"
+                    recipient.notes = f"❌ Invalid email: {', '.join(validation['warnings'])}\n{recipient.notes}"
                     recipient.is_active = False
                     recipient.save()
                 elif validation["risk_score"] > 50:
                     high_risk_count += 1
-                    recipient.notes = f"⚠️ Email risqué (score: {validation['risk_score']}): {', '.join(validation['warnings'])}\n{recipient.notes}"
+                    recipient.notes = f"⚠️ Risky email (score: {validation['risk_score']}): {', '.join(validation['warnings'])}\n{recipient.notes}"
                     recipient.save()
 
         self.message_user(
             request,
             format_html(
-                "✅ Validation terminée : {} recipient(s) analysé(s)<br>"
-                "❌ {} invalide(s)<br>"
-                "⚠️ {} à risque",
+                "✅ Validation complete: {} recipient(s) analyzed<br>"
+                "❌ {} invalid<br>"
+                "⚠️ {} at risk",
                 queryset.count(),
                 invalid_count,
                 high_risk_count,
             ),
         )
 
-    @admin.action(description=_("📞 Valider les téléphones"))
+    @admin.action(description=_("📞 Validate Phones"))
     def validate_phone_action(self, request, queryset):
-        """Action to validate phones of selected recipients"""
+        """Action pour valider les téléphones des destinataires sélectionnés."""
         from ..providers.base import BaseProvider
 
         provider = BaseProvider()
@@ -244,28 +241,28 @@ class RecipientAdmin(admin.ModelAdmin):
 
                 if not validation["is_valid"]:
                     invalid_count += 1
-                    recipient.notes = f"❌ Téléphone invalide: {', '.join(validation['warnings'])}\n{recipient.notes}"
+                    recipient.notes = f"❌ Invalid phone: {', '.join(validation['warnings'])}\n{recipient.notes}"
                     recipient.save()
                 elif validation.get("is_mobile") is False:
                     non_mobile_count += 1
-                    recipient.notes = f"⚠️ Numéro fixe détecté (pas de SMS possible)\n{recipient.notes}"
+                    recipient.notes = f"⚠️ Landline detected (no SMS possible)\n{recipient.notes}"
                     recipient.save()
 
         self.message_user(
             request,
             format_html(
-                "✅ Validation terminée : {} recipient(s) analysé(s)<br>"
-                "❌ {} invalide(s)<br>"
-                "⚠️ {} numéro(s) fixe(s)",
+                "✅ Validation complete: {} recipient(s) analyzed<br>"
+                "❌ {} invalid<br>"
+                "⚠️ {} landline(s)",
                 queryset.count(),
                 invalid_count,
                 non_mobile_count,
             ),
         )
 
-    @admin.action(description=_("✨ Valider tout (email + téléphone)"))
+    @admin.action(description=_("✨ Validate All (email + phone)"))
     def validate_all_action(self, request, queryset):
-        """Action pour valider tous les moyens de contact"""
+        """Action pour valider tous les moyens de contact."""
         from ..providers.base import BaseProvider
 
         provider = BaseProvider()
@@ -276,7 +273,6 @@ class RecipientAdmin(admin.ModelAdmin):
         for recipient in queryset:
             issues = []
 
-            # Valider l'email
             if recipient.email:
                 email_validation = provider.validate_email(recipient.email)
                 if (
@@ -286,7 +282,6 @@ class RecipientAdmin(admin.ModelAdmin):
                     email_issues += 1
                     issues.append(f"Email: {', '.join(email_validation['warnings'])}")
 
-            # Valider le téléphone
             if recipient.mobile:
                 phone_validation = provider.validate_phone_number(recipient.mobile)
                 if (
@@ -295,10 +290,9 @@ class RecipientAdmin(admin.ModelAdmin):
                 ):
                     phone_issues += 1
                     issues.append(
-                        f"Téléphone: {', '.join(phone_validation['warnings'])}"
+                        f"Phone: {', '.join(phone_validation['warnings'])}"
                     )
 
-            # Mettre à jour les notes
             if issues:
                 recipient.notes = (
                     "⚠️ Validation:\n"
@@ -312,10 +306,10 @@ class RecipientAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             format_html(
-                "✅ Validation complète terminée :<br>"
-                "✅ {} recipient(s) 100% valide(s)<br>"
-                "⚠️ {} avec problème(s) email<br>"
-                "⚠️ {} avec problème(s) téléphone",
+                "✅ Complete validation finished:<br>"
+                "✅ {} recipient(s) 100% valid<br>"
+                "⚠️ {} with email issue(s)<br>"
+                "⚠️ {} with phone issue(s)",
                 all_valid,
                 email_issues,
                 phone_issues,

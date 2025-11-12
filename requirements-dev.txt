@@ -1,5 +1,5 @@
 # Development dependencies
-# Install avec: pip install -r requirements-dev.txt
+# Install with: pip install -r requirements-dev.txt
 
 # Core dependencies
 -r requirements.txt

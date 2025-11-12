@@ -1,8 +1,4 @@
-"""
-Provider Facebook Messenger pour l'envoi de messages.
-
-Documentation: https://developers.facebook.com/docs/messenger-platform
-"""
+"""Facebook Messenger provider."""
 
 from typing import Any, Dict, Optional
 
@@ -11,13 +7,13 @@ from .base import BaseProvider
 
 class MessengerProvider(BaseProvider):
     """
-    Provider pour Facebook Messenger.
+    Facebook Messenger provider.
 
-    Configuration requise:
-        MESSENGER_PAGE_ACCESS_TOKEN: Token d'accès de la page Facebook
-        MESSENGER_APP_SECRET: Secret de l'application
+    Required configuration:
+        MESSENGER_PAGE_ACCESS_TOKEN: Facebook page access token
+        MESSENGER_APP_SECRET: Application secret
 
-    Le destinataire doit avoir un PSID (Page-Scoped ID) Messenger stocké dans metadata.
+    Recipient must have a PSID (Page-Scoped ID) Messenger stored in metadata.
     """
 
     name = "messenger"
@@ -27,16 +23,16 @@ class MessengerProvider(BaseProvider):
     config_keys = ["MESSENGER_PAGE_ACCESS_TOKEN", "MESSENGER_VERIFY_TOKEN"]
     required_packages = ["requests"]
     site_url = "https://www.messenger.com/"
-    description_text = "Facebook Messenger - Messagerie instantanée grand public (Meta)"
+    description_text = "Facebook Messenger - Consumer instant messaging (Meta)"
 
     def validate(self) -> Dict[str, Any]:
-        """Valide que le destinataire a un PSID Messenger"""
+        """Validate that the recipient has a Messenger PSID"""
         if not self.missive:
-            return {"is_valid": False, "error": "Missive non définie"}
+            return {"is_valid": False, "error": "Missive not defined"}
 
         recipient = self.missive.recipient
         if not recipient:
-            return {"is_valid": False, "error": "Destinataire non défini"}
+            return {"is_valid": False, "error": "Recipient not defined"}
 
         psid = recipient.metadata.get("messenger_psid") if recipient.metadata else None
         if not psid:
@@ -49,9 +45,9 @@ class MessengerProvider(BaseProvider):
 
     def send(self) -> Dict[str, Any]:
         """
-        Envoie un message via Messenger Send API.
+        Send a message via Messenger Send API.
 
-        TODO: Implémenter l'envoi réel via:
+        TODO: Implement actual sending via:
         POST https://graph.facebook.com/v18.0/me/messages
         """
         validation = self.validate()
@@ -59,7 +55,7 @@ class MessengerProvider(BaseProvider):
             self._update_status("FAILED", error_message=validation["error"])
             return {"success": False, "error": validation["error"]}
 
-        # TODO: Implémenter l'envoi réel
+        # TODO: Implement actual sending
         self._update_status(
             "SENT",
             external_id=f"messenger_sim_{self.missive.id}",
@@ -71,6 +67,6 @@ class MessengerProvider(BaseProvider):
         }
 
     def check_status(self, external_id: Optional[str] = None) -> Optional[str]:
-        """Vérifie le statut via webhooks Messenger"""
-        # TODO: Implémenter webhook handlers
+        """Check status via Messenger webhooks"""
+        # TODO: Implement webhook handlers
         return None

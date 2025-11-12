@@ -1,13 +1,4 @@
-"""
-Shortcut functions to send missives quickly.
-
-Usage:
-    from missive.shortcuts import send_missive
-
-    send_missive('sms', phone='+33612345678', content='Test SMS')
-    send_missive('email', email='user@example.com', subject='Test', content='Hello!')
-    send_missive('branded', phone='+33612345678', content='Hello WhatsApp')
-"""
+"""Shortcut functions to send missives quickly."""
 
 import re
 import uuid
@@ -20,21 +11,16 @@ from .exceptions import MissiveValidationError
 from .models import Missive, MissiveType, Recipient
 from .sender import MissiveSender
 
-# ============================================================================
-# VALIDATION FUNCTIONS
-# ============================================================================
-
 
 def _validate_email(email: str) -> None:
     """Validate email format (RFC 5321 compliant)."""
     if not email:
         raise MissiveValidationError(_("Email address cannot be empty"))
 
-    max_email_length = getattr(settings, "MISSIVE_MAX_EMAIL_LENGTH", 254)  # RFC 5321
+    max_email_length = getattr(settings, "MISSIVE_MAX_EMAIL_LENGTH", 254)
     if len(email) > max_email_length:
         raise MissiveValidationError(_("Email address is too long"))
 
-    # ReDoS-safe regex
     email_pattern = r"^[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]{1,253}\.[a-zA-Z]{2,63}$"
     if not re.match(email_pattern, email):
         raise MissiveValidationError(_("Invalid email format"))
@@ -49,7 +35,6 @@ def _validate_phone(phone: str) -> None:
     if len(phone) > max_phone_length:
         raise MissiveValidationError(_("Phone number is too long"))
 
-    # E.164 format, ReDoS-safe
     phone_pattern = r"^\+[1-9]\d{1,14}$"
     if not re.match(phone_pattern, phone):
         raise MissiveValidationError(
@@ -88,33 +73,7 @@ def send_missive(
     provider: Optional[str] = None,
     **kwargs,
 ) -> Missive:
-    """
-    Send a missive with minimal information. Auto-generates missing fields.
-
-    Args:
-        missive_type: Type ('sms', 'email', 'branded', 'postal', etc.)
-        content: Message content
-        phone: Recipient phone (for SMS/WhatsApp/Voice)
-        email: Recipient email (for Email)
-        address: Postal address (dict: street, city, postal_code, country)
-        sender_email: Sender email (default: settings.DEFAULT_FROM_EMAIL)
-        sender_phone: Sender phone
-        sender_name: Sender name
-        subject: Subject (auto-generated for emails)
-        first_name: Recipient first name
-        last_name: Recipient last name
-        denomination: Organization name
-        provider: Specific provider (else auto-selected)
-        **kwargs: Additional options
-
-    Returns:
-        Created and sent Missive
-
-    Example:
-        >>> send_missive('sms', phone='+33612345678', content='Test')
-        <Missive: SMS to +33612345678>
-    """
-    # Normalize type
+    """Sends missive with minimal info. Auto-generates missing fields."""
     missive_type = missive_type.upper()
     if not hasattr(MissiveType, missive_type):
         type_mapping = {
@@ -144,10 +103,8 @@ def send_missive(
         }
         missive_type = type_mapping.get(missive_type, "EMAIL")
 
-    # Validate content
     _validate_content(content, missive_type)
 
-    # Validate required fields by type
     if missive_type in ("SMS", "VOICE_CALL"):
         if not phone:
             raise MissiveValidationError(
@@ -164,7 +121,6 @@ def send_missive(
             raise MissiveValidationError(_("Email subject cannot be empty"))
 
     elif missive_type == "BRANDED":
-        # For branded (WhatsApp, Slack, etc.), phone/email optional
         if phone:
             _validate_phone(phone)
         if email:
@@ -182,13 +138,11 @@ def send_missive(
                 _("Missing address fields: %(fields)s") % {"fields": ", ".join(missing)}
             )
 
-    # Validate sender fields if provided
     if sender_email:
         _validate_email(sender_email)
     if sender_phone:
         _validate_phone(sender_phone)
 
-    # 1. CREATE OR GET SENDER
     sender = None
 
     if sender_email or sender_phone:
@@ -215,7 +169,6 @@ def send_missive(
             },
         )
 
-    # 2. CREATE RECIPIENT
     recipient_name = ""
     if first_name and last_name:
         recipient_name = f"{first_name} {last_name}"
@@ -256,7 +209,6 @@ def send_missive(
         **lookup_fields, defaults=recipient_data
     )
 
-    # 3. CREATE MISSIVE
     if missive_type == "EMAIL" and not subject:
         sender_display = (
             getattr(sender, "display_name", None) or sender.name or "System"
@@ -277,7 +229,6 @@ def send_missive(
         "subject": subject or "",
     }
 
-    # Add optional kwargs
     if "priority" in kwargs:
         missive_data["priority"] = kwargs.pop("priority")
     if "is_registered" in kwargs:
@@ -289,11 +240,9 @@ def send_missive(
 
     missive = Missive.objects.create(**missive_data)
 
-    # Force provider if specified
     if provider:
         missive._provider_name = provider
 
-    # 4. SEND MISSIVE
     sender_instance = MissiveSender()
     sender_instance.send(missive)
 
@@ -313,14 +262,14 @@ def send_email(email: str, subject: str, content: str, **kwargs) -> Missive:
 
 
 def send_whatsapp(phone: str, content: str, **kwargs) -> Missive:
-    """Shortcut to send a WhatsApp message (via Twilio by default)."""
+    """Sends WhatsApp message (via Twilio by default)."""
     if "provider" not in kwargs:
         kwargs["provider"] = "twilio"
     return send_missive("branded", phone=phone, content=content, **kwargs)
 
 
 def send_slack(channel_id: str, content: str, **kwargs) -> Missive:
-    """Shortcut to send a Slack message."""
+    """Sends Slack message."""
     if "provider" not in kwargs:
         kwargs["provider"] = "slack"
     if "provider_options" not in kwargs:
@@ -334,7 +283,7 @@ def send_slack(channel_id: str, content: str, **kwargs) -> Missive:
 
 
 def send_telegram(chat_id: str, content: str, **kwargs) -> Missive:
-    """Shortcut to send a Telegram message."""
+    """Sends Telegram message."""
     if "provider" not in kwargs:
         kwargs["provider"] = "telegram"
     if "provider_options" not in kwargs:

@@ -1,6 +1,4 @@
-"""
-Modèle virtuel (non persisté) pour afficher les providers dans l'admin.
-"""
+"""Virtual provider model for admin display (not persisted)."""
 
 from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
@@ -11,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 
 
 class ProviderInfoQuerySet(QuerySet):
-    """QuerySet en mémoire qui lit depuis MISSIVE_PROVIDERS au lieu de la base"""
+    """In-memory QuerySet for provider info."""
 
     def __init__(self, model=None, data=None, query=None, using=None, hints=None):
         if query is None and model is not None:
@@ -50,39 +48,32 @@ class ProviderInfoQuerySet(QuerySet):
         return len(self._result_cache)
 
     def filter(self, *args, **kwargs):
-        """Filtre les providers selon les kwargs avec support des lookups Django"""
+        """Filters providers with Django lookup support."""
         rslt = self._result_cache
 
         for lookup, value in kwargs.items():
-            # Gérer les lookups Django (__icontains, __contains, etc.)
             if "__" in lookup:
                 field_name, lookup_type = lookup.rsplit("__", 1)
 
                 if lookup_type == "icontains":
-                    # Recherche insensible à la casse
                     rslt = [
                         obj
                         for obj in rslt
                         if value.lower() in str(getattr(obj, field_name, "")).lower()
                     ]
                 elif lookup_type == "contains":
-                    # Recherche sensible à la casse
                     rslt = [
                         obj
                         for obj in rslt
                         if value in str(getattr(obj, field_name, ""))
                     ]
                 elif lookup_type == "exact":
-                    # Égalité exacte
                     rslt = [obj for obj in rslt if getattr(obj, field_name) == value]
                 elif lookup_type == "in":
-                    # Valeur dans une liste
                     rslt = [obj for obj in rslt if getattr(obj, field_name) in value]
                 else:
-                    # Autres lookups non supportés, ignorer
                     pass
             else:
-                # Filtre simple (égalité)
                 rslt = [obj for obj in rslt if getattr(obj, lookup, None) == value]
 
         return self.__class__(
@@ -94,7 +85,7 @@ class ProviderInfoQuerySet(QuerySet):
         )
 
     def order_by(self, *fields):
-        """Trie les providers"""
+        """Sorts providers."""
         rslt = self._result_cache
         for field in reversed(fields):
             reverse = False
@@ -113,7 +104,7 @@ class ProviderInfoQuerySet(QuerySet):
         )
 
     def get(self, **kwargs):
-        """Récupère un provider unique"""
+        """Get a unique provider"""
         rslt = self._result_cache
         for attr, value in kwargs.items():
             rslt = [obj for obj in rslt if getattr(obj, attr) == value]
@@ -130,15 +121,15 @@ class ProviderInfoQuerySet(QuerySet):
 
 
 class ProviderInfoManager(models.Manager):
-    """Manager personnalisé qui retourne notre QuerySet en mémoire"""
+    """Custom manager that returns our in-memory QuerySet"""
 
     def get_queryset(self):
-        # Charger les providers depuis la config
+        # Load providers from config
         from ..helpers import get_providers_from_config
 
         providers_by_type = get_providers_from_config()
 
-        # Regrouper les providers par nom (un provider peut supporter plusieurs types)
+        # Group providers by name (a provider can support multiple types)
         providers_dict = {}
         for missive_type, provider_names in sorted(providers_by_type.items()):
             for provider_name in provider_names:
@@ -166,74 +157,74 @@ class ProviderInfoManager(models.Manager):
 
 class ProviderInfo(models.Model):
     """
-    Modèle virtuel (non persisté) représentant un provider configuré.
-    Les données viennent de MISSIVE_PROVIDERS, pas de la base de données.
+    Virtual model (not persisted) representing a configured provider.
+    Data comes from MISSIVE_PROVIDERS, not from the database.
     """
 
     name = models.CharField(
         max_length=100,
-        verbose_name=_("Nom du provider"),
+        verbose_name=_("Provider Name"),
     )
     missive_type = models.CharField(
         max_length=50,
-        verbose_name=_("Type de missive"),
+        verbose_name=_("Missive Type"),
     )
 
     objects = ProviderInfoManager()
 
     class Meta:
-        managed = False  # Pas de table en base de données
+        managed = False  # No database table
         verbose_name = _("Provider")
         verbose_name_plural = _("Providers")
-        default_permissions = ()  # Pas de permissions add/change/delete
-        ordering = ["name"]  # Tri alphabétique par nom
+        default_permissions = ()  # No add/change/delete permissions
+        ordering = ["name"]  # Alphabetical sorting by name
 
     def __str__(self):
         return f"{self.name} ({self.missive_type})"
 
     @property
     def missive_types_list(self):
-        """Retourne la liste des types de missive supportés"""
+        """Returns the list of supported missive types"""
         if not self.missive_type:
             return []
         return [t.strip() for t in self.missive_type.split(",")]
 
     def _get_provider_class(self):
         """
-        Helper pour récupérer la classe du provider dynamiquement.
-        Retourne None si le provider ne peut pas être chargé.
+        Helper to retrieve the provider class dynamically.
+        Returns None if the provider cannot be loaded.
 
-        Cherche dans MISSIVE_PROVIDERS (format liste), sinon utilise un fallback.
+        Searches in MISSIVE_PROVIDERS (list format), otherwise uses a fallback.
         """
         try:
             from django.conf import settings
             from django.utils.module_loading import import_string
 
-            # Normaliser le nom (minuscules, sans espaces ni tirets)
+            # Normalize the name (lowercase, no spaces or dashes)
             normalized_name = (
                 self.name.lower().replace(" ", "").replace("-", "").replace("_", "")
             )
 
-            # Récupérer MISSIVE_PROVIDERS (doit être une liste)
+            # Get MISSIVE_PROVIDERS (must be a list)
             providers_config = getattr(settings, "MISSIVE_PROVIDERS", None)
 
-            # Chercher le provider dans la config
+            # Search for the provider in config
             provider_path = None
 
             if isinstance(providers_config, list):
                 for path in providers_config:
-                    # Extraire le nom du provider depuis le path
+                    # Extract provider name from path
                     path_lower = path.lower()
                     if normalized_name in path_lower:
                         provider_path = path
                         break
 
-            # Si trouvé dans la config, importer directement
+            # If found in config, import directly
             if provider_path:
                 return import_string(provider_path)
 
-            # Fallback : Essayer de construire le chemin automatiquement
-            # Cas spéciaux pour les noms de classe non standards
+            # Fallback: Try to construct the path automatically
+            # Special cases for non-standard class names
             class_name_map = {
                 "djangoemail": "DjangoEmailProvider",
                 "smspartner": "SMSPartnerProvider",
@@ -248,13 +239,13 @@ class ProviderInfo(models.Model):
 
             class_name = class_name_map.get(normalized_name)
             if not class_name:
-                # Fallback: capitaliser le nom
+                # Fallback: capitalize the name
                 class_name = f"{normalized_name.capitalize()}Provider"
 
-            # Construire le chemin du provider
+            # Construct the provider path
             provider_path = f"missive.providers.{normalized_name}.{class_name}"
 
-            # Importer la classe
+            # Import the class
             return import_string(provider_path)
 
         except Exception:
@@ -263,8 +254,8 @@ class ProviderInfo(models.Model):
     @property
     def required_packages(self):
         """
-        Retourne la liste des packages Python requis pour ce provider.
-        Récupère required_packages directement depuis la classe du provider.
+        Returns the list of required Python packages for this provider.
+        Gets required_packages directly from the provider class.
         """
         provider_class = self._get_provider_class()
         if provider_class is None:
@@ -273,10 +264,10 @@ class ProviderInfo(models.Model):
 
     @property
     def is_installed(self):
-        """Vérifie si tous les packages Python requis sont installés"""
+        """Checks if all required Python packages are installed."""
         packages = self.required_packages
         if not packages:
-            return True  # Pas de dépendance ou toujours dispo
+            return True  # No dependency or always available
 
         for package in packages:
             try:
@@ -288,8 +279,8 @@ class ProviderInfo(models.Model):
     @property
     def required_config_keys(self):
         """
-        Retourne la liste des variables d'environnement nécessaires.
-        Récupère les config_keys directement depuis la classe du provider.
+        Returns the list of required environment variables.
+        Gets config_keys directly from the provider class.
         """
         provider_class = self._get_provider_class()
         if provider_class is None:
@@ -299,8 +290,8 @@ class ProviderInfo(models.Model):
     @property
     def brands(self):
         """
-        Retourne la liste des marques de messagerie supportées (pour type BRANDED).
-        Récupère brands directement depuis la classe du provider.
+        Returns the list of supported messaging brands (for BRANDED type).
+        Gets brands directly from the provider class.
         """
         provider_class = self._get_provider_class()
         if provider_class is None:
@@ -310,8 +301,8 @@ class ProviderInfo(models.Model):
     @property
     def status_url(self):
         """
-        Retourne l'URL de la page de statut/SLA du provider.
-        Récupère status_url directement depuis la classe du provider.
+        Returns the provider status/SLA page URL.
+        Gets status_url directly from the provider class.
         """
         provider_class = self._get_provider_class()
         if provider_class is None:
@@ -321,8 +312,8 @@ class ProviderInfo(models.Model):
     @property
     def documentation_url(self):
         """
-        Retourne l'URL de la documentation API du provider.
-        Récupère documentation_url directement depuis la classe du provider.
+        Returns the provider API documentation URL.
+        Gets documentation_url directly from the provider class.
         """
         provider_class = self._get_provider_class()
         if provider_class is None:
@@ -332,8 +323,8 @@ class ProviderInfo(models.Model):
     @property
     def site_url(self):
         """
-        Retourne l'URL du site web officiel du provider.
-        Récupère site_url directement depuis la classe du provider.
+        Returns the provider official website URL.
+        Gets site_url directly from the provider class.
         """
         provider_class = self._get_provider_class()
         if provider_class is None:
@@ -343,8 +334,8 @@ class ProviderInfo(models.Model):
     @property
     def description_text(self):
         """
-        Retourne la description textuelle du provider.
-        Récupère description_text directement depuis la classe du provider.
+        Returns the provider textual description.
+        Gets description_text directly from the provider class.
         """
         provider_class = self._get_provider_class()
         if provider_class is None:
@@ -353,19 +344,19 @@ class ProviderInfo(models.Model):
 
     @property
     def config_status(self):
-        """Retourne le statut de configuration pour chaque variable"""
+        """Returns the configuration status for each variable"""
         config_vars = {}
         for key in self.required_config_keys:
             value = getattr(settings, key, None)
             config_vars[key] = {
                 "configured": bool(value),
-                "value": value,  # Afficher la vraie valeur
+                "value": value,  # Display the real value
             }
         return config_vars
 
     @property
     def is_configured(self):
-        """Vérifie si les credentials principaux sont configurés"""
+        """Checks if the main credentials are configured"""
         config_keys = {
             "sendgrid": "SENDGRID_API_KEY",
             "mailgun": "MAILGUN_API_KEY",
@@ -394,7 +385,7 @@ class ProviderInfo(models.Model):
 
     @property
     def status(self):
-        """Retourne le statut : ready, needs_config, not_installed"""
+        """Returns the status: ready, needs_config, not_installed"""
         if self.is_installed and self.is_configured:
             return "ready"
         elif self.is_installed and not self.is_configured:
@@ -404,46 +395,46 @@ class ProviderInfo(models.Model):
 
     @property
     def status_display(self):
-        """Label du statut"""
+        """Status label"""
         labels = {
-            "ready": _("✅ Prêt"),
-            "needs_config": _("⚠️ Configuration requise"),
-            "not_installed": _("❌ Non installé"),
+            "ready": _("✅ Ready"),
+            "needs_config": _("⚠️ Configuration Required"),
+            "not_installed": _("❌ Not Installed"),
         }
-        return labels.get(self.status, _("❓ Inconnu"))
+        return labels.get(self.status, _("❓ Unknown"))
 
     @property
     def usage_count(self):
-        """Nombre d'utilisations de ce provider"""
+        """Number of uses of this provider"""
         from .event import MissiveEvent
 
         return MissiveEvent.objects.filter(provider=self.name).count()
 
     @property
     def requirements_file(self):
-        """Fichier requirements correspondant"""
-        # Mapping provider → fichier requirements individuel
+        """Corresponding requirements file"""
+        # Mapping provider → individual requirements file
         mapping = {
-            # Providers Email (fichiers individuels)
+            # Email Providers (individual files)
             "sendgrid": "requirements-sendgrid.txt",
             "mailgun": "requirements-mailgun.txt",
             "brevo": "requirements-brevo.txt",
             "ses": "requirements-ses.txt",
-            "django_email": "requirements.txt",  # Toujours disponible
-            # Providers SMS (fichiers individuels)
+            "django_email": "requirements.txt",  # Always available
+            # SMS Providers (individual files)
             "twilio": "requirements-twilio.txt",
             "vonage": "requirements-vonage.txt",
-            "smspartner": "requirements.txt",  # Utilise requests (déjà dans core)
-            # Messageries de marque (fichiers individuels)
+            "smspartner": "requirements.txt",  # Uses requests (already in core)
+            # Branded messaging (individual files)
             "slack": "requirements-slack.txt",
             "teams": "requirements-teams.txt",
             "telegram": "requirements-telegram.txt",
-            "signal": "requirements.txt",  # Utilise requests (déjà dans core)
-            "messenger": "requirements.txt",  # Utilise requests (déjà dans core)
-            # Push (fichiers individuels)
+            "signal": "requirements.txt",  # Uses requests (already in core)
+            "messenger": "requirements.txt",  # Uses requests (already in core)
+            # Push (individual files)
             "fcm": "requirements-fcm.txt",
             "apn": "requirements-apn.txt",
-            # Postal (utilisent requests + reportlab/Pillow déjà dans core)
+            # Postal (use requests + reportlab/Pillow already in core)
             "laposte": "requirements.txt",
             "ar24": "requirements.txt",
             "certeurope": "requirements.txt",
@@ -453,9 +444,9 @@ class ProviderInfo(models.Model):
     @property
     def credits_info(self):
         """
-        Récupère les informations de crédits depuis le provider.
+        Get credit information from the provider.
 
-        Retourne un dict avec les infos de crédits ou None si erreur.
+        Returns a dict with credit info or None if error.
         """
         if not self.is_installed or not self.is_configured:
             return None

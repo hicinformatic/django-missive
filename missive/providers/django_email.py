@@ -1,6 +1,4 @@
-"""
-Provider Django Email (SMTP natif de Django).
-"""
+"""Django Email provider (native SMTP)."""
 
 from typing import Dict, Tuple
 
@@ -9,38 +7,33 @@ from .base import BaseProvider
 
 
 class DjangoEmailProvider(BaseProvider):
-    """Provider utilisant le système d'email de Django (SMTP)"""
+    """Django's native email system provider."""
 
     name = "Django Email"
-    display_name = "Django Email (par défaut)"
+    display_name = "Django Email (default)"
     supported_types = ["EMAIL"]
-    services = ["email"]  # Email via SMTP configuré dans Django
+    services = ["email"]
     config_keys = ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_HOST_USER", "EMAIL_HOST_PASSWORD"]
-    required_packages = []  # Toujours disponible avec Django
-    description_text = (
-        "Email SMTP Django natif (toujours disponible, aucune dépendance)"
-    )
+    required_packages = []
+    description_text = "Native Django SMTP email (always available)"
 
     def send_email(self, **kwargs) -> bool:
-        """Envoie via Django mail (SMTP)"""
-        # Validation
+        """Sends email via Django's SMTP."""
         is_valid, error = self.validate()
         if not is_valid:
             self._update_status(MissiveStatus.FAILED, error_message=error)
             return False
 
         if not self.missive.recipient_email:
-            self._update_status(MissiveStatus.FAILED, error_message="Email manquant")
+            self._update_status(MissiveStatus.FAILED, error_message="Email missing")
             return False
 
         try:
             from django.conf import settings
             from django.core.mail import send_mail
 
-            # Marquer comme en traitement
             self._update_status(MissiveStatus.PROCESSING, provider=self.name)
 
-            # Envoyer l'email
             send_mail(
                 subject=self.missive.subject,
                 message=self.missive.body,
@@ -49,9 +42,8 @@ class DjangoEmailProvider(BaseProvider):
                 fail_silently=False,
             )
 
-            # Succès
             self._update_status(MissiveStatus.SENT)
-            self._create_event("sent", f"Email envoyé via {self.name}")
+            self._create_event("sent", f"Email sent via {self.name}")
 
             return True
 
@@ -63,18 +55,18 @@ class DjangoEmailProvider(BaseProvider):
     def validate_webhook_signature(
         self, payload: Dict, headers: Dict
     ) -> Tuple[bool, str]:
-        """Pas de webhooks pour Django Email natif"""
-        return False, "Django Email ne supporte pas les webhooks"
+        """No webhooks for native Django Email"""
+        return False, "Django Email does not support webhooks"
 
     def get_service_status(self) -> Dict:
         """
-        Récupère le statut du serveur SMTP Django.
+        Gets Django SMTP server status.
 
-        Django Email utilise le serveur SMTP configuré dans settings.py.
-        Pas de crédits, mais on peut tester la connexion SMTP.
+        Django Email uses the SMTP server configured in settings.py.
+        No credits, but SMTP connection can be tested.
 
         Returns:
-            Dict avec status, disponibilité SMTP, etc.
+            Dict with status, SMTP availability, etc.
         """
         # TODO: Tester la connexion SMTP
         # from django.core.mail import get_connection

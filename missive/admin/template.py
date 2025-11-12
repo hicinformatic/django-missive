@@ -1,4 +1,4 @@
-"""Admin for MissiveTemplate model."""
+"""Administration du modèle MissiveTemplate."""
 
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
@@ -10,7 +10,7 @@ from ..models import MissiveTemplate
 @sandbox_warning
 @admin.register(MissiveTemplate)
 class MissiveTemplateAdmin(admin.ModelAdmin):
-    """Admin for missive templates"""
+    """Administration des modèles de missive."""
 
     list_display = ["name", "missive_type", "is_active", "created_at"]
     list_filter = ["missive_type", "is_active", "created_at"]
@@ -26,7 +26,7 @@ class MissiveTemplateAdmin(admin.ModelAdmin):
             _("Template"),
             {
                 "fields": ("subject_template", "body_template"),
-                "description": _("Utilisez {{variable}} pour les variables dynamiques"),
+                "description": _("Use {{variable}} for dynamic variables"),
             },
         ),
         (

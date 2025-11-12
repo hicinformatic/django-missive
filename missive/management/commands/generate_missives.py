@@ -1,6 +1,4 @@
-"""
-Commande pour générer des missives d'exemple.
-"""
+"""Commande pour générer des missives d'exemple."""
 
 from django.core.management.base import BaseCommand
 
@@ -8,32 +6,30 @@ from missive.models import Missive, Recipient
 
 
 class Command(BaseCommand):
-    help = "Génère des missives d'exemple pour chaque type"
+    help = "Generate sample missives for each type"
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--clear",
             action="store_true",
-            help="Supprimer toutes les missives existantes avant de générer",
+            help="Delete all existing missives before generating",
         )
 
     def handle(self, *args, **options):
         if options["clear"]:
             count = Missive.objects.count()
             Missive.objects.all().delete()
-            self.stdout.write(self.style.WARNING(f"✓ {count} missives supprimées"))
+            self.stdout.write(self.style.WARNING(f"✓ {count} missives deleted"))
 
-        # Récupérer un expéditeur par défaut
         sender = Recipient.objects.filter(can_be_sender=True).first()
         if not sender:
             self.stdout.write(
                 self.style.ERROR(
-                    '❌ Aucun expéditeur disponible. Lancez "python dev.py generate_recipients" d\'abord.'
+                    '❌ No sender available. Run "python dev.py generate_recipients" first.'
                 )
             )
             return
 
-        # Récupérer des destinataires selon leur type de contact
         email_recipients = (
             Recipient.objects.exclude(email="")
             .exclude(email__isnull=True)
@@ -52,7 +48,6 @@ class Command(BaseCommand):
 
         missives = []
 
-        # MISSIVES EMAIL
         for i, recipient in enumerate(email_recipients, 1):
             missives.append(
                 {
@@ -67,7 +62,6 @@ class Command(BaseCommand):
                 }
             )
 
-        # MISSIVES SMS
         for i, recipient in enumerate(mobile_recipients, 1):
             missives.append(
                 {
@@ -81,7 +75,6 @@ class Command(BaseCommand):
                 }
             )
 
-        # MISSIVES BRANDED (Messageries d'applications)
         for i, recipient in enumerate(mobile_recipients[:2], 1):
             missives.append(
                 {
@@ -95,7 +88,6 @@ class Command(BaseCommand):
                 }
             )
 
-        # MISSIVES POSTAL
         for i, recipient in enumerate(postal_recipients, 1):
             missives.append(
                 {
@@ -112,7 +104,6 @@ class Command(BaseCommand):
                 }
             )
 
-        # MISSIVES NOTIFICATION
         notif_recipients = list(email_recipients[:2])
         for i, recipient in enumerate(notif_recipients, 1):
             missives.append(
@@ -131,7 +122,6 @@ class Command(BaseCommand):
         for missive_data in missives:
             missive = Missive.objects.create(**missive_data)
 
-            # Créer l'événement d'envoi initial avec le provider approprié
             provider_map = {
                 "EMAIL": "django_email",
                 "SMS": "twilio",
@@ -144,12 +134,11 @@ class Command(BaseCommand):
             missive.create_send_event(
                 provider=provider,
                 status=missive.status,
-                description=f"Missive {missive.missive_type} créée",
+                description=f"Missive {missive.missive_type} created",
             )
 
             created_count += 1
 
-            # Afficher avec icône selon le type
             icons = {
                 "EMAIL": "✉️",
                 "SMS": "📱",
@@ -165,28 +154,27 @@ class Command(BaseCommand):
                 )
             )
 
-        self.stdout.write(self.style.SUCCESS(f"\n✓ {created_count} missives créées"))
+        self.stdout.write(self.style.SUCCESS(f"\n✓ {created_count} missives created"))
         self.stdout.write(
             self.style.SUCCESS(f"✓ Total: {Missive.objects.count()} missives")
         )
 
-        # Statistiques
-        self.stdout.write("\n📊 Statistiques par type:")
+        self.stdout.write("\n📊 Statistics by type:")
         for missive_type, label in [
             ("EMAIL", "Email"),
             ("SMS", "SMS"),
-            ("BRANDED", "Messagerie App"),
+            ("BRANDED", "App Messaging"),
             ("POSTAL", "Postal"),
             ("NOTIFICATION", "Notification"),
         ]:
             count = Missive.objects.filter(missive_type=missive_type).count()
             self.stdout.write(f"  - {label}: {count}")
 
-        self.stdout.write("\n📊 Statistiques par statut:")
+        self.stdout.write("\n📊 Statistics by status:")
         for status, label in [
-            ("DRAFT", "Brouillon"),
-            ("PENDING", "En attente"),
-            ("SENT", "Envoyé"),
+            ("DRAFT", "Draft"),
+            ("PENDING", "Pending"),
+            ("SENT", "Sent"),
         ]:
             count = Missive.objects.filter(status=status).count()
             self.stdout.write(f"  - {label}: {count}")

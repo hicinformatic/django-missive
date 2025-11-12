@@ -1,7 +1,7 @@
 # Provider Microsoft Teams (Messaging)
-# Install avec: pip install -r requirements-teams.txt
+# Install with: pip install -r requirements-teams.txt
 
-# Dépendances core requises
+# Required core dependencies
 -r requirements.txt
 
 # Packages Microsoft Teams

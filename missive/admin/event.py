@@ -1,4 +1,4 @@
-"""Admin for MissiveEvent model."""
+"""Administration du modèle MissiveEvent."""
 
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
@@ -8,7 +8,7 @@ from ..models import MissiveEvent
 
 
 class MissiveEventInline(admin.TabularInline):
-    """Inline for event history"""
+    """Inline de l'historique des événements."""
 
     model = MissiveEvent
     extra = 0
@@ -24,18 +24,16 @@ class MissiveEventInline(admin.TabularInline):
     can_delete = False
 
     def has_add_permission(self, request, obj=None):
-        """Prevent adding events via admin"""
         return False
 
     def has_delete_permission(self, request, obj=None):
-        """Prevent deleting events via admin"""
         return False
 
 
 @sandbox_warning
 @admin.register(MissiveEvent)
 class MissiveEventAdmin(admin.ModelAdmin):
-    """Admin for events (read-only)"""
+    """Administration des événements (lecture seule)."""
 
     list_display = ["event_type", "provider", "missive", "status", "created_at"]
     list_filter = ["event_type", "provider", "status", "created_at"]
@@ -59,13 +57,10 @@ class MissiveEventAdmin(admin.ModelAdmin):
     )
 
     def has_add_permission(self, request):
-        """Events cannot be created manually"""
         return False
 
     def has_delete_permission(self, request, obj=None):
-        """Events cannot be deleted"""
         return False
 
     def has_change_permission(self, request, obj=None):
-        """Events cannot be modified"""
         return False

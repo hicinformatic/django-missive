@@ -1,1 +1,1 @@
-# Tests package for django-missive
+"""Tests package for django-missive."""

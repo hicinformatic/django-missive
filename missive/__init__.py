@@ -1,12 +1,10 @@
-"""
-Django Missive - A Django library for missive management
-"""
+"""Django Missive - Django library for missive management."""
 
 __version__ = "0.1.0"
 
 
 def __getattr__(name):
-    """Lazy imports pour éviter les imports circulaires"""
+    """Lazy imports to avoid circular dependencies."""
     if name == "Missive":
         from .models import Missive
 
@@ -55,7 +53,6 @@ def __getattr__(name):
         from .helpers import get_missives_stats_for_object
 
         return get_missives_stats_for_object
-    # Shortcuts
     elif name == "send_missive":
         from .shortcuts import send_missive
 
@@ -80,7 +77,6 @@ def __getattr__(name):
         from .shortcuts import send_telegram
 
         return send_telegram
-    # Exceptions
     elif name == "MissiveError":
         from .exceptions import MissiveError
 
@@ -114,7 +110,6 @@ def __getattr__(name):
 
 __all__ = [
     "__version__",
-    # Models
     "Missive",
     "MissiveType",
     "MissiveStatus",
@@ -124,18 +119,15 @@ __all__ = [
     "MissiveTemplate",
     "Recipient",
     "RecipientType",
-    # Sender
     "MissiveSender",
     "MissiveBuilder",
     "get_missives_stats_for_object",
-    # Shortcuts
     "send_missive",
     "send_sms",
     "send_email",
     "send_whatsapp",
     "send_slack",
     "send_telegram",
-    # Exceptions
     "MissiveError",
     "MissiveValidationError",
     "MissiveProviderError",

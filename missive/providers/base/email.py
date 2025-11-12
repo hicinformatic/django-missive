@@ -1,86 +1,28 @@
-"""
-Mixin pour les fonctionnalités email des providers.
-"""
+"""Email provider mixin."""
 
 import re
 from typing import Any, Dict, List
 
 
 class BaseEmailMixin:
-    """
-    Mixin fournissant les fonctionnalités spécifiques aux emails.
-
-    Kwargs standardisés pour send_email() :
-        cc (list|str): Destinataires en copie
-        bcc (list|str): Destinataires en copie cachée
-        reply_to (str): Adresse de réponse
-        headers (dict): Headers HTTP personnalisés
-        tags (list|dict): Tags pour tracking/analytics
-        template_id (str): ID de template email
-        template_vars (dict): Variables du template
-        track_opens (bool): Activer le tracking des ouvertures
-        track_clicks (bool): Activer le tracking des clics
-        send_at (datetime|str): Date/heure d'envoi programmé
-        unsubscribe_url (str): URL de désinscription
-        sandbox (bool): Mode test
-    """
+    """Email-specific functionality mixin."""
 
     def get_email_service_info(self) -> Dict[str, Any]:
-        """
-        Récupère les informations du compte/service Email.
-
-        Retourne les informations importantes pour le service Email :
-        - Crédits disponibles (nombre d'emails ou montant)
-        - Limites et quotas (emails/jour, taille max, etc.)
-        - État du service (actif/inactif)
-        - Réputation de l'expéditeur
-
-        Returns:
-            Dict contenant :
-                - credits: Nombre d'emails ou montant disponible
-                - credits_type: 'count' (nombre) ou 'amount' (montant) ou 'unlimited'
-                - is_available: bool, service accessible
-                - limits: Dict avec les limites (quota_daily, max_attachment_size, etc.)
-                - warnings: Liste des alertes
-                - reputation: Dict avec infos de réputation (score, bounces, etc.)
-                - details: Dict avec infos supplémentaires
-
-        À surcharger dans les providers concrets.
-        """
+        """Returns email service info. Override in subclasses."""
         return {
             "credits": None,
             "credits_type": "unlimited",
             "is_available": None,
             "limits": {},
             "warnings": [
-                "Méthode get_email_service_info() non implémentée pour ce provider"
+                "get_email_service_info() method not implemented for this provider"
             ],
             "reputation": {},
             "details": {},
         }
 
     def check_email_delivery_status(self, **kwargs) -> Dict[str, Any]:
-        """
-        Vérifie le statut de livraison d'un email spécifique.
-
-        Utilise l'external_id de la missive pour interroger l'API du provider
-        et récupérer le statut actuel, les ouvertures, clics, etc.
-
-        Returns:
-            Dict contenant :
-                - status: Statut actuel ('delivered', 'bounced', 'spam', 'opened', 'clicked', etc.)
-                - delivered_at: Date/heure de livraison
-                - opened_at: Date/heure de première ouverture
-                - clicked_at: Date/heure de premier clic
-                - opens_count: Nombre d'ouvertures
-                - clicks_count: Nombre de clics
-                - bounce_type: Type de bounce (hard/soft) si applicable
-                - error_code: Code d'erreur (si échec)
-                - error_message: Message d'erreur (si échec)
-                - details: Infos supplémentaires du provider
-
-        À surcharger dans les providers concrets.
-        """
+        """Checks email delivery status. Override in subclasses."""
         return {
             "status": "unknown",
             "delivered_at": None,
@@ -90,64 +32,29 @@ class BaseEmailMixin:
             "clicks_count": 0,
             "bounce_type": None,
             "error_code": None,
-            "error_message": "Méthode check_email_delivery_status() non implémentée pour ce provider",
+            "error_message": "check_email_delivery_status() method not implemented for this provider",
             "details": {},
         }
 
     def send_email(self, **kwargs) -> bool:
-        """
-        Envoie un email. À surcharger dans les providers concrets.
-
-        Args:
-            **kwargs: Options propriétaires du provider
-
-        Returns:
-            bool: True si succès, False sinon
-        """
+        """Sends email. Override in subclasses."""
         from ...models import MissiveStatus
 
-        # Vérifier qu'on a un email de destinataire
         if not self.missive.get_recipient_email():
             self._update_status(
-                MissiveStatus.FAILED, error_message="Pas d'email destinataire"
+                MissiveStatus.FAILED, error_message="No recipient email"
             )
             return False
 
-        # À implémenter dans les sous-classes
         raise NotImplementedError(
-            f"{self.name} doit implémenter la méthode send_email()"
+            f"{self.name} must implement the send_email() method"
         )
 
     def validate_email(self, email: str) -> Dict[str, Any]:
-        """
-        Valide une adresse email et évalue le risque d'échec de délivrance.
-
-        Vérifie :
-        - Syntaxe de l'email
-        - Format du domaine
-        - Domaines jetables/temporaires connus
-        - Existence d'enregistrements MX (DNS)
-
-        Args:
-            email: L'adresse email à valider
-
-        Returns:
-            Dict contenant :
-            - is_valid (bool): Email valide syntaxiquement
-            - is_deliverable (bool): Email probablement délivrable
-            - risk_score (int): Score de risque 0-100 (0=sûr, 100=très risqué)
-            - warnings (List[str]): Liste des avertissements
-            - details (Dict): Détails techniques (MX records, etc.)
-
-        Example:
-            result = provider.validate_email("user@example.com")
-            if result['risk_score'] > 70:
-                print("Risque élevé d'échec!")
-        """
+        """Validates email and assesses delivery risk."""
         warnings = []
         details = {}
 
-        # Validation syntaxique de base
         email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         is_valid = bool(re.match(email_regex, email))
 
@@ -156,28 +63,13 @@ class BaseEmailMixin:
                 "is_valid": False,
                 "is_deliverable": False,
                 "risk_score": 100,
-                "warnings": ["Format d'email invalide"],
+                "warnings": ["Invalid email format"],
                 "details": {},
             }
 
-        # Extraction du domaine
         domain = email.split("@")[1].lower()
         details["domain"] = domain
 
-        # TODO: Vérifier les domaines jetables/temporaires
-        # disposable_domains = ['tempmail.com', 'guerrillamail.com', ...]
-        # if domain in disposable_domains:
-        #     warnings.append("Domaine jetable détecté")
-
-        # TODO: Vérifier les enregistrements MX
-        # try:
-        #     import dns.resolver
-        #     mx_records = dns.resolver.resolve(domain, 'MX')
-        #     details['mx_records'] = [str(r.exchange) for r in mx_records]
-        # except:
-        #     warnings.append("Aucun enregistrement MX trouvé")
-
-        # Calcul du score de risque
         risk_score = self._calculate_email_risk_score(email, domain, warnings, details)
 
         return {
@@ -191,98 +83,20 @@ class BaseEmailMixin:
     def _calculate_email_risk_score(
         self, email: str, domain: str, warnings: List[str], details: Dict
     ) -> int:
-        """
-        Calcule un score de risque pour une adresse email.
-
-        Args:
-            email: L'adresse email
-            domain: Le domaine
-            warnings: Liste des avertissements détectés
-            details: Détails de validation
-
-        Returns:
-            int: Score de risque entre 0 (sûr) et 100 (très risqué)
-        """
+        """Calculates email risk score (0-100)."""
         score = 0
 
-        # Pénalités selon les avertissements
-        if "Domaine jetable détecté" in warnings:
+        if "Disposable domain detected" in warnings:
             score += 80
-        if "Aucun enregistrement MX trouvé" in warnings:
+        if "No MX record found" in warnings:
             score += 60
-        if "Serveur SMTP injoignable" in warnings:
+        if "SMTP server unreachable" in warnings:
             score += 50
-
-        # TODO: Ajouter d'autres critères
-        # - Réputation du domaine
-        # - Historique d'envois précédents
-        # - Blacklists
 
         return min(score, 100)
 
     def test_smtp_server(self, domain: str) -> Dict[str, Any]:
-        """
-        Teste la disponibilité et la configuration d'un serveur SMTP.
-
-        Vérifie :
-        - Résolution DNS des enregistrements MX
-        - Connexion au serveur SMTP
-        - Support TLS/SSL
-        - Réponse du serveur
-
-        Args:
-            domain: Le domaine à tester (ex: "example.com")
-
-        Returns:
-            Dict contenant :
-            - is_reachable (bool): Serveur joignable
-            - mx_records (List[str]): Liste des serveurs MX
-            - supports_tls (bool): Support TLS/SSL
-            - smtp_banner (str): Bannière du serveur
-            - response_time_ms (int): Temps de réponse en ms
-            - warnings (List[str]): Avertissements
-
-        Example:
-            result = provider.test_smtp_server("example.com")
-            if not result['is_reachable']:
-                print("Serveur SMTP injoignable!")
-        """
-        # TODO: Implémenter la logique de test SMTP
-        # import dns.resolver
-        # import smtplib
-        # import socket
-        # from time import time
-        #
-        # try:
-        #     # Résolution MX
-        #     mx_records = dns.resolver.resolve(domain, 'MX')
-        #     mx_host = str(mx_records[0].exchange)
-        #
-        #     # Test de connexion
-        #     start = time()
-        #     server = smtplib.SMTP(mx_host, timeout=10)
-        #     response_time = int((time() - start) * 1000)
-        #
-        #     # Test TLS
-        #     supports_tls = hasattr(server, 'starttls')
-        #     banner = server.ehlo_resp.decode() if server.ehlo_resp else ""
-        #
-        #     server.quit()
-        #
-        #     return {
-        #         'is_reachable': True,
-        #         'mx_records': [str(r.exchange) for r in mx_records],
-        #         'supports_tls': supports_tls,
-        #         'smtp_banner': banner,
-        #         'response_time_ms': response_time,
-        #         'warnings': []
-        #     }
-        # except Exception as e:
-        #     return {
-        #         'is_reachable': False,
-        #         'warnings': [str(e)]
-        #     }
-
+        """Tests SMTP server availability and configuration."""
         return {
             "is_reachable": None,
             "mx_records": [],
@@ -327,8 +141,8 @@ class BaseEmailMixin:
             body: Corps de l'email
 
         Returns:
-            Dict contenant :
-            - spam_score (int): Score 0-100 (0=sûr, 100=spam)
+            Dict containing:
+            - spam_score (int): Score 0-100 (0=safe, 100=spam)
             - triggers (List[str]): Mots/patterns déclencheurs
             - recommendations (List[str]): Conseils d'amélioration
         """
@@ -336,7 +150,7 @@ class BaseEmailMixin:
         triggers = []
         recommendations = []
 
-        # TODO: Implémenter la détection de spam
+        # TODO: Implement spam detection
         # - Mots-clés : GRATUIT, URGENT, CLIQUEZ ICI, etc.
         # - Ratio ALL CAPS
         # - Trop de liens
@@ -351,15 +165,15 @@ class BaseEmailMixin:
 
     def cancel_email(self, **kwargs) -> bool:
         """
-        Annule l'envoi d'un email programmé.
+        Cancel sending of a scheduled email.
 
         Args:
-            **kwargs: Options propriétaires du provider
+            **kwargs: Provider-specific options
 
-        Méthode de base qui retourne False. Les providers qui supportent
-        l'annulation doivent surcharger cette méthode avec leur implémentation API.
+        Base method that returns False. Providers that support
+        cancellation must override this method with their API implementation.
 
         Returns:
-            bool: True si annulation réussie, False sinon
+            bool: True if cancellation succeeded, False otherwise
         """
         return False

@@ -1,20 +1,17 @@
-"""
-Django settings for testing django-missive
-"""
+"""Django settings for testing django-missive."""
 
 import os
 from pathlib import Path
 
-# Charger les variables d'environnement depuis .env si disponible
 try:
     from dotenv import load_dotenv
 
     env_path = Path(__file__).resolve().parent.parent / ".env"
     if env_path.exists():
         load_dotenv(env_path)
-        print(f"✓ Variables d'environnement chargées depuis {env_path}")
+        print(f"✓ Environment variables loaded from {env_path}")
 except ImportError:
-    print("⚠️ python-dotenv non installé. Installez-le avec: pip install python-dotenv")
+    print("⚠️ python-dotenv not installed. Install with: pip install python-dotenv")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "test-secret-key-for-django-missive")
 
@@ -95,8 +92,8 @@ MISSIVE_PROVIDERS = [
     # Providers SMS/Voice (multi-types)
     "missive.providers.twilio.TwilioProvider",  # Auto-catégorisé: SMS + BRANDED + VOICE_CALL
     "missive.providers.vonage.VonageProvider",  # Auto-catégorisé: SMS + VOICE_CALL
-    "missive.providers.smspartner.SMSPartnerProvider",  # Auto-catégorisé: SMS + EMAIL + VOICE_CALL
-    # Providers Messageries de marque (BRANDED)
+    "missive.providers.smspartner.SMSPartnerProvider",  # Auto-categorized: SMS + EMAIL + VOICE_CALL
+    # Branded messaging providers (BRANDED)
     "missive.providers.slack.SlackProvider",
     "missive.providers.teams.TeamsProvider",
     "missive.providers.telegram.TelegramProvider",
@@ -164,7 +161,7 @@ CERTEUROPE_API_SECRET = os.getenv("CERTEUROPE_API_SECRET")
 CERTEUROPE_API_URL = os.getenv("CERTEUROPE_API_URL")
 CERTEUROPE_SENDER_EMAIL = os.getenv("CERTEUROPE_SENDER_EMAIL")
 
-# Messageries providers
+# Messaging providers
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 SIGNAL_API_KEY = os.getenv("SIGNAL_API_KEY")
 MESSENGER_PAGE_ACCESS_TOKEN = os.getenv("MESSENGER_PAGE_ACCESS_TOKEN")

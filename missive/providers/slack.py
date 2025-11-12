@@ -1,8 +1,4 @@
-"""
-Provider Slack pour l'envoi de messages dans des canaux ou en privé.
-
-Documentation: https://api.slack.com/messaging/sending
-"""
+"""Slack provider for channel and direct messaging."""
 
 from typing import Any, Dict, Optional
 
@@ -10,38 +6,28 @@ from .base import BaseProvider
 
 
 class SlackProvider(BaseProvider):
-    """
-    Provider pour Slack.
-
-    Configuration requise:
-        SLACK_BOT_TOKEN: Token du bot Slack (xoxb-...)
-        SLACK_SIGNING_SECRET: Secret pour vérifier les webhooks
-
-    Le destinataire doit avoir:
-    - Un user_id Slack (dans metadata.slack_user_id)
-    - OU un channel_id Slack (dans metadata.slack_channel_id)
-    """
+    """Slack provider."""
 
     name = "slack"
     display_name = "Slack"
-    supported_types = ["BRANDED"]  # Utilise le type générique BRANDED
+    supported_types = ["BRANDED"]
     services = ["slack", "messaging"]
-    brands = ["slack"]  # Slack uniquement
+    brands = ["slack"]
     config_keys = ["SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET"]
     required_packages = ["slack-sdk"]
     site_url = "https://slack.com/"
     status_url = "https://status.slack.com/"
     documentation_url = "https://api.slack.com/"
-    description_text = "Messagerie collaborative professionnelle pour équipes"
+    description_text = "Professional team collaboration messaging"
 
     def validate(self) -> Dict[str, Any]:
-        """Valide que le destinataire a un user_id ou channel_id Slack"""
+        """Validates recipient has Slack user_id or channel_id."""
         if not self.missive:
-            return {"is_valid": False, "error": "Missive non définie"}
+            return {"is_valid": False, "error": "Missive not defined"}
 
         recipient = self.missive.recipient
         if not recipient:
-            return {"is_valid": False, "error": "Destinataire non défini"}
+            return {"is_valid": False, "error": "Recipient not defined"}
 
         metadata = recipient.metadata or {}
         user_id = metadata.get("slack_user_id")
@@ -50,18 +36,13 @@ class SlackProvider(BaseProvider):
         if not user_id and not channel_id:
             return {
                 "is_valid": False,
-                "error": "Le destinataire doit avoir un slack_user_id ou slack_channel_id dans metadata",
+                "error": "Recipient must have slack_user_id or slack_channel_id in metadata",
             }
 
         return {"is_valid": True}
 
     def send_slack(self) -> bool:
-        """
-        Envoie un message Slack via Web API.
-
-        TODO: Implémenter l'envoi réel via slack_sdk:
-        from slack_sdk import WebClient
-        """
+        """Sends Slack message via Web API."""
         from ..models import MissiveStatus
 
         validation = self.validate()
@@ -69,7 +50,7 @@ class SlackProvider(BaseProvider):
             self._update_status(MissiveStatus.FAILED, error_message=validation["error"])
             return False
 
-        # TODO: Implémenter l'envoi réel
+        # TODO: Implement actual sending
         # client = WebClient(token=settings.SLACK_BOT_TOKEN)
         # response = client.chat_postMessage(
         #     channel=channel_id or user_id,
@@ -85,6 +66,6 @@ class SlackProvider(BaseProvider):
         return True
 
     def check_status(self, external_id: Optional[str] = None) -> Optional[str]:
-        """Vérifie si le message a été lu (nécessite Events API)"""
-        # TODO: Implémenter via Slack Events API
+        """Checks if message was read (requires Events API)."""
+        # TODO: Implement via Slack Events API
         return None

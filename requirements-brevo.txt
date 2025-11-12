@@ -1,7 +1,7 @@
 # Provider Brevo (Email, SMS)
-# Install avec: pip install -r requirements-brevo.txt
+# Install with: pip install -r requirements-brevo.txt
 
-# Dépendances core requises
+# Required core dependencies
 -r requirements.txt
 
 # Package Brevo (ex-Sendinblue)

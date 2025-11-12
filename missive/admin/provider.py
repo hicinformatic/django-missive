@@ -1,4 +1,4 @@
-"""Admin for virtual ProviderInfo model."""
+"""Administration du modèle virtuel ProviderInfo."""
 
 from django.contrib import admin
 from django.utils.html import format_html, format_html_join
@@ -10,19 +10,16 @@ from ..models.provider import ProviderInfoQuerySet
 
 
 class MissiveTypeFilter(admin.SimpleListFilter):
-    """Custom filter to display types with their translated labels"""
+    """Filtre personnalisé pour afficher les types avec leurs labels traduits."""
 
-    title = _("Type de missive")
+    title = _("Missive Type")
     parameter_name = "missive_type"
 
     def lookups(self, request, model_admin):
-        """Return choices with translated labels"""
         return [(choice.value, choice.label) for choice in MissiveType]
 
     def queryset(self, request, queryset):
-        """Filter queryset by selected type"""
         if self.value():
-            # Filtrer les providers qui supportent ce type (cherche dans la liste CSV)
             filtered = []
             for provider in queryset:
                 if self.value() in provider.missive_types_list:
@@ -40,12 +37,12 @@ class MissiveTypeFilter(admin.SimpleListFilter):
 @sandbox_warning
 @admin.register(ProviderInfo)
 class ProviderInfoAdmin(admin.ModelAdmin):
-    """Read-only admin to view provider status"""
+    """Administration en lecture seule pour consulter le statut des providers."""
 
     class Media:
         js = ("admin/js/config_vars_toggle.js",)
 
-    ordering = ["name"]  # Tri alphabétique par nom de provider
+    ordering = ["name"]
 
     list_display = [
         "name_display",
@@ -77,16 +74,15 @@ class ProviderInfoAdmin(admin.ModelAdmin):
     ]
 
     def get_fieldsets(self, request, obj=None):
-        """Generate fieldsets dynamically based on missive types"""
+        """Génère les fieldsets dynamiquement selon les types de missive."""
         if obj is None:
             return [
-                (_("Informations générales"), {"fields": ("name",)}),
+                (_("General Information"), {"fields": ("name",)}),
             ]
 
-        # Fieldsets de base
         fieldsets = [
             (
-                _("Informations générales"),
+                _("General Information"),
                 {
                     "fields": (
                         "name",
@@ -99,30 +95,25 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             ),
         ]
 
-        # Ajouter une section par type de missive pour les crédits
         missive_types = obj.missive_types_list
         for missive_type in missive_types:
-            # Récupérer le label traduit
             try:
                 label = MissiveType(missive_type).label
             except ValueError:
                 label = missive_type
 
-            # Créer un nom de méthode unique pour ce type
             field_name = f"credits_{missive_type.lower()}_display"
 
-            # Ajouter la section
             fieldsets.append(
                 (
                     label,
                     {
                         "fields": (field_name,),
-                        "description": f"Crédits et informations pour {label}",
+                        "description": f"Credits and information for {label}",
                     },
                 )
             )
 
-        # Sections restantes
         fieldsets.extend(
             [
                 (
@@ -134,12 +125,12 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                             "webhook_urls_display",
                         ),
                         "description": _(
-                            "Variables d'environnement et URLs de webhook pour ce provider"
+                            "Environment variables and webhook URLs for this provider"
                         ),
                     },
                 ),
                 (
-                    _("État du service"),
+                    _("Service Status"),
                     {
                         "fields": (
                             "installation_display",
@@ -148,18 +139,17 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                         )
                     },
                 ),
-                (_("Statistiques"), {"fields": ("usage_count", "requirements_file")}),
+                (_("Statistics"), {"fields": ("usage_count", "requirements_file")}),
             ]
         )
 
         return fieldsets
 
     def get_readonly_fields(self, request, obj=None):
-        """Dynamically add readonly fields for each missive type"""
+        """Ajoute dynamiquement les champs readonly pour chaque type de missive."""
         readonly = list(self.readonly_fields)
 
         if obj:
-            # Ajouter les champs de crédits pour chaque type
             for missive_type in obj.missive_types_list:
                 field_name = f"credits_{missive_type.lower()}_display"
                 if field_name not in readonly:
@@ -168,20 +158,16 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         return readonly
 
     def __getattr__(self, name):
-        """Dynamically generate credits_{type}_display methods"""
+        """Génère dynamiquement les méthodes credits_{type}_display."""
         if name.startswith("credits_") and name.endswith("_display"):
-            # Extraire le type de missive
-            missive_type = name[8:-8].upper()  # Enlever 'credits_' et '_display'
+            missive_type = name[8:-8].upper()
 
             def credits_method(obj):
-                # Récupérer les crédits en temps réel depuis le provider
                 try:
                     provider_class = obj._get_provider_class()
                     if provider_class:
-                        # Instancier le provider (sans missive pour juste récupérer le statut)
                         provider_instance = provider_class()
 
-                        # Mapper le type de missive à la méthode get_*_service_info()
                         method_map = {
                             "SMS": "get_sms_service_info",
                             "EMAIL": "get_email_service_info",
@@ -189,59 +175,50 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                             "VOICE_CALL": "get_voice_call_service_info",
                             "NOTIFICATION": "get_notification_service_info",
                             "PUSH_NOTIFICATION": "get_notification_service_info",
-                            "BRANDED": "get_branded_service_info",  # Utilise la méthode générique
+                            "BRANDED": "get_branded_service_info",
                         }
 
                         method_name = method_map.get(missive_type)
 
                         if method_name and hasattr(provider_instance, method_name):
-                            # Appeler la méthode spécifique au type
                             service_info = getattr(provider_instance, method_name)()
                         else:
-                            # Pas de méthode spécifique implémentée
                             service_info = {
-                                "credits": "Non implémenté",
+                                "credits": "Not implemented",
                                 "credits_type": "unknown",
                                 "is_available": None,
                                 "warnings": [
-                                    f"Méthode {method_name} non implémentée pour {provider_instance.name}"
+                                    f"Method {method_name} not implemented for {provider_instance.name}"
                                 ],
                             }
 
-                        # Récupérer les crédits
                         credits = service_info.get("credits")
                         is_available = service_info.get("is_available")
                         warnings = service_info.get("warnings", [])
 
-                        # Construire l'affichage
                         credits_html = ""
 
                         if credits is not None:
-                            # Afficher les crédits (déjà formatés par la méthode)
                             credits_html = format_html(
                                 '<p style="font-size: 20px; font-weight: bold; color: #198754; margin: 10px 0;">{}</p>',
                                 str(credits),
                             )
                         else:
-                            # Pas de crédits disponibles
                             credits_html = format_html(
-                                '<p style="color: #6c757d; font-style: italic; font-size: 16px; margin: 10px 0;">Crédits non disponibles</p>'
+                                '<p style="color: #6c757d; font-style: italic; font-size: 16px; margin: 10px 0;">Credits not available</p>'
                             )
 
-                        # Ajouter le statut de disponibilité
                         if is_available is not None:
                             if is_available:
                                 credits_html += format_html(
-                                    '<p style="margin: 5px 0; font-size: 14px;"><span style="color: #198754;">✓ Service disponible</span></p>'
+                                    '<p style="margin: 5px 0; font-size: 14px;"><span style="color: #198754;">✓ Service available</span></p>'
                                 )
                             else:
                                 credits_html += format_html(
-                                    '<p style="margin: 5px 0; font-size: 14px;"><span style="color: #dc3545;">✗ Service indisponible</span></p>'
+                                    '<p style="margin: 5px 0; font-size: 14px;"><span style="color: #dc3545;">✗ Service unavailable</span></p>'
                                 )
 
-                        # Ajouter les avertissements (toujours, même si credits est None)
                         if warnings:
-                            # Utiliser format_html_join pour sécuriser (pas de mark_safe)
                             warnings_html = format_html_join(
                                 "<br>",
                                 '<span style="color: #ffc107;">{}</span>',
@@ -255,15 +232,15 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                         return credits_html
                     else:
                         return format_html(
-                            '<p style="color: #6c757d; font-style: italic; margin: 0;">Provider non chargé</p>'
+                            '<p style="color: #6c757d; font-style: italic; margin: 0;">Provider not loaded</p>'
                         )
 
                 except Exception as e:
                     return format_html(
-                        '<p style="color: #dc3545; margin: 0;">Erreur : {}</p>', str(e)
+                        '<p style="color: #dc3545; margin: 0;">Error: {}</p>', str(e)
                     )
 
-            credits_method.short_description = _("Crédits disponibles")
+            credits_method.short_description = _("Available Credits")
             return credits_method
 
         raise AttributeError(
@@ -271,46 +248,36 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         )
 
     def has_add_permission(self, request):
-        """No manual creation"""
         return False
 
     def has_delete_permission(self, request, obj=None):
-        """No deletion"""
         return False
 
     def has_change_permission(self, request, obj=None):
-        """Allow viewing but not modification"""
         return True
 
     def get_search_results(self, request, queryset, search_term):
-        """
-        Implémente la recherche manuelle car on utilise un QuerySet custom.
-        """
+        """Implémente la recherche manuelle pour le QuerySet personnalisé."""
         if not search_term:
             return queryset, False
 
-        # Recherche dans le nom et les types de missive
         search_term_lower = search_term.lower()
         filtered = []
 
         for provider in queryset:
-            # Rechercher dans le nom
             if search_term_lower in provider.name.lower():
                 filtered.append(provider)
                 continue
 
-            # Rechercher dans les types de missive supportés
             if search_term_lower in provider.missive_type.lower():
                 filtered.append(provider)
                 continue
 
-            # Rechercher dans la liste des types (CSV)
             for missive_type in provider.missive_types_list:
                 if search_term_lower in missive_type.lower():
                     filtered.append(provider)
                     break
 
-        # Retourner un nouveau QuerySet avec les résultats filtrés
         from ..models.provider import ProviderInfoQuerySet
 
         filtered_qs = ProviderInfoQuerySet(
@@ -324,7 +291,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         return filtered_qs, False
 
     def name_display(self, obj):
-        """Display provider name with description"""
+        """Displays provider name with description."""
         description = obj.description_text
         if description:
             return format_html(
@@ -338,7 +305,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
     name_display.short_description = _("Provider")
 
     def missive_type_display(self, obj):
-        """Colored badges for all supported types"""
+        """Badges colorés pour tous les types supportés."""
         colors = {
             "POSTAL": "#6c757d",
             "LRE": "#495057",
@@ -348,15 +315,13 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             "VOICE_CALL": "#6f42c1",
             "NOTIFICATION": "#fd7e14",
             "PUSH_NOTIFICATION": "#dc3545",
-            "BRANDED": "#9b59b6",  # Purple pour toutes les messageries d'applications
+            "BRANDED": "#9b59b6",
         }
 
-        # Afficher tous les types supportés
         badges = []
         for missive_type in obj.missive_types_list:
             color = colors.get(missive_type, "#6c757d")
 
-            # Récupérer le label traduit depuis MissiveType
             try:
                 label = MissiveType(missive_type).label
             except ValueError:
@@ -375,13 +340,12 @@ class ProviderInfoAdmin(admin.ModelAdmin):
     missive_type_display.short_description = _("Types supportés")
 
     def missive_type_display_detail(self, obj):
-        """Display missive types with translated labels in detail page"""
         return self.missive_type_display(obj)
 
     missive_type_display_detail.short_description = _("Types supportés")
 
     def brands_display(self, obj):
-        """Display supported messaging brands (for BRANDED providers)"""
+        """Displays supported messaging brands (for BRANDED providers)."""
         brands = obj.brands
 
         if not brands:
@@ -389,7 +353,6 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 '<span style="color: #6c757d; font-style: italic;">—</span>'
             )
 
-        # Couleurs pour les brands
         brand_colors = {
             "whatsapp": "#25D366",
             "slack": "#4A154B",
@@ -400,7 +363,6 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             "discord": "#5865F2",
         }
 
-        # Utiliser format_html_join pour sécuriser les badges
         badges_html = format_html_join(
             "",
             '<span style="background-color: {}; color: white; padding: 3px 10px; '
@@ -414,30 +376,30 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
         return format_html('<span style="white-space: nowrap;">{}</span>', badges_html)
 
-    brands_display.short_description = _("Marques supportées")
+    brands_display.short_description = _("Supported Brands")
 
     def status_display(self, obj):
-        """Badge for overall status"""
+        """Badge pour le statut global."""
         if obj.status == "ready":
             return format_html(
                 '<span style="background-color: #d1e7dd; color: #0f5132; padding: 5px 12px; '
-                'border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap;">✅ Prêt</span>'
+                'border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap;">✅ Ready</span>'
             )
         elif obj.status == "needs_config":
             return format_html(
                 '<span style="background-color: #fff3cd; color: #664d03; padding: 5px 12px; '
-                'border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap;">⚠️ Config requise</span>'
+                'border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap;">⚠️ Config Required</span>'
             )
         else:
             return format_html(
                 '<span style="background-color: #f8d7da; color: #842029; padding: 5px 12px; '
-                'border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap;">❌ Non installé</span>'
+                'border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap;">❌ Not Installed</span>'
             )
 
-    status_display.short_description = _("Statut")
+    status_display.short_description = _("Status")
 
     def credits_display(self, obj):
-        """Display available credits"""
+        """Displays available credits."""
         credits_info = obj.credits_info
 
         if not credits_info:
@@ -454,15 +416,13 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 '<span style="color: #ccc; white-space: nowrap;">-</span>'
             )
 
-        # Formatage selon le type
         if credit_type == "money":
-            # Crédits en euros
             if remaining < 10:
-                color = "#dc3545"  # Rouge
+                color = "#dc3545"  # Red
             elif remaining < 50:
-                color = "#ffc107"  # Orange
+                color = "#ffc107"
             else:
-                color = "#198754"  # Vert
+                color = "#198754"
 
             return format_html(
                 '<span style="color: {}; font-weight: bold; white-space: nowrap;">{:.2f} {}</span>',
@@ -471,13 +431,12 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 currency,
             )
         elif credit_type == "count" or credit_type == "sms_units":
-            # Crédits en unités (SMS, etc.)
             if remaining < 100:
-                color = "#dc3545"  # Rouge
+                color = "#dc3545"
             elif remaining < 500:
-                color = "#ffc107"  # Orange
+                color = "#ffc107"
             else:
-                color = "#198754"  # Vert
+                color = "#198754"
 
             return format_html(
                 '<span style="color: {}; font-weight: bold; white-space: nowrap;">{} SMS</span>',
@@ -486,37 +445,32 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             )
         elif credit_type == "unlimited":
             return format_html(
-                '<span style="color: #198754; font-weight: bold; white-space: nowrap;">∞ Illimité</span>'
+                '<span style="color: #198754; font-weight: bold; white-space: nowrap;">∞ Unlimited</span>'
             )
         else:
-            # Type mixte ou inconnu
             return format_html(
                 '<span style="white-space: nowrap;">{}</span>', str(remaining)
             )
 
-    credits_display.short_description = _("Crédits")
+    credits_display.short_description = _("Credits")
 
     def installation_display(self, obj):
-        """Affiche les packages requis et leur statut d'installation individuel"""
+        """Displays required packages and installation status."""
         packages = obj.required_packages
 
         if packages:
-            # Vérifier le statut de chaque package individuellement
             package_statuses = []
             for package in packages:
                 try:
                     __import__(package)
-                    # Package installé : icône verte + nom normal
                     package_statuses.append(
                         f'<span style="color: #198754;">✓</span> <code>{package}</code>'
                     )
                 except ImportError:
-                    # Package manquant : icône rouge + nom en rouge
                     package_statuses.append(
                         f'<span style="color: #dc3545;">✗ <code style="color: #dc3545;">{package}</code></span>'
                     )
 
-            # Joindre tous les packages avec leur statut (sécurisé)
             packages_html = format_html_join(
                 ", ", "{}", ((status,) for status in package_statuses)
             )
@@ -525,118 +479,112 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 packages_html,
             )
         else:
-            # Pas de package requis (toujours disponible)
             return format_html(
-                '<span style="color: #6c757d; white-space: nowrap; font-style: italic;">Aucun (toujours dispo)</span>'
+                '<span style="color: #6c757d; white-space: nowrap; font-style: italic;">None (always available)</span>'
             )
 
     installation_display.short_description = _("Packages")
 
     def configuration_display(self, obj):
-        """Indicate if credentials are configured"""
+        """Indique si les identifiants sont configurés."""
         if obj.is_configured:
             return format_html(
-                '<span style="color: #198754; white-space: nowrap;">✓ Configuré</span>'
+                '<span style="color: #198754; white-space: nowrap;">✓ Configured</span>'
             )
         else:
             return format_html(
-                '<span style="color: #ffc107; white-space: nowrap;">✗ Manquant</span>'
+                '<span style="color: #ffc107; white-space: nowrap;">✗ Missing</span>'
             )
 
     configuration_display.short_description = _("Credentials")
 
     def status_url_display(self, obj):
-        """Affiche le lien vers la page de statut/SLA du provider"""
+        """Displays provider status/SLA page link."""
         url = obj.status_url
 
         if url:
             return format_html(
                 '<a href="{}" target="_blank" style="white-space: nowrap;">'
-                '<span style="color: #0d6efd;">🔗 Page de statut</span>'
+                '<span style="color: #0d6efd;">🔗 Status Page</span>'
                 "</a>",
                 url,
             )
         else:
             return format_html(
-                '<span style="color: #6c757d; font-style: italic; white-space: nowrap;">Non disponible</span>'
+                '<span style="color: #6c757d; font-style: italic; white-space: nowrap;">Not available</span>'
             )
 
-    status_url_display.short_description = _("Statut SLA")
+    status_url_display.short_description = _("SLA Status")
 
     def documentation_url_display(self, obj):
-        """Affiche le lien vers la documentation API du provider"""
+        """Displays provider API documentation link."""
         url = obj.documentation_url
 
         if url:
             return format_html(
                 '<a href="{}" target="_blank" style="white-space: nowrap;">'
-                '<span style="color: #0d6efd;">📖 Documentation API</span>'
+                '<span style="color: #0d6efd;">📖 API Documentation</span>'
                 "</a>",
                 url,
             )
         else:
             return format_html(
-                '<span style="color: #6c757d; font-style: italic; white-space: nowrap;">Non disponible</span>'
+                '<span style="color: #6c757d; font-style: italic; white-space: nowrap;">Not available</span>'
             )
 
     def site_url_display(self, obj):
-        """Affiche le lien vers le site web officiel du provider"""
+        """Displays provider official website link."""
         url = obj.site_url
 
         if url:
             return format_html(
                 '<a href="{}" target="_blank" style="white-space: nowrap;">'
-                '<span style="color: #0d6efd;">🌐 Site officiel</span>'
+                '<span style="color: #0d6efd;">🌐 Official Site</span>'
                 "</a>",
                 url,
             )
         else:
             return format_html(
-                '<span style="color: #6c757d; font-style: italic; white-space: nowrap;">Non disponible</span>'
+                '<span style="color: #6c757d; font-style: italic; white-space: nowrap;">Not available</span>'
             )
 
-    site_url_display.short_description = _("Site officiel")
+    site_url_display.short_description = _("Official Site")
     documentation_url_display.short_description = _("Documentation")
 
     def webhook_urls_display(self, obj):
-        """Affiche l'URL webhook unique pour ce provider"""
+        """Displays unique webhook URL for this provider."""
         from django.conf import settings
 
         types = obj.missive_types_list
         if not types:
             return format_html(
-                '<span style="color: #6c757d; font-style: italic;">Aucun service configuré</span>'
+                '<span style="color: #6c757d; font-style: italic;">No service configured</span>'
             )
 
-        # Récupérer le domaine de base depuis la config
         base_domain = getattr(
             settings, "MISSIVE_WEBHOOK_BASE_URL", "https://example.com"
         )
-        # Retirer le slash final si présent
         base_domain = base_domain.rstrip("/")
 
-        # Construire l'URL unique du webhook (une seule URL pour tous les types)
         provider_slug = obj.name.lower().replace(" ", "")
         webhook_url = f"{base_domain}/missive/webhooks/{provider_slug}/"
 
         html_parts = []
 
-        # Afficher l'URL unique
         html_parts.append(
             '<div style="margin-top: 5px; padding: 12px; background: #e7f3ff; border-left: 4px solid #0d6efd; border-radius: 4px;">'
-            '<div style="font-weight: 600; color: #0c5b9d; margin-bottom: 8px; font-size: 13px;">🔗 URL Webhook unique</div>'
+            '<div style="font-weight: 600; color: #0c5b9d; margin-bottom: 8px; font-size: 13px;">🔗 Unique Webhook URL</div>'
             f'<code style="background: #fff; padding: 6px 12px; border-radius: 4px; font-size: 12px; color: #0d6efd; display: block; word-break: break-all;">{webhook_url}</code>'
             '<div style="margin-top: 8px; padding: 6px; background: #fff; border-radius: 3px;">'
-            '<small style="color: #6c757d;">✅ Une seule URL pour tous les types de services :'
+            '<small style="color: #6c757d;">✅ One URL for all service types:'
         )
 
-        # Liste des types supportés
         type_labels = {
             "EMAIL": "Email",
             "SMS": "SMS",
-            "VOICE_CALL": "Appels vocaux",
-            "BRANDED": "Messageries",
-            "POSTAL": "Courrier",
+            "VOICE_CALL": "Voice Calls",
+            "BRANDED": "Messaging",
+            "POSTAL": "Postal",
             "LRE": "LRE",
             "NOTIFICATION": "Notifications",
             "PUSH_NOTIFICATION": "Push",
@@ -647,21 +595,20 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         html_parts.append(f' {", ".join(type_names)}</small>')
         html_parts.append("</div></div>")
 
-        # Note d'aide avec info sur la config
         if base_domain == "https://example.com":
-            note_color = "#dc3545"  # Rouge si pas configuré
+            note_color = "#dc3545"
             note_icon = "⚠️"
             note_text = (
-                f"{note_icon} <strong>Configuration requise:</strong> "
-                f"Ajoutez <code>MISSIVE_WEBHOOK_BASE_URL = 'https://votre-domaine.com'</code> "
-                f"dans settings.py pour obtenir les vraies URLs."
+                f"{note_icon} <strong>Configuration required:</strong> "
+                f"Add <code>MISSIVE_WEBHOOK_BASE_URL = 'https://your-domain.com'</code> "
+                f"in settings.py to get real URLs."
             )
         else:
-            note_color = "#856404"  # Jaune si configuré
+            note_color = "#856404"
             note_icon = "💡"
             note_text = (
-                f"{note_icon} <strong>Note:</strong> Configurez ces URLs dans le dashboard de votre provider "
-                f"pour recevoir les notifications de statut."
+                f"{note_icon} <strong>Note:</strong> Configure these URLs in your provider dashboard "
+                f"to receive status notifications."
             )
 
         html_parts.append(
@@ -672,41 +619,38 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
         return format_html("".join(html_parts))
 
-    webhook_urls_display.short_description = _("URLs de Webhook")
+    webhook_urls_display.short_description = _("Webhook URLs")
 
     def usage_display(self, obj):
-        """Affiche le nombre d'utilisations"""
+        """Displays usage count."""
         count = obj.usage_count
         if count > 0:
             return format_html(
-                '<strong style="white-space: nowrap;">{}</strong> utilisation{}',
+                '<strong style="white-space: nowrap;">{}</strong> use{}',
                 count,
                 "s" if count > 1 else "",
             )
         else:
             return format_html(
-                '<span style="color: #ccc; white-space: nowrap;">Jamais utilisé</span>'
+                '<span style="color: #ccc; white-space: nowrap;">Never used</span>'
             )
 
-    usage_display.short_description = _("Utilisation")
+    usage_display.short_description = _("Usage")
 
     def status_display_detail(self, obj):
-        """Display detailed status in change page"""
         return self.status_display(obj)
 
-    status_display_detail.short_description = _("Statut")
+    status_display_detail.short_description = _("Status")
 
     def config_vars_display(self, obj):
-        """Affiche les variables de configuration dans la liste"""
+        """Displays config variables in list."""
         config_vars = obj.required_config_keys
 
         if not config_vars:
             return format_html(
-                '<span style="color: #6c757d; font-style: italic;">Aucune</span>'
+                '<span style="color: #6c757d; font-style: italic;">None</span>'
             )
 
-        # Créer une liste des variables dans des balises <code>
-        # Utiliser format_html_join pour sécuriser les variables
         vars_html = format_html_join(
             ", ", "<code>{}</code>", ((var,) for var in config_vars)
         )
@@ -719,15 +663,14 @@ class ProviderInfoAdmin(admin.ModelAdmin):
     config_vars_display.short_description = _("Variables")
 
     def config_vars_display_detail(self, obj):
-        """Affiche toutes les variables de configuration dans la page de changement"""
+        """Displays all config variables in edit page."""
         config_vars = obj.required_config_keys
 
         if not config_vars:
             return format_html(
-                '<p style="color: #666;">Aucune configuration spécifique requise pour ce provider.</p>'
+                '<p style="color: #666;">No specific configuration required for this provider.</p>'
             )
 
-        # Récupérer le statut de chaque variable
         config_status = obj.config_status
 
         rows = []
@@ -736,31 +679,27 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             is_configured = status.get("configured", False)
 
             if is_configured:
-                # Variable configurée
                 icon = '<span style="color: #198754; font-weight: bold;">✓</span>'
-                status_text = '<span style="color: #198754;">Configurée</span>'
+                status_text = '<span style="color: #198754;">Configured</span>'
                 actual_value = str(status.get("value", ""))
-                # Masquer la valeur par défaut avec une icône pour l'afficher
                 value_html = (
                     '<span class="config-eye" data-var="{}" style="cursor: pointer; color: #6c757d; margin-right: 8px;" '
-                    'title="Cliquer pour afficher/masquer">👁️</span>'
+                    'title="Click to show/hide">👁️</span>'
                     '<span class="config-value-masked" data-var="{}" style="color: #6c757d;">••••••••</span>'
                     '<span class="config-value-revealed" data-var="{}" style="display: none;"><code>{}</code></span>'
                 ).format(var_name, var_name, var_name, actual_value)
             else:
-                # Variable manquante
-                # Cas spécial pour SMSPARTNER_WEBHOOK_IPS : afficher la valeur par défaut
                 if var_name == "SMSPARTNER_WEBHOOK_IPS":
                     icon = '<span style="color: #0d6efd; font-weight: bold;">ℹ️</span>'
-                    status_text = '<span style="color: #0d6efd;">Par défaut</span>'
+                    status_text = '<span style="color: #0d6efd;">Default</span>'
                     value_html = (
                         '<code style="color: #0d6efd;">185.66.232.0/24</code> '
-                        '<small style="color: #6c757d;">(plage officielle SMSPartner)</small>'
+                        '<small style="color: #6c757d;">(official SMSPartner range)</small>'
                     )
                 else:
                     icon = '<span style="color: #dc3545; font-weight: bold;">✗</span>'
-                    status_text = '<span style="color: #dc3545;">Manquante</span>'
-                    value_html = "<code>Non définie</code>"
+                    status_text = '<span style="color: #dc3545;">Missing</span>'
+                    value_html = "<code>Not defined</code>"
 
             rows.append(
                 "<tr>"
@@ -777,8 +716,8 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 <tr style="background-color: #f8f9fa;">
                     <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6; width: 30px;"></th>
                     <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Variable</th>
-                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Statut</th>
-                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Valeur</th>
+                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Status</th>
+                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">Value</th>
                 </tr>
             </thead>
             <tbody>
@@ -786,7 +725,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             </tbody>
         </table>
         <p style="margin-top: 15px; padding: 10px; background-color: #cfe2ff; border-left: 4px solid #0d6efd; color: #084298;">
-            <strong>💡 Pour configurer :</strong> Éditez le fichier <code>.env</code> à la racine du projet et redémarrez le serveur.
+            <strong>💡 To configure:</strong> Edit the <code>.env</code> file at the project root and restart the server.
         </p>
         """.format(
             "".join(rows)
@@ -794,18 +733,16 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
         return format_html(table_html)
 
-    config_vars_display_detail.short_description = _("Variables de configuration")
+    config_vars_display_detail.short_description = _("Configuration Variables")
 
     def changelist_view(self, request, extra_context=None):
-        """Add context to list view"""
+        """Ajoute du contexte à la vue liste."""
         extra_context = extra_context or {}
 
-        # Ajouter des statistiques globales
         from ..models import Missive
 
         extra_context["total_missives"] = Missive.objects.count()
 
-        # Compter les providers par statut
         all_providers = list(ProviderInfo.objects.all())
         extra_context["ready_count"] = sum(
             1 for p in all_providers if p.status == "ready"

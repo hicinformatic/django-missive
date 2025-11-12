@@ -1,7 +1,4 @@
-"""
-Helpers pour créer des missives depuis n'importe quel modèle.
-Utilitaires pour l'administration des providers.
-"""
+"""Helper functions for missive creation and provider administration."""
 
 import importlib
 import inspect
@@ -20,22 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class MissiveBuilder:
-    """
-    Builder pour créer facilement des missives liées à n'importe quel objet.
-
-    Usage:
-        from missive.helpers import MissiveBuilder
-
-        # Depuis une commande
-        missive = MissiveBuilder.from_object(
-            source_object=order,
-            sender=order.user,
-            missive_type=MissiveType.EMAIL,
-            recipient_email=order.email,
-            subject=f"Commande #{order.id} confirmée",
-            body="Votre commande a été confirmée..."
-        )
-    """
+    """Builder to create missives linked to any object."""
 
     @staticmethod
     def from_object(
@@ -56,51 +38,14 @@ class MissiveBuilder:
         metadata: Optional[Dict] = None,
         **kwargs,
     ) -> Missive:
-        """
-        Crée une missive liée à un objet source.
-
-        Args:
-            source_object: L'objet source (Order, Participant, Invoice, etc.)
-            sender: L'utilisateur expéditeur
-            missive_type: Type de missive (EMAIL, SMS, POSTAL, etc.)
-            subject: Sujet de la missive
-            body: Corps du message (HTML pour emails, texte pour SMS)
-            body_text: Version texte brut (optionnel pour emails, requis pour SMS)
-            recipient_*: Informations du destinataire selon le type
-            priority: Priorité de la missive
-            is_registered: Si recommandé
-            requires_signature: Si signature requise
-            scheduled_at: Date d'envoi programmée
-            metadata: Métadonnées additionnelles
-            **kwargs: Autres paramètres du modèle Missive
-
-        Returns:
-            Missive: L'instance créée
-
-        Example:
-            from myapp.models import Order
-            from missive.helpers import MissiveBuilder
-
-            order = Order.objects.get(id=123)
-
-            missive = MissiveBuilder.from_object(
-                source_object=order,
-                sender=order.user,
-                missive_type=MissiveType.EMAIL,
-                recipient_email=order.email,
-                subject=f"Commande #{order.id} confirmée",
-                body=f"Merci pour votre commande...",
-                priority=MissivePriority.HIGH
-            )
-        """
+        """Creates a missive linked to a source object."""
         missive = Missive(
             content_object=source_object,
             sender=sender,
             missive_type=missive_type,
             subject=subject,
             body=body,
-            body_text=body_text
-            or body,  # Fallback: utilise body si body_text non fourni
+            body_text=body_text or body,
             recipient_user=recipient_user,
             recipient_email=recipient_email,
             recipient_phone=recipient_phone,
@@ -289,7 +234,7 @@ def get_provider_name_from_path(provider_path):
     if not provider_path:
         return "custom"
 
-    # Si c'est déjà un nom court, le retourner tel quel
+    # If it's already a short name, return it as is
     if "." not in provider_path:
         return provider_path.lower()
 
@@ -309,7 +254,7 @@ def get_providers_from_config():
     Récupère la configuration MISSIVE_PROVIDERS depuis les settings
     et retourne un dictionnaire {type_missive: [liste_noms_providers]}.
 
-    Configuration (liste simple avec auto-catégorisation):
+    Configuration (simple list with auto-categorization):
        MISSIVE_PROVIDERS = [
            'missive.providers.twilio.TwilioProvider',
            'missive.providers.sendgrid.SendGridProvider',
@@ -326,7 +271,7 @@ def get_providers_from_config():
     providers_config = getattr(settings, "MISSIVE_PROVIDERS", None)
     providers_by_type = {}
 
-    # Format : Liste simple (auto-catégorisation)
+    # Format: Simple list (auto-categorization)
     if isinstance(providers_config, list):
         for provider_path in providers_config:
             try:
@@ -334,10 +279,10 @@ def get_providers_from_config():
                 provider_class = import_string(provider_path)
                 provider_name = get_provider_name_from_path(provider_path)
 
-                # Récupérer les types supportés
+                # Get supported types
                 supported_types = getattr(provider_class, "supported_types", [])
 
-                # Ajouter le provider à chaque type qu'il supporte
+                # Add the provider to each type it supports
                 for missive_type in supported_types:
                     if missive_type not in providers_by_type:
                         providers_by_type[missive_type] = []
@@ -349,7 +294,7 @@ def get_providers_from_config():
                 print(f"Warning: Could not load provider {provider_path}: {e}")
                 continue
 
-    # Si aucune config, utiliser les valeurs par défaut
+    # If no config, use default values
     if not providers_by_type:
         providers_by_type = {
             "EMAIL": [
@@ -392,17 +337,17 @@ def get_provider_paths_from_config():
     providers_config = getattr(settings, "MISSIVE_PROVIDERS", None)
     providers_by_type = {}
 
-    # Format : Liste simple (auto-catégorisation)
+    # Format: Simple list (auto-categorization)
     if isinstance(providers_config, list):
         for provider_path in providers_config:
             try:
                 # Charger la classe du provider
                 provider_class = import_string(provider_path)
 
-                # Récupérer les types supportés
+                # Get supported types
                 supported_types = getattr(provider_class, "supported_types", [])
 
-                # Ajouter le chemin complet à chaque type qu'il supporte
+                # Add the full path to each type it supports
                 for missive_type in supported_types:
                     if missive_type not in providers_by_type:
                         providers_by_type[missive_type] = []
@@ -414,7 +359,7 @@ def get_provider_paths_from_config():
                 logger.warning(f"Could not load provider {provider_path}: {e}")
                 continue
 
-    # Si aucune config, utiliser les valeurs par défaut (avec chemins complets)
+    # If no config, use default values (with full paths)
     if not providers_by_type:
         providers_by_type = {
             "EMAIL": [
@@ -469,8 +414,8 @@ def discover_providers():
     """
     providers_dict = {}
 
-    # Ajouter le provider "custom" spécial
-    providers_dict["custom"] = _("Provider personnalisé")
+    # Add special "custom" provider
+    providers_dict["custom"] = _("Custom Provider")
 
     # Chemin vers le dossier providers
     providers_dir = Path(__file__).parent / "providers"
@@ -480,7 +425,7 @@ def discover_providers():
 
     # Parcourir tous les fichiers Python du dossier providers
     for file_path in providers_dir.glob("*.py"):
-        # Ignorer __init__.py et les fichiers privés
+        # Ignore __init__.py and private files
         if file_path.name.startswith("_"):
             continue
 
@@ -490,18 +435,18 @@ def discover_providers():
             # Importer dynamiquement le module
             module = importlib.import_module(f"missive.providers.{module_name}")
 
-            # Chercher toutes les classes qui héritent de BaseProvider
+            # Search for all classes that inherit from BaseProvider
             for name, obj in inspect.getmembers(module, inspect.isclass):
-                # Vérifier que c'est une classe Provider définie dans CE module (pas importée)
+                # Check that it's a Provider class defined in THIS module (not imported)
                 if (
                     name.endswith("Provider")
                     and hasattr(obj, "name")
                     and obj.__module__ == f"missive.providers.{module_name}"
                 ):
-                    # Utiliser le nom du module (fichier) comme identifiant, pas obj.name
+                    # Use the module name (file) as identifier, not obj.name
                     provider_name = module_name.lower()
 
-                    # Récupérer display_name ou fallback sur name
+                    # Get display_name or fallback to name
                     if hasattr(obj, "display_name"):
                         display_name = obj.display_name
                     else:
@@ -515,7 +460,7 @@ def discover_providers():
                     break  # Une seule classe provider par fichier
 
         except (ImportError, AttributeError):
-            # Ignorer silencieusement les erreurs d'import (dépendances manquantes, etc.)
+            # Silently ignore import errors (missing dependencies, etc.)
             continue
 
     return providers_dict
@@ -523,8 +468,8 @@ def discover_providers():
 
 def get_all_provider_choices():
     """
-    Génère la liste de tous les providers disponibles pour les choices du form.
-    Utilise la découverte automatique des providers depuis leurs classes.
+    Generate the list of all available providers for form choices.
+    Uses automatic provider discovery from their classes.
     """
     providers_by_type = get_providers_from_config()
     all_providers = set()
@@ -533,13 +478,13 @@ def get_all_provider_choices():
     for providers in providers_by_type.values():
         all_providers.update(providers)
 
-    # Découvrir automatiquement les display_name depuis les classes providers
+    # Automatically discover display_name from provider classes
     providers_display = discover_providers()
 
-    # Créer les choices triés
+    # Create sorted choices
     choices = []
     for provider in sorted(all_providers):
-        # Utiliser le display_name découvert ou fallback sur le nom capitalisé
+        # Use discovered display_name or fallback to capitalized name
         label = providers_display.get(provider, provider.capitalize())
         choices.append((provider, label))
 

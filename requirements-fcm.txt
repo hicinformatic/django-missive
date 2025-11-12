@@ -1,7 +1,7 @@
 # Provider Firebase Cloud Messaging (Push Notifications)
-# Install avec: pip install -r requirements-fcm.txt
+# Install with: pip install -r requirements-fcm.txt
 
-# Dépendances core requises
+# Required core dependencies
 -r requirements.txt
 
 # Package Firebase

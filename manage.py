@@ -6,21 +6,21 @@ import django
 
 
 def create_superuser():
-    """Create a default superuser if none exists"""
+    """Creates default superuser if none exists."""
     from django.contrib.auth.models import User
     
     if not User.objects.filter(is_superuser=True).exists():
-        print("📦 Création du superuser: admin/admin")
+        print("📦 Creating superuser: admin/admin")
         User.objects.create_superuser('admin', 'admin@example.com', 'admin')
-        print("✅ Superuser créé avec succès!")
+        print("✅ Superuser created successfully!")
         print("   Username: admin")
         print("   Password: admin")
     else:
-        print("✅ Superuser déjà existant")
+        print("✅ Superuser already exists")
 
 
 def main():
-    """Run administrative tasks."""
+    """Runs administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'tests.settings')
     
     try:
@@ -32,12 +32,9 @@ def main():
             "forget to activate a virtual environment?"
         ) from exc
     
-    # If running migrations or migrate command, create superuser after
     if len(sys.argv) > 1 and sys.argv[1] in ['migrate', 'runserver']:
-        # Execute the command first
         if sys.argv[1] == 'migrate':
             execute_from_command_line(sys.argv)
-            # Setup Django and create superuser
             django.setup()
             create_superuser()
             return

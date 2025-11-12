@@ -8,27 +8,15 @@ from django.utils.translation import gettext_lazy as _
 
 
 def sandbox_warning(admin_class):
-    """
-    Decorator to add sandbox warning messages in admin views.
+    """Adds sandbox warning messages in admin views when MISSIVE_SANDBOX is enabled."""
 
-    Overrides changelist_view, add_view, and change_view to display
-    a warning when MISSIVE_SANDBOX is enabled.
-
-    Usage:
-        @sandbox_warning
-        @admin.register(MyModel)
-        class MyModelAdmin(admin.ModelAdmin):
-            pass
-    """
-
-    # Save original methods
     original_changelist_view = admin_class.changelist_view
     original_add_view = admin_class.add_view
     original_change_view = admin_class.change_view
 
     @wraps(original_changelist_view)
     def changelist_view_with_warning(self, request, extra_context=None):
-        """Override changelist_view with sandbox message."""
+        """Overrides changelist_view with sandbox message."""
         extra_context = extra_context or {}
 
         if getattr(settings, "MISSIVE_SANDBOX", False):
@@ -45,7 +33,7 @@ def sandbox_warning(admin_class):
 
     @wraps(original_add_view)
     def add_view_with_warning(self, request, form_url="", extra_context=None):
-        """Override add_view with sandbox message."""
+        """Overrides add_view with sandbox message."""
         extra_context = extra_context or {}
 
         if getattr(settings, "MISSIVE_SANDBOX", False):
@@ -60,7 +48,7 @@ def sandbox_warning(admin_class):
     def change_view_with_warning(
         self, request, object_id, form_url="", extra_context=None
     ):
-        """Override change_view with sandbox message."""
+        """Overrides change_view with sandbox message."""
         extra_context = extra_context or {}
 
         if getattr(settings, "MISSIVE_SANDBOX", False):
@@ -71,7 +59,6 @@ def sandbox_warning(admin_class):
 
         return original_change_view(self, request, object_id, form_url, extra_context)
 
-    # Replace methods
     admin_class.changelist_view = changelist_view_with_warning
     admin_class.add_view = add_view_with_warning
     admin_class.change_view = change_view_with_warning

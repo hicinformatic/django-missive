@@ -1,8 +1,4 @@
-"""
-Provider APN (Apple Push Notification) pour notifications push iOS.
-
-Documentation: https://developer.apple.com/documentation/usernotifications
-"""
+"""Apple Push Notification provider for iOS push notifications."""
 
 from typing import Any, Dict, Optional
 
@@ -11,16 +7,16 @@ from .base import BaseProvider
 
 class APNProvider(BaseProvider):
     """
-    Provider pour Apple Push Notification Service.
+    Apple Push Notification Service provider.
 
-    Configuration requise:
-        APN_CERTIFICATE_PATH: Chemin vers le certificat .pem
-        APN_KEY_ID: Key ID (pour auth par token)
-        APN_TEAM_ID: Team ID Apple
-        APN_BUNDLE_ID: Bundle ID de l'app
-        APN_USE_SANDBOX: True pour développement, False pour production
+    Required configuration:
+        APN_CERTIFICATE_PATH: Path to .pem certificate
+        APN_KEY_ID: Key ID (for token auth)
+        APN_TEAM_ID: Apple Team ID
+        APN_BUNDLE_ID: App Bundle ID
+        APN_USE_SANDBOX: True for development, False for production
 
-    Le destinataire doit avoir un device_token APN stocké dans metadata.
+    Recipient must have an APN device_token stored in metadata.
     """
 
     name = "apn"
@@ -29,16 +25,16 @@ class APNProvider(BaseProvider):
     config_keys = ["APN_CERTIFICATE_PATH", "APN_KEY_ID", "APN_TEAM_ID"]
     required_packages = ["aioapns"]
     site_url = "https://developer.apple.com/documentation/usernotifications"
-    description_text = "Notifications push iOS natives via APNs (Apple)"
+    description_text = "Native iOS push notifications via APNs (Apple)"
 
     def validate(self) -> Dict[str, Any]:
-        """Valide que le destinataire a un device token APN"""
+        """Validate that the recipient has an APN device token"""
         if not self.missive:
-            return {"is_valid": False, "error": "Missive non définie"}
+            return {"is_valid": False, "error": "Missive not defined"}
 
         recipient = self.missive.recipient
         if not recipient:
-            return {"is_valid": False, "error": "Destinataire non défini"}
+            return {"is_valid": False, "error": "Recipient not defined"}
 
         device_token = (
             recipient.metadata.get("apn_device_token") if recipient.metadata else None
@@ -53,16 +49,16 @@ class APNProvider(BaseProvider):
 
     def send(self) -> Dict[str, Any]:
         """
-        Envoie une notification push via APN.
+        Send a push notification via APN.
 
-        TODO: Implémenter l'envoi réel via aioapns ou PyAPNs
+        TODO: Implement actual sending via aioapns or PyAPNs
         """
         validation = self.validate()
         if not validation["is_valid"]:
             self._update_status("FAILED", error_message=validation["error"])
             return {"success": False, "error": validation["error"]}
 
-        # TODO: Implémenter l'envoi réel
+        # TODO: Implement actual sending
         # from aioapns import APNs, NotificationRequest
         # apns = APNs(...)
         # request = NotificationRequest(
@@ -89,6 +85,6 @@ class APNProvider(BaseProvider):
         }
 
     def check_status(self, external_id: Optional[str] = None) -> Optional[str]:
-        """Vérifie le statut de livraison APN"""
-        # APN ne fournit pas de confirmation de livraison par défaut
+        """Check APN delivery status"""
+        # APN doesn't provide delivery confirmation by default
         return None

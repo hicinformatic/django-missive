@@ -1,7 +1,7 @@
 # Provider Mailgun (Email)
-# Install avec: pip install -r requirements-mailgun.txt
+# Install with: pip install -r requirements-mailgun.txt
 
-# Dépendances core requises
+# Required core dependencies
 -r requirements.txt
 
 # Package Mailgun

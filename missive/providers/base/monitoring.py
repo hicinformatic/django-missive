@@ -1,6 +1,4 @@
-"""
-Mixin pour le monitoring et le statut des providers.
-"""
+"""Provider monitoring mixin."""
 
 from typing import Any, Dict
 
@@ -8,53 +6,10 @@ from django.utils import timezone
 
 
 class BaseMonitoringMixin:
-    """
-    Mixin fournissant les fonctionnalités de monitoring des providers.
-    """
+    """Provider monitoring functionality mixin."""
 
     def get_service_status(self) -> Dict[str, Any]:
-        """
-        Récupère le statut complet du provider.
-
-        Retourne :
-        - Statut opérationnel (operational, degraded, down)
-        - Crédits/quota restants
-        - Limites de rate
-        - SLA et uptime
-        - Services disponibles
-        - Dernière vérification
-
-        Returns:
-            Dict contenant :
-            - status (str): 'operational', 'degraded', 'down', 'unknown'
-            - is_available (bool): Provider disponible
-            - services (List[str]): Liste des services offerts
-            - credits (Dict): Informations sur les crédits
-                - type (str): 'money', 'emails', 'sms', 'unlimited'
-                - remaining (float|int): Montant ou nombre restant
-                - currency (str): 'EUR', 'USD', 'units'
-                - limit (float|int): Limite totale
-                - percentage (float): % restant
-            - rate_limits (Dict): Limites de débit
-                - per_second (int): Requêtes par seconde
-                - per_minute (int): Requêtes par minute
-                - per_hour (int): Requêtes par heure
-                - per_day (int): Requêtes par jour
-            - sla (Dict): SLA et performances
-                - uptime_percentage (float): % d'uptime (ex: 99.9)
-                - response_time_ms (int): Temps de réponse moyen
-                - success_rate (float): Taux de succès (ex: 98.5)
-            - last_check (datetime): Date du dernier check
-            - warnings (List[str]): Avertissements
-            - details (Dict): Détails spécifiques au provider
-
-        Example:
-            status = provider.get_service_status()
-            if status['credits']['remaining'] < 100:
-                print(f"⚠️ Seulement {status['credits']['remaining']} crédits restants!")
-        """
-        # Par défaut, retourner un statut inconnu
-        # Les providers concrets doivent override cette méthode
+        """Returns provider service status. Override in subclasses."""
         return {
             "status": "unknown",
             "is_available": None,
@@ -84,10 +39,10 @@ class BaseMonitoringMixin:
 
     def check_credits(self) -> Dict[str, Any]:
         """
-        Vérifie spécifiquement les crédits disponibles.
+        Specifically check available credits.
 
         Returns:
-            Dict contenant :
+            Dict containing:
             - type (str): Type de crédit ('money', 'emails', 'sms', 'unlimited')
             - remaining (float|int): Crédits restants
             - currency (str): Devise ('EUR', 'USD') ou unité ('emails', 'sms')
@@ -106,8 +61,8 @@ class BaseMonitoringMixin:
         status = self.get_service_status()
         credits = status.get("credits", {})
 
-        # Calculer si recharge nécessaire
-        threshold = 10  # 10% par défaut
+        # Calculate if recharge is needed
+        threshold = 10  # 10% by default
         percentage = credits.get("percentage")
         needs_refill = percentage is not None and percentage < threshold
 
@@ -127,7 +82,7 @@ class BaseMonitoringMixin:
         Vérifie les limites de débit actuelles.
 
         Returns:
-            Dict contenant :
+            Dict containing:
             - limits (Dict): Limites configurées
             - current_usage (Dict): Utilisation actuelle
             - remaining (Dict): Requêtes restantes
@@ -155,13 +110,13 @@ class BaseMonitoringMixin:
         Récupère les métriques SLA du provider.
 
         Returns:
-            Dict contenant :
+            Dict containing:
             - uptime_percentage (float): % d'uptime (ex: 99.99)
             - uptime_target (float): Objectif SLA (ex: 99.9)
             - meets_sla (bool): Respecte le SLA
             - incidents_30d (int): Nombre d'incidents sur 30 jours
             - mttr_minutes (int): Mean Time To Recovery en minutes
-            - response_time_avg_ms (int): Temps de réponse moyen
+            - response_time_avg_ms (int): Average response time
             - response_time_p95_ms (int): 95e percentile
             - success_rate (float): Taux de succès %
             - last_incident (datetime): Dernier incident
@@ -176,7 +131,7 @@ class BaseMonitoringMixin:
         sla = status.get("sla", {})
 
         uptime = sla.get("uptime_percentage")
-        target = 99.9  # Objectif par défaut
+        target = 99.9  # Default target
         meets_sla = uptime is not None and uptime >= target
 
         return {
@@ -203,8 +158,8 @@ class BaseMonitoringMixin:
         - SLA
 
         Returns:
-            Dict contenant :
-            - is_healthy (bool): Provider sain et opérationnel
+            Dict containing:
+            - is_healthy (bool): Provider healthy and operational
             - status (str): 'healthy', 'warning', 'critical', 'down'
             - issues (List[str]): Liste des problèmes détectés
             - recommendations (List[str]): Actions recommandées

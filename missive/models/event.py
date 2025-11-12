@@ -1,6 +1,4 @@
-"""
-Modèle MissiveEvent pour le tracking des événements.
-"""
+"""MissiveEvent model for tracking."""
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -9,19 +7,19 @@ from .choices import MissiveStatus
 
 
 class MissiveEvent(models.Model):
-    """Événements et historique de tracking d'une missive"""
+    """Missive event tracking."""
 
     missive = models.ForeignKey(
         "missive.Missive",
         on_delete=models.CASCADE,
         related_name="events",
         verbose_name=_("Missive"),
-        help_text=_("Missive associée à cet événement"),
+        help_text=_("Missive associated with this event"),
     )
     event_type = models.CharField(
         max_length=50,
-        verbose_name=_("Type d'événement"),
-        help_text=_("Ex: created, sent, delivered, opened, clicked, bounced, etc."),
+        verbose_name=_("Event Type"),
+        help_text=_("E.g.: created, sent, delivered, opened, clicked, bounced, etc."),
     )
     provider = models.CharField(
         max_length=50,
@@ -29,7 +27,7 @@ class MissiveEvent(models.Model):
         null=True,
         verbose_name=_("Provider"),
         help_text=_(
-            "Provider qui a généré cet événement (sendgrid, twilio, laposte, etc.)"
+            "Provider that generated this event (sendgrid, twilio, laposte, etc.)"
         ),
     )
     status = models.CharField(
@@ -37,29 +35,29 @@ class MissiveEvent(models.Model):
         choices=MissiveStatus.choices,
         null=True,
         blank=True,
-        verbose_name=_("Statut associé"),
-        help_text=_("Statut de la missive suite à cet événement"),
+        verbose_name=_("Associated Status"),
+        help_text=_("Missive status following this event"),
     )
     description = models.TextField(
         blank=True,
         verbose_name=_("Description"),
-        help_text=_("Description détaillée de l'événement"),
+        help_text=_("Detailed event description"),
     )
     metadata = models.JSONField(
         default=dict,
         blank=True,
-        verbose_name=_("Métadonnées"),
-        help_text=_("Données additionnelles (IP, user agent, etc.)"),
+        verbose_name=_("Metadata"),
+        help_text=_("Additional data (IP, user agent, etc.)"),
     )
     created_at = models.DateTimeField(
         auto_now_add=True,
-        verbose_name=_("Date de l'événement"),
-        help_text=_("Date et heure de l'événement"),
+        verbose_name=_("Event Date"),
+        help_text=_("Event date and time"),
     )
 
     class Meta:
-        verbose_name = _("Événement")
-        verbose_name_plural = _("Événements")
+        verbose_name = _("Event")
+        verbose_name_plural = _("Events")
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["missive", "-created_at"]),

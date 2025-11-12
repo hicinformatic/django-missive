@@ -1,7 +1,4 @@
-"""
-Provider Brevo (anciennement SendinBlue) pour Email ET SMS.
-Exemple parfait de provider multi-types.
-"""
+"""Brevo provider for Email and SMS."""
 
 from typing import Dict, Optional, Tuple
 
@@ -11,10 +8,10 @@ from .base import BaseProvider
 
 class BrevoProvider(BaseProvider):
     """
-    Provider pour Brevo (anciennement SendinBlue).
+    Brevo provider (formerly SendinBlue).
 
-    Supporte :
-    - Email (transactionnel et marketing)
+    Supports:
+    - Email (transactional and marketing)
     - SMS
     """
 
@@ -26,7 +23,7 @@ class BrevoProvider(BaseProvider):
         "email_transactional",
         "email_marketing",
         "sms",
-        "contacts",  # Gestion de contacts
+        "contacts",  # Contact management
         "automation",  # Marketing automation
     ]  # Multi-types !
     config_keys = ["BREVO_API_KEY"]
@@ -34,10 +31,10 @@ class BrevoProvider(BaseProvider):
     site_url = "https://www.brevo.com/"
     status_url = "https://status.brevo.com/"
     documentation_url = "https://developers.brevo.com/"
-    description_text = "Plateforme CRM complète (Email, SMS, Marketing automation)"
+    description_text = "Complete CRM platform (Email, SMS, Marketing automation)"
 
     def send_email(self) -> bool:
-        """Envoie un email via Brevo API"""
+        """Send an email via Brevo API"""
         # Validation
         is_valid, error = self.validate()
         if not is_valid:
@@ -45,11 +42,11 @@ class BrevoProvider(BaseProvider):
             return False
 
         if not self.missive.recipient_email:
-            self._update_status(MissiveStatus.FAILED, error_message="Email manquant")
+            self._update_status(MissiveStatus.FAILED, error_message="Email missing")
             return False
 
         try:
-            # TODO: Intégrer avec Brevo
+            # TODO: Integrate with Brevo
             # import sib_api_v3_sdk
             # from sib_api_v3_sdk.rest import ApiException
             #
@@ -77,7 +74,7 @@ class BrevoProvider(BaseProvider):
             self._update_status(
                 MissiveStatus.SENT, provider=self.name, external_id=external_id
             )
-            self._create_event("sent", "Email envoyé via Brevo")
+            self._create_event("sent", "Email sent via Brevo")
 
             return True
 
@@ -87,7 +84,7 @@ class BrevoProvider(BaseProvider):
             return False
 
     def send_sms(self) -> bool:
-        """Envoie un SMS via Brevo API"""
+        """Send an SMS via Brevo API"""
         # Validation
         is_valid, error = self.validate()
         if not is_valid:
@@ -95,11 +92,11 @@ class BrevoProvider(BaseProvider):
             return False
 
         if not self.missive.recipient_phone:
-            self._update_status(MissiveStatus.FAILED, error_message="Numéro manquant")
+            self._update_status(MissiveStatus.FAILED, error_message="Phone missing")
             return False
 
         try:
-            # TODO: Intégrer avec Brevo SMS
+            # TODO: Integrate with Brevo SMS
             # import sib_api_v3_sdk
             #
             # configuration = sib_api_v3_sdk.Configuration()
@@ -125,7 +122,7 @@ class BrevoProvider(BaseProvider):
             self._update_status(
                 MissiveStatus.SENT, provider=self.name, external_id=external_id
             )
-            self._create_event("sent", "SMS envoyé via Brevo")
+            self._create_event("sent", "SMS sent via Brevo")
 
             return True
 
@@ -151,14 +148,14 @@ class BrevoProvider(BaseProvider):
 
     def get_service_status(self) -> Dict:
         """
-        Récupère le statut et les crédits Brevo.
+        Gets Brevo status and credits.
 
-        Brevo utilise un système de quota d'emails par jour + crédits SMS.
+        Brevo uses a daily email quota system + SMS credits.
 
         Returns:
-            Dict avec status, crédits email + SMS, etc.
+            Dict with status, email + SMS credits, etc.
         """
-        # TODO: Implémenter l'appel à l'API Brevo
+        # TODO: Implement Brevo API call
         # import requests
         #
         # try:

@@ -1,9 +1,4 @@
-"""
-Views pour Django Missive.
-
-Seuls les webhooks sont nécessaires pour la bibliothèque.
-Pour des vues CRUD, consultez examples/secure_views.py
-"""
+"""Django Missive views."""
 
 from .webhooks import WebhookView, webhook_status_view, webhook_test_view
 

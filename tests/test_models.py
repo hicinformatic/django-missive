@@ -1,6 +1,4 @@
-"""
-Tests for Missive models
-"""
+"""Missive model tests."""
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -12,10 +10,10 @@ User = get_user_model()
 
 @pytest.mark.django_db
 class TestMissive:
-    """Tests for Missive model"""
+    """Missive model tests."""
 
     def test_create_missive(self, user):
-        """Test creating a Missive instance"""
+        """Tests Missive creation."""
         missive = Missive.objects.create(
             sender=user,
             missive_type=MissiveType.EMAIL,
@@ -30,7 +28,7 @@ class TestMissive:
         assert missive.status == MissiveStatus.DRAFT
 
     def test_missive_str(self, user):
-        """Test string representation of Missive"""
+        """Tests Missive string representation."""
         missive = Missive.objects.create(
             sender=user,
             missive_type=MissiveType.EMAIL,
@@ -43,7 +41,7 @@ class TestMissive:
         assert "Brouillon" in str(missive)
 
     def test_missive_ordering(self, user):
-        """Test that Missive instances are ordered by created_at descending"""
+        """Tests Missive ordering by created_at descending."""
         missive1 = Missive.objects.create(
             sender=user,
             missive_type=MissiveType.EMAIL,
@@ -64,7 +62,7 @@ class TestMissive:
         assert missives[1] == missive1
 
     def test_missive_can_send(self, user):
-        """Test that can_send works correctly"""
+        """Tests can_send method."""
         missive = Missive.objects.create(
             sender=user,
             missive_type=MissiveType.EMAIL,

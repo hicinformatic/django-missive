@@ -1,6 +1,4 @@
-"""
-Provider Mailgun pour emails.
-"""
+"""Mailgun email provider."""
 
 import hashlib
 import hmac
@@ -11,7 +9,7 @@ from .base import BaseProvider
 
 
 class MailgunProvider(BaseProvider):
-    """Provider pour Mailgun (Email uniquement)"""
+    """Mailgun provider (Email only)."""
 
     name = "Mailgun"
     display_name = "Mailgun"
@@ -22,10 +20,10 @@ class MailgunProvider(BaseProvider):
     site_url = "https://www.mailgun.com/"
     status_url = "https://status.mailgun.com/"
     documentation_url = "https://documentation.mailgun.com/"
-    description_text = "Service email transactionnel avec validation et routage avancés"
+    description_text = "Transactional email service with advanced validation and routing"
 
     def send_email(self, **kwargs) -> bool:
-        """Envoie via Mailgun API"""
+        """Send via Mailgun API"""
         # Validation
         is_valid, error = self.validate()
         if not is_valid:
@@ -33,11 +31,11 @@ class MailgunProvider(BaseProvider):
             return False
 
         if not self.missive.recipient_email:
-            self._update_status(MissiveStatus.FAILED, error_message="Email manquant")
+            self._update_status(MissiveStatus.FAILED, error_message="Email missing")
             return False
 
         try:
-            # TODO: Intégrer avec Mailgun
+            # TODO: Integrate with Mailgun
             # import requests
             #
             # api_key = self.config.get('MAILGUN_API_KEY')
@@ -63,7 +61,7 @@ class MailgunProvider(BaseProvider):
             self._update_status(
                 MissiveStatus.SENT, provider=self.name, external_id=external_id
             )
-            self._create_event("sent", "Email envoyé via Mailgun")
+            self._create_event("sent", "Email sent via Mailgun")
 
             return True
 
@@ -106,14 +104,14 @@ class MailgunProvider(BaseProvider):
 
     def get_service_status(self) -> Dict:
         """
-        Récupère le statut et les crédits Mailgun.
+        Gets Mailgun status and credits.
 
-        Mailgun facture par email envoyé.
+        Mailgun charges per email sent.
 
         Returns:
-            Dict avec status, crédits, etc.
+            Dict with status, credits, etc.
         """
-        # TODO: Implémenter l'appel à l'API Mailgun
+        # TODO: Implement Mailgun API call
         # import requests
         #
         # try:

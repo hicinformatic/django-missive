@@ -1,97 +1,50 @@
-"""
-Mixin pour les fonctionnalités courrier postal des providers.
-"""
+"""Postal mail provider mixin."""
 
 from typing import Any, Dict, List
 
 
 class BasePostalMixin:
-    """
-    Mixin fournissant les fonctionnalités spécifiques au courrier postal.
-    """
+    """Postal mail-specific functionality mixin."""
 
     def get_postal_service_info(self) -> Dict[str, Any]:
-        """
-        Récupère les informations du compte/service Courrier postal.
-
-        Retourne les informations importantes pour le service postal :
-        - Crédits disponibles (montant en euros généralement)
-        - Limites et tarifs
-        - État du service (actif/inactif)
-        - Options disponibles (recommandé, suivi, signature, etc.)
-
-        Returns:
-            Dict contenant :
-                - credits: Montant disponible (généralement en euros)
-                - credits_type: 'amount' (montant en €)
-                - is_available: bool, service accessible
-                - limits: Dict avec les limites
-                - warnings: Liste des alertes
-                - options: Liste des options disponibles (recommandé, suivi, etc.)
-                - details: Dict avec infos supplémentaires
-
-        À surcharger dans les providers concrets.
-        """
+        """Returns postal service info. Override in subclasses."""
         return {
             "credits": None,
             "credits_type": "amount",
             "is_available": None,
             "limits": {},
             "warnings": [
-                "Méthode get_postal_service_info() non implémentée pour ce provider"
+                "get_postal_service_info() method not implemented for this provider"
             ],
             "options": [],
             "details": {},
         }
 
     def check_postal_delivery_status(self, **kwargs) -> Dict[str, Any]:
-        """
-        Vérifie le statut de livraison d'un courrier postal spécifique.
-
-        Returns:
-            Dict contenant :
-                - status: Statut actuel ('posted', 'in_transit', 'delivered', 'returned', etc.)
-                - delivered_at: Date/heure de livraison
-                - tracking_events: Liste des événements de tracking
-                - signature_proof: Preuve de signature (si applicable)
-                - error_code: Code d'erreur (si échec)
-                - error_message: Message d'erreur (si échec)
-                - details: Infos supplémentaires du provider
-
-        À surcharger dans les providers concrets.
-        """
+        """Checks postal delivery status. Override in subclasses."""
         return {
             "status": "unknown",
             "delivered_at": None,
             "tracking_events": [],
             "signature_proof": None,
             "error_code": None,
-            "error_message": "Méthode check_postal_delivery_status() non implémentée pour ce provider",
+            "error_message": "check_postal_delivery_status() method not implemented for this provider",
             "details": {},
         }
 
     def send_postal(self, **kwargs) -> bool:
-        """
-        Envoie un courrier postal. À surcharger dans les providers concrets.
-
-        Args:
-            **kwargs: Options propriétaires du provider
-
-        Returns:
-            bool: True si succès, False sinon
-        """
+        """Sends postal mail. Override in subclasses."""
         from ...models import MissiveStatus
 
-        # Vérifier qu'on a une adresse
         if not self.missive.get_recipient_address():
             self._update_status(
-                MissiveStatus.FAILED, error_message="Pas d'adresse postale"
+                MissiveStatus.FAILED, error_message="No postal address"
             )
             return False
 
-        # À implémenter dans les sous-classes
+        # To be implemented in subclasses
         raise NotImplementedError(
-            f"{self.name} doit implémenter la méthode send_postal()"
+            f"{self.name} must implement the send_postal() method"
         )
 
     def validate_postal_address(self, address: str) -> Dict[str, Any]:
@@ -107,8 +60,8 @@ class BasePostalMixin:
             address: Adresse postale complète (multi-lignes)
 
         Returns:
-            Dict contenant :
-            - is_valid (bool): Adresse valide
+            Dict containing:
+            - is_valid (bool): Valid address
             - is_complete (bool): Tous les éléments présents
             - warnings (List[str]): Avertissements
             - parsed (Dict): Éléments détectés
@@ -155,8 +108,8 @@ class BasePostalMixin:
             international: Envoi international
 
         Returns:
-            Dict contenant :
-            - cost (float): Coût en euros
+            Dict containing:
+            - cost (float): Cost in euros
             - format (str): Format de courrier (lettre verte, prioritaire, etc.)
             - delivery_days (int): Délai de livraison estimé
 
@@ -229,15 +182,15 @@ class BasePostalMixin:
 
     def cancel_postal(self, **kwargs) -> bool:
         """
-        Annule l'envoi d'un courrier postal.
+        Cancel sending of a postal mail.
 
         Args:
-            **kwargs: Options propriétaires du provider
+            **kwargs: Provider-specific options
 
-        Méthode de base qui retourne False. Les providers qui supportent
-        l'annulation doivent surcharger cette méthode avec leur implémentation API.
+        Base method that returns False. Providers that support
+        cancellation must override this method with their API implementation.
 
         Returns:
-            bool: True si annulation réussie, False sinon
+            bool: True if cancellation succeeded, False otherwise
         """
         return False

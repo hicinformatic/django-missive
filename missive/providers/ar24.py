@@ -1,8 +1,4 @@
-"""
-Provider AR24 pour l'envoi de Lettres Recommandées Électroniques (LRE).
-
-Documentation: https://www.ar24.fr/api
-"""
+"""AR24 provider for electronic registered letters (LRE)."""
 
 from typing import Any, Dict, Optional
 
@@ -11,14 +7,14 @@ from .base import BaseProvider
 
 class AR24Provider(BaseProvider):
     """
-    Provider pour AR24 (Lettre Recommandée Électronique).
+    AR24 provider (Electronic Registered Letter).
 
-    Configuration requise:
-        AR24_API_TOKEN: Token d'API AR24
-        AR24_API_URL: URL de l'API (production ou sandbox)
-        AR24_SENDER_ID: ID de l'expéditeur enregistré sur AR24
+    Required configuration:
+        AR24_API_TOKEN: AR24 API token
+        AR24_API_URL: API URL (production or sandbox)
+        AR24_SENDER_ID: Registered sender ID on AR24
 
-    Le destinataire doit avoir un email et idéalement une adresse postale complète.
+    Recipient must have an email and ideally a complete postal address.
     """
 
     name = "ar24"
@@ -27,34 +23,34 @@ class AR24Provider(BaseProvider):
     config_keys = ["AR24_API_TOKEN", "AR24_API_URL", "AR24_SENDER_ID"]
     required_packages = ["requests"]
     site_url = "https://www.ar24.fr/"
-    description_text = "Email recommandé électronique (LRE) avec valeur juridique"
+    description_text = "Electronic registered email (LRE) with legal value"
 
     def validate(self) -> Dict[str, Any]:
-        """Valide que le destinataire a un email et une adresse"""
+        """Validate that the recipient has an email and address"""
         if not self.missive:
-            return {"is_valid": False, "error": "Missive non définie"}
+            return {"is_valid": False, "error": "Missive not defined"}
 
         recipient = self.missive.recipient
         if not recipient or not recipient.email:
             return {
                 "is_valid": False,
-                "error": "Le destinataire doit avoir un email pour une LRE AR24",
+                "error": "Recipient must have an email for AR24 ERL",
             }
 
         # Vérifier l'adresse postale (recommandé mais pas obligatoire)
         warnings = []
         if not recipient.address_line1:
-            warnings.append("Adresse postale manquante (recommandée pour AR24)")
+            warnings.append("Postal address missing (recommended for AR24)")
         if not recipient.postal_code or not recipient.city:
-            warnings.append("Code postal et ville manquants")
+            warnings.append("Postal code and city missing")
 
         return {"is_valid": True, "warnings": warnings}
 
     def send(self) -> Dict[str, Any]:
         """
-        Envoie une LRE via AR24.
+        Send an LRE via AR24.
 
-        TODO: Implémenter l'envoi réel via:
+        TODO: Implement actual sending via:
         POST https://api.ar24.fr/api/v2/mail/send
         """
         validation = self.validate()
@@ -62,10 +58,10 @@ class AR24Provider(BaseProvider):
             self._update_status("FAILED", error_message=validation["error"])
             return {"success": False, "error": validation["error"]}
 
-        # TODO: Implémenter l'envoi réel
-        # 1. Générer le PDF du courrier
-        # 2. Préparer le payload AR24 avec destinataire(s)
-        # 3. POST vers /api/v2/mail/send
+        # TODO: Implement actual sending
+        # 1. Generate the mail PDF
+        # 2. Prepare the AR24 payload with recipient(s)
+        # 3. POST to /api/v2/mail/send
         # 4. Récupérer l'ID de suivi et le certificat de dépôt
 
         self._update_status(
@@ -81,24 +77,24 @@ class AR24Provider(BaseProvider):
 
     def check_status(self, external_id: Optional[str] = None) -> Optional[str]:
         """
-        Vérifie le statut de la LRE (dépôt, envoi, réception, lecture).
+        Check the LRE status (deposit, sending, reception, reading).
 
-        TODO: Implémenter via:
+        TODO: Implement via:
         GET https://api.ar24.fr/api/v2/mail/{mail_id}/status
         """
         return None
 
     def get_proofs_of_delivery(self, service_type: Optional[str] = None) -> list:
         """
-        Récupère toutes les preuves AR24.
+        Get all AR24 proofs.
 
-        AR24 génère plusieurs documents :
-        1. Certificat de dépôt (immédiat)
-        2. Copie du document envoyé
-        3. Accusé de réception (quand le destinataire lit)
-        4. Certificat de refus (si non réclamé après 15 jours)
+        AR24 generates several documents:
+        1. Deposit certificate (immediate)
+        2. Copy of sent document
+        3. Acknowledgement of receipt (when recipient reads)
+        4. Refusal certificate (if not claimed after 15 days)
 
-        TODO: Implémenter via:
+        TODO: Implement via:
         GET https://api.ar24.fr/api/v2/mail/{mail_id}/proofs
         """
         if not self.missive:
@@ -123,11 +119,11 @@ class AR24Provider(BaseProvider):
         #         data = response.json()
         #         proofs_list = []
         #
-        #         # Certificat de dépôt (toujours disponible)
+        #         # Deposit certificate (always available)
         #         if data.get('deposit_certificate'):
         #             proofs_list.append({...})
         #
-        #         # Copie du document
+        #         # Document copy
         #         if data.get('document_copy'):
         #             proofs_list.append({...})
         #
@@ -145,11 +141,11 @@ class AR24Provider(BaseProvider):
         sent_at = self.missive.sent_at or timezone.now()
         proofs = []
 
-        # 1. Certificat de dépôt (toujours disponible dès l'envoi)
+        # 1. Deposit certificate (always available from sending)
         proofs.append(
             {
                 "type": "deposit_certificate",
-                "label": "Certificat de dépôt",
+                "label": "Deposit Certificate",
                 "available": True,
                 "url": f"https://www.ar24.fr/certificate/deposit/{external_id}.pdf",
                 "generated_at": sent_at,
@@ -163,11 +159,11 @@ class AR24Provider(BaseProvider):
             }
         )
 
-        # 2. Copie du document envoyé
+        # 2. Copy of sent document
         proofs.append(
             {
                 "type": "sent_document",
-                "label": "Document envoyé",
+                "label": "Sent Document",
                 "available": True,
                 "url": f"https://www.ar24.fr/mail/{external_id}/document.pdf",
                 "generated_at": sent_at,
@@ -185,7 +181,7 @@ class AR24Provider(BaseProvider):
             proofs.append(
                 {
                     "type": "acknowledgment_receipt",
-                    "label": "Accusé de réception",
+                    "label": "Acknowledgement of Receipt",
                     "available": True,
                     "url": f"https://www.ar24.fr/certificate/ar/{external_id}.pdf",
                     "generated_at": self.missive.read_at,
@@ -207,7 +203,7 @@ class AR24Provider(BaseProvider):
             proofs.append(
                 {
                     "type": "acknowledgment_receipt",
-                    "label": "Accusé de réception",
+                    "label": "Acknowledgement of Receipt",
                     "available": False,
                     "url": None,
                     "generated_at": None,

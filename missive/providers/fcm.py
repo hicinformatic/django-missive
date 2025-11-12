@@ -1,8 +1,4 @@
-"""
-Provider FCM (Firebase Cloud Messaging) pour notifications push Android/iOS.
-
-Documentation: https://firebase.google.com/docs/cloud-messaging
-"""
+"""Firebase Cloud Messaging provider for push notifications."""
 
 from typing import Any, Dict, Optional
 
@@ -11,14 +7,14 @@ from .base import BaseProvider
 
 class FCMProvider(BaseProvider):
     """
-    Provider pour Firebase Cloud Messaging (notifications push).
+    Firebase Cloud Messaging provider (push notifications).
 
-    Configuration requise:
-        FCM_SERVER_KEY: Clé serveur Firebase
-        ou
-        FCM_SERVICE_ACCOUNT_JSON: Chemin vers le fichier JSON du compte de service
+    Required configuration:
+        FCM_SERVER_KEY: Firebase server key
+        or
+        FCM_SERVICE_ACCOUNT_JSON: Path to service account JSON file
 
-    Le destinataire doit avoir un device_token FCM stocké dans metadata.
+    Recipient must have an FCM device_token stored in metadata.
     """
 
     name = "fcm"
@@ -27,16 +23,16 @@ class FCMProvider(BaseProvider):
     config_keys = ["FCM_SERVER_KEY"]
     required_packages = ["firebase-admin"]
     site_url = "https://firebase.google.com/products/cloud-messaging"
-    description_text = "Notifications push mobile Android et iOS (Google Firebase)"
+    description_text = "Mobile push notifications for Android and iOS (Google Firebase)"
 
     def validate(self) -> Dict[str, Any]:
-        """Valide que le destinataire a un device token FCM"""
+        """Validate that the recipient has an FCM device token"""
         if not self.missive:
-            return {"is_valid": False, "error": "Missive non définie"}
+            return {"is_valid": False, "error": "Missive not defined"}
 
         recipient = self.missive.recipient
         if not recipient:
-            return {"is_valid": False, "error": "Destinataire non défini"}
+            return {"is_valid": False, "error": "Recipient not defined"}
 
         device_token = (
             recipient.metadata.get("fcm_device_token") if recipient.metadata else None
@@ -51,9 +47,9 @@ class FCMProvider(BaseProvider):
 
     def send(self) -> Dict[str, Any]:
         """
-        Envoie une notification push via FCM.
+        Send a push notification via FCM.
 
-        TODO: Implémenter l'envoi réel via firebase-admin SDK:
+        TODO: Implement actual sending via firebase-admin SDK:
         from firebase_admin import messaging
         """
         validation = self.validate()
@@ -61,7 +57,7 @@ class FCMProvider(BaseProvider):
             self._update_status("FAILED", error_message=validation["error"])
             return {"success": False, "error": validation["error"]}
 
-        # TODO: Implémenter l'envoi réel
+        # TODO: Implement actual sending
         # message = messaging.Message(
         #     notification=messaging.Notification(
         #         title=self.missive.subject,
@@ -83,7 +79,7 @@ class FCMProvider(BaseProvider):
 
     def check_status(self, external_id: Optional[str] = None) -> Optional[str]:
         """
-        Vérifie le statut de livraison.
+        Check delivery status.
 
         Note: FCM fournit des callbacks via webhooks.
         """

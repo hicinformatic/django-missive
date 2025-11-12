@@ -24,24 +24,13 @@ def get_client_ip(request):
 
 @method_decorator(csrf_exempt, name="dispatch")
 class WebhookView(View):
-    """
-    Unified webhook view.
-
-    Receives webhooks from all providers on a single URL:
-    /missive/webhook/{provider}/
-
-    Examples:
-    - /missive/webhook/sendgrid/
-    - /missive/webhook/twilio/
-    - /missive/webhook/laposte/
-    """
+    """Unified webhook view for all providers at /missive/webhook/{provider}/."""
 
     def post(self, request, provider=None, *args, **kwargs):
-        """Receive and process webhook."""
+        """Receives and processes webhook."""
         try:
             logger.info(f"Webhook received from {provider} ({get_client_ip(request)})")
 
-            # Parse payload with size limit (DoS protection)
             from django.conf import settings
 
             MAX_BODY_SIZE = getattr(
@@ -57,13 +46,10 @@ class WebhookView(View):
             if "application/json" in content_type:
                 payload = json.loads(request.body.decode("utf-8"))
             else:
-                # Form data (e.g. Twilio)
                 payload = dict(request.POST.items())
 
-            # Log only keys, not values (security)
             logger.debug(f"Webhook keys: {list(payload.keys())}")
 
-            # Extract headers
             headers = {
                 key: value
                 for key, value in request.META.items()
@@ -71,11 +57,9 @@ class WebhookView(View):
                 or key in ["CONTENT_TYPE", "CONTENT_LENGTH", "REMOTE_ADDR"]
             }
 
-            # Get provider from URL
             if not provider:
                 return JsonResponse({"error": "Provider missing in URL"}, status=400)
 
-            # Load provider from config
             from ..helpers import get_providers_from_config
 
             providers_config = get_providers_from_config()

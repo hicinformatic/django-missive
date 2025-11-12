@@ -1,6 +1,4 @@
-"""
-Provider SendGrid pour emails.
-"""
+"""SendGrid email provider."""
 
 import base64
 import hashlib
@@ -13,7 +11,7 @@ from .base import BaseProvider
 
 
 class SendGridProvider(BaseProvider):
-    """Provider pour SendGrid (Email uniquement)"""
+    """SendGrid email provider."""
 
     name = "SendGrid"
     display_name = "SendGrid"
@@ -24,40 +22,20 @@ class SendGridProvider(BaseProvider):
     site_url = "https://sendgrid.com/"
     status_url = "https://status.sendgrid.com/"
     documentation_url = "https://docs.sendgrid.com/"
-    description_text = "Email transactionnel et marketing (Twilio SendGrid)"
+    description_text = "Transactional and marketing email (Twilio SendGrid)"
 
     def send_email(self) -> bool:
-        """Envoie un email via SendGrid API"""
-        # Validation
+        """Sends email via SendGrid API."""
         is_valid, error = self.validate()
         if not is_valid:
             self._update_status(MissiveStatus.FAILED, error_message=error)
             return False
 
         if not self.missive.recipient_email:
-            self._update_status(MissiveStatus.FAILED, error_message="Email manquant")
+            self._update_status(MissiveStatus.FAILED, error_message="Email missing")
             return False
 
         try:
-            # TODO: Intégrer avec SendGrid
-            # from sendgrid import SendGridAPIClient
-            # from sendgrid.helpers.mail import Mail
-            #
-            # api_key = self.config.get('SENDGRID_API_KEY')
-            # sg = SendGridAPIClient(api_key)
-            #
-            # message = Mail(
-            #     from_email=self.config.get('DEFAULT_FROM_EMAIL'),
-            #     to_emails=recipient_email,
-            #     subject=self.missive.subject,
-            #     plain_text_content=self.missive.body
-            # )
-            #
-            # # Ajouter custom_args pour le webhook
-            # message.custom_arg = {
-            #     'missive_id': str(self.missive.id),
-            # }
-            #
             # response = sg.send(message)
             # external_id = response.headers.get('X-Message-Id')
 
@@ -67,7 +45,7 @@ class SendGridProvider(BaseProvider):
             self._update_status(
                 MissiveStatus.SENT, provider=self.name, external_id=external_id
             )
-            self._create_event("sent", "Email envoyé via SendGrid")
+            self._create_event("sent", "Email sent via SendGrid")
 
             return True
 
@@ -82,13 +60,13 @@ class SendGridProvider(BaseProvider):
         """Valide la signature SendGrid"""
         webhook_key = self.config.get("SENDGRID_WEBHOOK_KEY")
         if not webhook_key:
-            return True, ""  # Pas de validation
+            return True, ""  # No validation
 
         signature = headers.get("HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_SIGNATURE", "")
         timestamp = headers.get("HTTP_X_TWILIO_EMAIL_EVENT_WEBHOOK_TIMESTAMP", "")
 
         if not signature or not timestamp:
-            return False, "Signature ou timestamp manquant"
+            return False, "Signature or timestamp missing"
 
         # Reconstruire la signature
         payload_str = json.dumps(payload, separators=(",", ":"))
@@ -128,12 +106,12 @@ class SendGridProvider(BaseProvider):
 
     def get_service_status(self) -> Dict:
         """
-        Récupère le statut et les crédits SendGrid.
+        Gets SendGrid status and credits.
 
         Returns:
-            Dict avec status, crédits, etc.
+            Dict with status, credits, etc.
         """
-        # TODO: Implémenter l'appel à l'API SendGrid
+        # TODO: Implement SendGrid API call
         # import requests
         #
         # try:
