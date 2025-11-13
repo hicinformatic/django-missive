@@ -18,6 +18,7 @@ if platform.system() == 'Windows' and not os.environ.get('ANSICON'):
     BLUE = GREEN = RED = YELLOW = NC = ''
 
 PROJECT_ROOT = Path(__file__).parent
+PYTHON_MISSIVE_DIR = PROJECT_ROOT.parent / 'python-missive'
 VENV_DIR = PROJECT_ROOT / 'venv'
 VENV_BIN = VENV_DIR / ('Scripts' if platform.system() == 'Windows' else 'bin')
 PYTHON = VENV_BIN / ('python.exe' if platform.system() == 'Windows' else 'python')
@@ -71,6 +72,7 @@ def task_help():
     print("  venv              Create virtual environment")
     print("  install           Install package in production mode")
     print("  install-dev       Install package in development mode")
+    print("  update-python-missive  Install or refresh local python-missive package")
     print("")
     
     print(f"{GREEN}Django Dev Server:{NC}")
@@ -84,6 +86,7 @@ def task_help():
     print(f"{GREEN}Testing:{NC}")
     print("  test              Run tests with pytest")
     print("  test-verbose      Run tests with verbose output")
+    print("  test-provider     Run pytest filtered by provider name")
     print("  coverage          Run tests with coverage report")
     print("")
     
@@ -179,6 +182,27 @@ def task_install_dev():
     
     print_success("Development installation complete!")
     return True
+
+
+def task_update_python_missive():
+    """Install or update the local python-missive package inside the venv."""
+    if not venv_exists() and not task_venv():
+        return False
+
+    if not PYTHON_MISSIVE_DIR.exists():
+        print_error(
+            f"python-missive directory not found at {PYTHON_MISSIVE_DIR}. "
+            "Ensure the library project is available alongside django-missive."
+        )
+        return False
+
+    print_info("Installing python-missive into the virtual environment...")
+    if run_command([str(PIP), 'install', '--upgrade', '-e', str(PYTHON_MISSIVE_DIR)]):
+        print_success("python-missive installed/updated successfully.")
+        return True
+
+    print_error("Failed to install/update python-missive.")
+    return False
 
 
 def task_clean_build():
@@ -282,6 +306,28 @@ def task_test_verbose():
     
     if run_command([str(pytest), '-vv']):
         print_success("Tests complete!")
+        return True
+    return False
+
+
+def task_test_provider():
+    """Runs pytest filtered on a provider name."""
+    if not venv_exists():
+        print_error("Virtual environment not found. Run: python dev.py install-dev")
+        return False
+
+    if len(sys.argv) < 3:
+        print_error("Usage: python dev.py test-provider <provider-name>")
+        return False
+
+    provider_name = sys.argv[2]
+    pattern = provider_name.replace('-', '_')
+
+    print_info(f"Running pytest with pattern '{pattern}'")
+    pytest = VENV_BIN / ('pytest.exe' if platform.system() == 'Windows' else 'pytest')
+
+    if run_command([str(pytest), '-k', pattern]):
+        print_success(f"Provider tests for '{provider_name}' complete!")
         return True
     return False
 
@@ -847,6 +893,7 @@ COMMANDS = {
     'venv': task_venv,
     'install': task_install,
     'install-dev': task_install_dev,
+    'update-python-missive': task_update_python_missive,
     # Django commands
     'migrate': task_migrate,
     'makemigrations': task_makemigrations,
@@ -860,6 +907,7 @@ COMMANDS = {
     'clean-test': task_clean_test,
     'test': task_test,
     'test-verbose': task_test_verbose,
+    'test-provider': task_test_provider,
     'coverage': task_coverage,
     # Code quality
     'lint': task_lint,
