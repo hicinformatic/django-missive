@@ -435,8 +435,16 @@ class Missive(models.Model):
                     break
 
             if not provider_path:
-                # Fallback: try to construct the path
-                provider_path = f"missive.providers.{provider_name.lower()}.{provider_name.capitalize()}Provider"
+                # Fallback: try to construct the path (python-missive, except local django_email)
+                if provider_name.lower() == "django_email":
+                    provider_path = (
+                        "missive.providers.django_email.DjangoEmailProvider"
+                    )
+                else:
+                    provider_path = (
+                        f"python_missive.providers.{provider_name.lower()}."
+                        f"{provider_name.capitalize()}Provider"
+                    )
 
             # Import and instantiate the provider
             provider_class = import_string(provider_path)
@@ -488,8 +496,16 @@ class Missive(models.Model):
                         break
 
                 if not provider_path:
-                    # Fallback: try to construct the path
-                    provider_path = f"missive.providers.{self.provider.lower()}.{self.provider.capitalize()}Provider"
+                    # Fallback: try to construct the path (python-missive, except local django_email)
+                    if self.provider.lower() == "django_email":
+                        provider_path = (
+                            "missive.providers.django_email.DjangoEmailProvider"
+                        )
+                    else:
+                        provider_path = (
+                            f"python_missive.providers.{self.provider.lower()}."
+                            f"{self.provider.capitalize()}Provider"
+                        )
 
                 # Import and instantiate the provider
                 provider_class = import_string(provider_path)

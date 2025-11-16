@@ -229,7 +229,7 @@ def get_missives_stats_for_object(obj: Any) -> Dict[str, int]:
 def get_provider_name_from_path(provider_path):
     """
     Extrait le nom court du provider depuis son chemin complet.
-    Ex: 'missive.providers.sendgrid.SendGridProvider' -> 'sendgrid'
+    Ex: 'python_missive.providers.sendgrid.SendGridProvider' -> 'sendgrid'
     """
     if not provider_path:
         return "custom"
@@ -240,7 +240,11 @@ def get_provider_name_from_path(provider_path):
 
     # Extraire le nom du module provider
     parts = provider_path.split(".")
-    if len(parts) >= 3 and parts[0] == "missive" and parts[1] == "providers":
+    if (
+        len(parts) >= 3
+        and parts[1] == "providers"
+        and parts[0] in ("missive", "python_missive")
+    ):
         return parts[2].lower()
 
     # Fallback: extraire le nom de la classe sans "Provider"
@@ -359,48 +363,48 @@ def get_provider_paths_from_config():
                 logger.warning(f"Could not load provider {provider_path}: {e}")
                 continue
 
-    # If no config, use default values (with full paths)
+    # If no config, use default values (with full paths, python-missive as backend)
     if not providers_by_type:
         providers_by_type = {
             "EMAIL": [
                 "missive.providers.django_email.DjangoEmailProvider",
-                "missive.providers.sendgrid.SendGridProvider",
-                "missive.providers.mailgun.MailgunProvider",
-                "missive.providers.ses.SESProvider",
-                "missive.providers.brevo.BrevoProvider",
-                "missive.providers.smspartner.SMSPartnerProvider",
+                "python_missive.providers.sendgrid.SendGridProvider",
+                "python_missive.providers.mailgun.MailgunProvider",
+                "python_missive.providers.ses.SESProvider",
+                "python_missive.providers.brevo.BrevoProvider",
+                "python_missive.providers.smspartner.SMSPartnerProvider",
             ],
             "SMS": [
-                "missive.providers.twilio.TwilioProvider",
-                "missive.providers.vonage.VonageProvider",
-                "missive.providers.smspartner.SMSPartnerProvider",
-                "missive.providers.brevo.BrevoProvider",
+                "python_missive.providers.twilio.TwilioProvider",
+                "python_missive.providers.vonage.VonageProvider",
+                "python_missive.providers.smspartner.SMSPartnerProvider",
+                "python_missive.providers.brevo.BrevoProvider",
             ],
-            "RCS": ["missive.providers.twilio.TwilioProvider"],
-            "POSTAL": ["missive.providers.laposte.LaPosteProvider"],
+            "RCS": ["python_missive.providers.twilio.TwilioProvider"],
+            "POSTAL": ["python_missive.providers.laposte.LaPosteProvider"],
             "LRE": [
-                "missive.providers.ar24.AR24Provider",
-                "missive.providers.certeurope.CertEuropeProvider",
+                "python_missive.providers.ar24.AR24Provider",
+                "python_missive.providers.certeurope.CertEuropeProvider",
             ],
             "VOICE_CALL": [
-                "missive.providers.twilio.TwilioProvider",
-                "missive.providers.vonage.VonageProvider",
-                "missive.providers.smspartner.SMSPartnerProvider",
+                "python_missive.providers.twilio.TwilioProvider",
+                "python_missive.providers.vonage.VonageProvider",
+                "python_missive.providers.smspartner.SMSPartnerProvider",
             ],
             "NOTIFICATION": [
-                "missive.providers.notification.InAppNotificationProvider"
+                "python_missive.providers.notification.InAppNotificationProvider"
             ],
             "PUSH_NOTIFICATION": [
-                "missive.providers.fcm.FCMProvider",
-                "missive.providers.apn.APNProvider",
+                "python_missive.providers.fcm.FCMProvider",
+                "python_missive.providers.apn.APNProvider",
             ],
             "BRANDED": [
-                "missive.providers.twilio.TwilioProvider",
-                "missive.providers.slack.SlackProvider",
-                "missive.providers.teams.TeamsProvider",
-                "missive.providers.telegram.TelegramProvider",
-                "missive.providers.signal.SignalProvider",
-                "missive.providers.messenger.MessengerProvider",
+                "python_missive.providers.twilio.TwilioProvider",
+                "python_missive.providers.slack.SlackProvider",
+                "python_missive.providers.teams.TeamsProvider",
+                "python_missive.providers.telegram.TelegramProvider",
+                "python_missive.providers.signal.SignalProvider",
+                "python_missive.providers.messenger.MessengerProvider",
             ],
         }
 

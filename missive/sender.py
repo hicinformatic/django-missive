@@ -13,10 +13,10 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_PROVIDERS = {
     "EMAIL": ["missive.providers.django_email.DjangoEmailProvider"],
-    "SMS": ["missive.providers.twilio.TwilioProvider"],
-    "POSTAL": ["missive.providers.laposte.LaPosteProvider"],
-    "NOTIFICATION": ["missive.providers.notification.InAppNotificationProvider"],
-    "BRANDED": ["missive.providers.twilio.TwilioProvider"],
+    "SMS": ["python_missive.providers.twilio.TwilioProvider"],
+    "POSTAL": ["python_missive.providers.laposte.LaPosteProvider"],
+    "NOTIFICATION": ["python_missive.providers.notification.InAppNotificationProvider"],
+    "BRANDED": ["python_missive.providers.twilio.TwilioProvider"],
 }
 
 

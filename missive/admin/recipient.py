@@ -195,8 +195,7 @@ class RecipientAdmin(admin.ModelAdmin):
     @admin.action(description=_("🔍 Validate Emails"))
     def validate_email_action(self, request, queryset):
         """Action pour valider les emails des destinataires sélectionnés."""
-from python_missive.providers.base import BaseProvider
-
+        from python_missive.providers.base import BaseProvider
         provider = BaseProvider()
         invalid_count = 0
         high_risk_count = 0

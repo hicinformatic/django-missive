@@ -84,29 +84,29 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 MISSIVE_PROVIDERS = [
     # Providers Email
-    "missive.providers.django_email.DjangoEmailProvider",
-    "missive.providers.sendgrid.SendGridProvider",
-    "missive.providers.mailgun.MailgunProvider",
-    "missive.providers.ses.SESProvider",
-    "missive.providers.brevo.BrevoProvider",  # Auto-catégorisé: EMAIL + SMS
+    "missive.providers.django_email.DjangoEmailProvider",  # local Django backend
+    "python_missive.providers.sendgrid.SendGridProvider",
+    "python_missive.providers.mailgun.MailgunProvider",
+    "python_missive.providers.ses.SESProvider",
+    "python_missive.providers.brevo.BrevoProvider",  # Auto-catégorisé: EMAIL + SMS
     # Providers SMS/Voice (multi-types)
-    "missive.providers.twilio.TwilioProvider",  # Auto-catégorisé: SMS + BRANDED + VOICE_CALL
-    "missive.providers.vonage.VonageProvider",  # Auto-catégorisé: SMS + VOICE_CALL
-    "missive.providers.smspartner.SMSPartnerProvider",  # Auto-categorized: SMS + EMAIL + VOICE_CALL
+    "python_missive.providers.twilio.TwilioProvider",  # Auto-catégorisé: SMS + BRANDED + VOICE_CALL
+    "python_missive.providers.vonage.VonageProvider",  # Auto-catégorisé: SMS + VOICE_CALL
+    "python_missive.providers.smspartner.SMSPartnerProvider",  # Auto-categorized: SMS + EMAIL + VOICE_CALL
     # Branded messaging providers (BRANDED)
-    "missive.providers.slack.SlackProvider",
-    "missive.providers.teams.TeamsProvider",
-    "missive.providers.telegram.TelegramProvider",
-    "missive.providers.signal.SignalProvider",
-    "missive.providers.messenger.MessengerProvider",
+    "python_missive.providers.slack.SlackProvider",
+    "python_missive.providers.teams.TeamsProvider",
+    "python_missive.providers.telegram.TelegramProvider",
+    "python_missive.providers.signal.SignalProvider",
+    "python_missive.providers.messenger.MessengerProvider",
     # Providers Postal/LRE
-    "missive.providers.laposte.LaPosteProvider",
-    "missive.providers.ar24.AR24Provider",
-    "missive.providers.certeurope.CerteuropeProvider",
+    "python_missive.providers.laposte.LaPosteProvider",
+    "python_missive.providers.ar24.AR24Provider",
+    "python_missive.providers.certeurope.CerteuropeProvider",
     # Providers Notifications
-    "missive.providers.fcm.FCMProvider",
-    "missive.providers.apn.APNProvider",
-    "missive.providers.notification.InAppNotificationProvider",
+    "python_missive.providers.fcm.FCMProvider",
+    "python_missive.providers.apn.APNProvider",
+    "python_missive.providers.notification.InAppNotificationProvider",
 ]
 
 # Note: Les providers multi-types (Twilio, Brevo, SMSPartner) sont automatiquement

@@ -419,7 +419,16 @@ class MissiveAdmin(admin.ModelAdmin):
                     break
 
             if not provider_path:
-                provider_path = f"missive.providers.{provider_name.lower()}.{provider_name.capitalize()}Provider"
+                # Fallback to python-missive providers (except local django_email)
+                if provider_name.lower() == "django_email":
+                    provider_path = (
+                        "missive.providers.django_email.DjangoEmailProvider"
+                    )
+                else:
+                    provider_path = (
+                        f"python_missive.providers.{provider_name.lower()}."
+                        f"{provider_name.capitalize()}Provider"
+                    )
 
             provider_class = import_string(provider_path)
             return provider_class(missive=obj)
