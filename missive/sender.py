@@ -1,7 +1,7 @@
 """Missive sending with automatic provider fallback."""
 
 import logging
-from typing import List
+from typing import Any, Dict, List
 
 from django.utils.module_loading import import_string
 
@@ -39,7 +39,7 @@ class MissiveSender:
             logger.info(
                 f"Missive {missive.id}: Configured providers for {missive.missive_type}: {provider_paths}"
             )
-            return provider_paths
+            return list(provider_paths) if provider_paths else []
 
         default_providers = DEFAULT_PROVIDERS.get(missive.missive_type, [])
         if default_providers:
@@ -57,7 +57,7 @@ class MissiveSender:
             provider_instance = provider_class()
             health = provider_instance.health_check()
 
-            is_healthy = health.get("is_healthy", False)
+            is_healthy: bool = bool(health.get("is_healthy", False))
             status = health.get("status", "unknown")
 
             if not is_healthy:
@@ -141,9 +141,7 @@ class MissiveSender:
                         }
                     )
 
-                    # Update the provider used on the missive
-                    missive.provider = provider_path
-                    missive.save(update_fields=["provider"])
+                    # Provider is stored in the event, no need to update missive directly
 
                     return True
                 else:
@@ -213,7 +211,7 @@ class MissiveSender:
             results = MissiveSender.send_bulk(missives)
             print(f"Sent: {results['success']}, Failed: {results['failed']}")
         """
-        results = {"success": 0, "failed": 0, "errors": []}
+        results: Dict[str, Any] = {"success": 0, "failed": 0, "errors": []}
 
         for missive in missives:
             try:

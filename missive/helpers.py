@@ -4,13 +4,18 @@ import importlib
 import inspect
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
 from .models import Missive, MissivePriority, MissiveType
+
+if TYPE_CHECKING:
+    from django.contrib.auth.models import User as UserType
+else:
+    UserType = get_user_model()
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -22,16 +27,16 @@ class MissiveBuilder:
     @staticmethod
     def from_object(
         source_object: Any,
-        sender: User,
+        sender: "UserType",
         missive_type: str,
         subject: str,
         body: str,
         body_text: Optional[str] = None,
-        recipient_user: Optional[User] = None,
+        recipient_user: Optional["UserType"] = None,
         recipient_email: Optional[str] = None,
         recipient_phone: Optional[str] = None,
         recipient_address: Optional[str] = None,
-        priority: str = MissivePriority.NORMAL,
+        priority: str = MissivePriority.NORMAL.value,  # type: ignore[attr-defined]
         is_registered: bool = False,
         requires_signature: bool = False,
         scheduled_at: Optional[Any] = None,
@@ -86,11 +91,11 @@ class MissiveBuilder:
     @staticmethod
     def create_notification(
         source_object: Any,
-        sender: User,
-        recipient_user: User,
+        sender: "UserType",
+        recipient_user: "UserType",
         subject: str,
         body: str,
-        priority: str = MissivePriority.NORMAL,
+        priority: str = MissivePriority.NORMAL.value,  # type: ignore[attr-defined]
         metadata: Optional[Dict] = None,
     ) -> Missive:
         """
@@ -108,7 +113,7 @@ class MissiveBuilder:
         return MissiveBuilder.from_object(
             source_object=source_object,
             sender=sender,
-            missive_type=MissiveType.NOTIFICATION,
+            missive_type=MissiveType.NOTIFICATION.value,  # type: ignore[attr-defined]
             recipient_user=recipient_user,
             subject=subject,
             body=body,
@@ -119,13 +124,13 @@ class MissiveBuilder:
     @staticmethod
     def create_email(
         source_object: Any,
-        sender: User,
+        sender: "UserType",
         recipient_email: str,
         subject: str,
         body: str,
         body_text: Optional[str] = None,
         is_registered: bool = False,
-        priority: str = MissivePriority.NORMAL,
+        priority: str = MissivePriority.NORMAL.value,  # type: ignore[attr-defined]
         metadata: Optional[Dict] = None,
     ) -> Missive:
         """
@@ -144,7 +149,7 @@ class MissiveBuilder:
         return MissiveBuilder.from_object(
             source_object=source_object,
             sender=sender,
-            missive_type=MissiveType.EMAIL,
+            missive_type=MissiveType.EMAIL.value,  # type: ignore[attr-defined]
             recipient_email=recipient_email,
             subject=subject,
             body=body,
@@ -157,11 +162,11 @@ class MissiveBuilder:
     @staticmethod
     def create_sms(
         source_object: Any,
-        sender: User,
+        sender: "UserType",
         recipient_phone: str,
         subject: str,
         body: str,
-        priority: str = MissivePriority.NORMAL,
+        priority: str = MissivePriority.NORMAL.value,  # type: ignore[attr-defined]
         metadata: Optional[Dict] = None,
     ) -> Missive:
         """
@@ -174,13 +179,13 @@ class MissiveBuilder:
                 recipient_phone=appointment.patient_phone,
                 subject="Rappel RDV",
                 body=f"RDV demain à {appointment.time}",
-                priority=MissivePriority.HIGH
+                priority=MissivePriority.HIGH.value  # type: ignore[attr-defined]
             )
         """
         return MissiveBuilder.from_object(
             source_object=source_object,
             sender=sender,
-            missive_type=MissiveType.SMS,
+            missive_type=MissiveType.SMS.value,  # type: ignore[attr-defined]
             recipient_phone=recipient_phone,
             subject=subject,
             body=body,

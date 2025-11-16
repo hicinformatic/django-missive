@@ -52,8 +52,8 @@ class BaseEmailMixin:
 
     def validate_email(self, email: str) -> Dict[str, Any]:
         """Validates email and assesses delivery risk."""
-        warnings = []
-        details = {}
+        warnings: list[str] = []
+        details: dict[str, Any] = {}
 
         email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         is_valid = bool(re.match(email_regex, email))
@@ -147,8 +147,8 @@ class BaseEmailMixin:
             - recommendations (List[str]): Conseils d'amélioration
         """
         score = 0
-        triggers = []
-        recommendations = []
+        triggers: list[str] = []
+        recommendations: list[str] = []
 
         # TODO: Implement spam detection
         # - Mots-clés : GRATUIT, URGENT, CLIQUEZ ICI, etc.

@@ -27,10 +27,10 @@ class BaseProvider(
 ):
     """
     Base class for all providers.
-    
-    Inherits all mixins to support all missive types. Concrete providers 
+
+    Inherits all mixins to support all missive types. Concrete providers
     inherit this class and implement only the send_* methods they need.
-    
+
     To implement in subclasses:
     - name: Provider name
     - supported_types: List of supported MissiveType
@@ -50,7 +50,7 @@ class BaseProvider(
             error = (
                 f"{self.name} does not support {self.missive.get_missive_type_display()}"
             )
-            self._update_status(MissiveStatus.FAILED, error_message=error)
+            self._update_status(MissiveStatus.FAILED, error_message=error)  # type: ignore[arg-type]
             return False
 
         from ...models import MissiveType

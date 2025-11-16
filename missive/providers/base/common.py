@@ -12,11 +12,11 @@ class BaseProviderCommon:
     """Base provider with common functionality."""
 
     name = "Base"
-    supported_types = []
-    services = []
-    brands = []
-    config_keys = []
-    required_packages = []
+    supported_types: list[str] = []
+    services: list[str] = []
+    brands: list[str] = []
+    config_keys: list[str] = []
+    required_packages: list[str] = []
     status_url = None
     documentation_url = None
     site_url = None
@@ -31,7 +31,7 @@ class BaseProviderCommon:
         """Gets provider config from Django settings."""
         config = {}
         for key in self.config_keys:
-            value = getattr(settings, key, None)
+            value = getattr(settings, key, None)  # nosec B105
             if value is not None:
                 config[key] = value
         return config
@@ -47,17 +47,16 @@ class BaseProviderCommon:
     def _update_status(
         self,
         status: MissiveStatus,
-        provider: str = None,
-        external_id: str = None,
-        error_message: str = None,
+        provider: Optional[str] = None,
+        external_id: Optional[str] = None,
+        error_message: Optional[str] = None,
     ):
         """Updates missive status and creates event."""
         if not self.missive:
             return
 
         self.missive.status = status
-        if provider:
-            self.missive.provider = provider
+        # Provider is stored in events, not directly on missive (it's a read-only property)
         if external_id:
             self.missive.external_id = external_id
         if error_message:
@@ -77,7 +76,7 @@ class BaseProviderCommon:
         event_type: str,
         description: str = "",
         status: Optional[MissiveStatus] = None,
-        metadata: Dict = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ):
         """Creates tracking event."""
         if not self.missive:
@@ -104,7 +103,8 @@ class BaseProviderCommon:
             "rejected": MissiveStatus.FAILED,
             "dropped": MissiveStatus.FAILED,
         }
-        return event_mapping.get(event_type.lower())
+        result = event_mapping.get(event_type.lower())
+        return result  # type: ignore[return-value]
 
     def get_proofs_of_delivery(self, service_type: Optional[str] = None) -> list:
         """Returns list of delivery proofs for the missive."""
@@ -136,11 +136,12 @@ class BaseProviderCommon:
         elif missive_type == "SMS":
             return "sms"
         elif missive_type == "BRANDED":
-            return self.name.lower() if hasattr(self, "name") else "branded"
+            name = getattr(self, "name", "branded")
+            return str(name).lower()
         elif missive_type == "RCS":
             return "rcs"
 
-        return missive_type.lower()
+        return str(missive_type).lower()
 
     def list_available_proofs(self) -> Dict[str, bool]:
         """

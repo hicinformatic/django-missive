@@ -28,7 +28,8 @@ class BaseBrandedMixin:
             )
             return False
 
-        return getattr(self, method_name)(**kwargs)
+        result = getattr(self, method_name)(**kwargs)
+        return bool(result)  # type: ignore[no-any-return]
 
     def get_branded_service_info(
         self, brand_name: Optional[str] = None
@@ -48,7 +49,8 @@ class BaseBrandedMixin:
         method_name = f"get_{target_name.lower()}_service_info"
 
         if hasattr(self, method_name):
-            return getattr(self, method_name)()
+            result = getattr(self, method_name)()
+            return result if isinstance(result, dict) else {}  # type: ignore[no-any-return]
 
         return {
             "credits": None,
@@ -77,7 +79,8 @@ class BaseBrandedMixin:
         method_name = f"check_{target_name.lower()}_delivery_status"
 
         try:
-            return getattr(self, method_name)(**kwargs)
+            result = getattr(self, method_name)(**kwargs)
+            return result if isinstance(result, dict) else {}  # type: ignore[no-any-return]
 
         except AttributeError:
             return {
@@ -122,7 +125,8 @@ class BaseBrandedMixin:
         method_name = f"cancel_{target_name.lower()}"
 
         if hasattr(self, method_name):
-            return getattr(self, method_name)()
+            result = getattr(self, method_name)()
+            return bool(result)  # type: ignore[no-any-return]
 
         # Par défaut, retourne False si la méthode n'est pas implémentée
         return False

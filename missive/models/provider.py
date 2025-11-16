@@ -1,5 +1,7 @@
 """Virtual provider model for admin display (not persisted)."""
 
+import importlib
+
 from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from django.db import models
@@ -244,7 +246,7 @@ class ProviderInfo(models.Model):
 
         for package in packages:
             try:
-                __import__(package)
+                importlib.import_module(package)
             except ImportError:
                 return False
         return True
@@ -318,19 +320,24 @@ class ProviderInfo(models.Model):
     @property
     def config_status(self):
         """Returns the configuration status for each variable"""
+        # Sensitive keys that should not be displayed
+        sensitive_keywords = ["password", "secret", "key", "token", "credential"]
         config_vars = {}
         for key in self.required_config_keys:
-            value = getattr(settings, key, None)
+            value = getattr(settings, key, None)  # nosec B105
+            is_sensitive = any(
+                keyword in key.lower() for keyword in sensitive_keywords
+            )
             config_vars[key] = {
                 "configured": bool(value),
-                "value": value,  # Display the real value
+                "value": "***HIDDEN***" if is_sensitive and value else value,
             }
         return config_vars
 
     @property
     def is_configured(self):
         """Checks if the main credentials are configured"""
-        config_keys = {
+        config_keys = {  # nosec B105
             "sendgrid": "SENDGRID_API_KEY",
             "mailgun": "MAILGUN_API_KEY",
             "ses": "AWS_ACCESS_KEY_ID",
@@ -354,7 +361,7 @@ class ProviderInfo(models.Model):
         if key is None:
             return True
 
-        return hasattr(settings, key) and bool(getattr(settings, key, None))
+        return hasattr(settings, key) and bool(getattr(settings, key, None))  # nosec B105
 
     @property
     def status(self):

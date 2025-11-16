@@ -13,26 +13,39 @@ class DjangoEmailProvider(BaseProvider):
     display_name = "Django Email (default)"
     supported_types = ["EMAIL"]
     services = ["email"]
-    config_keys = ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_HOST_USER", "EMAIL_HOST_PASSWORD"]
-    required_packages = []
-    description_text = "Native Django SMTP email (always available)"
+    config_keys = [  # nosec B105
+        "EMAIL_HOST",
+        "EMAIL_PORT",
+        "EMAIL_HOST_USER",
+        "EMAIL_HOST_PASSWORD",
+    ]
+    required_packages: list[str] = []
+    description_text: str = "Native Django SMTP email (always available)"  # type: ignore[assignment]
+
+    def validate(self) -> Tuple[bool, str]:
+        """Validates provider configuration."""
+        # Django Email is always available (uses Django's SMTP settings)
+        return True, ""
 
     def send_email(self, **kwargs) -> bool:
         """Sends email via Django's SMTP."""
+        if not self.missive:
+            return False
+
         is_valid, error = self.validate()
         if not is_valid:
-            self._update_status(MissiveStatus.FAILED, error_message=error)
+            self._update_status(MissiveStatus.FAILED, error_message=error)  # type: ignore[arg-type]
             return False
 
         if not self.missive.recipient_email:
-            self._update_status(MissiveStatus.FAILED, error_message="Email missing")
+            self._update_status(MissiveStatus.FAILED, error_message="Email missing")  # type: ignore[arg-type]
             return False
 
         try:
             from django.conf import settings
             from django.core.mail import send_mail
 
-            self._update_status(MissiveStatus.PROCESSING, provider=self.name)
+            self._update_status(MissiveStatus.PROCESSING, provider=self.name)  # type: ignore[arg-type]
 
             send_mail(
                 subject=self.missive.subject,
@@ -42,13 +55,13 @@ class DjangoEmailProvider(BaseProvider):
                 fail_silently=False,
             )
 
-            self._update_status(MissiveStatus.SENT)
+            self._update_status(MissiveStatus.SENT)  # type: ignore[arg-type]
             self._create_event("sent", f"Email sent via {self.name}")
 
             return True
 
         except Exception as e:
-            self._update_status(MissiveStatus.FAILED, error_message=str(e))
+            self._update_status(MissiveStatus.FAILED, error_message=str(e))  # type: ignore[arg-type]
             self._create_event("failed", str(e))
             return False
 

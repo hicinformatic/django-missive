@@ -1,5 +1,8 @@
 """Administration du modèle virtuel ProviderInfo."""
 
+import importlib
+import json
+
 from django.contrib import admin
 from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
@@ -96,6 +99,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             ),
         ]
 
+        # Add service info fieldsets for each supported missive type
         missive_types = obj.missive_types_list
         for missive_type in missive_types:
             try:
@@ -103,14 +107,14 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             except ValueError:
                 label = missive_type
 
-            field_name = f"credits_{missive_type.lower()}_display"
-
+            service_info_field = f"service_info_{missive_type.lower()}_display"
+            geo_field = f"geo_{missive_type.lower()}_display"
             fieldsets.append(
                 (
                     label,
                     {
-                        "fields": (field_name,),
-                        "description": f"Credits and information for {label}",
+                        "fields": (service_info_field, geo_field),
+                        "description": f"Service information for {label}",
                     },
                 )
             )
@@ -152,18 +156,21 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
         if obj:
             for missive_type in obj.missive_types_list:
-                field_name = f"credits_{missive_type.lower()}_display"
-                if field_name not in readonly:
-                    readonly.append(field_name)
+                service_info_field = f"service_info_{missive_type.lower()}_display"
+                geo_field = f"geo_{missive_type.lower()}_display"
+                if service_info_field not in readonly:
+                    readonly.append(service_info_field)
+                if geo_field not in readonly:
+                    readonly.append(geo_field)
 
         return readonly
 
     def __getattr__(self, name):
-        """Génère dynamiquement les méthodes credits_{type}_display."""
-        if name.startswith("credits_") and name.endswith("_display"):
-            missive_type = name[8:-8].upper()
+        """Génère dynamiquement les méthodes service_info_{type}_display."""
+        if name.startswith("service_info_") and name.endswith("_display"):
+            missive_type = name[14:-8].upper()
 
-            def credits_method(obj):
+            def service_info_method(obj):
                 try:
                     provider_class = obj._get_provider_class()
                     if provider_class:
@@ -175,7 +182,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                             "POSTAL": "get_postal_service_info",
                             "VOICE_CALL": "get_voice_call_service_info",
                             "NOTIFICATION": "get_notification_service_info",
-                            "PUSH_NOTIFICATION": "get_notification_service_info",
+                            "PUSH_NOTIFICATION": "get_push_notification_service_info",
                             "BRANDED": "get_branded_service_info",
                         }
 
@@ -183,66 +190,73 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
                         if method_name and hasattr(provider_instance, method_name):
                             service_info = getattr(provider_instance, method_name)()
+                            # Return raw response as JSON string
+                            return json.dumps(service_info, indent=2, ensure_ascii=False)
                         else:
-                            service_info = {
-                                "credits": "Not implemented",
-                                "credits_type": "unknown",
-                                "is_available": None,
-                                "warnings": [
-                                    f"Method {method_name} not implemented for {provider_instance.name}"
-                                ],
-                            }
-
-                        credits = service_info.get("credits")
-                        is_available = service_info.get("is_available")
-                        warnings = service_info.get("warnings", [])
-
-                        credits_html = ""
-
-                        if credits is not None:
-                            credits_html = format_html(
-                                '<p style="font-size: 20px; font-weight: bold; color: #198754; margin: 10px 0;">{}</p>',
-                                str(credits),
-                            )
-                        else:
-                            credits_html = format_html(
-                                '<p style="color: #6c757d; font-style: italic; font-size: 16px; margin: 10px 0;">Credits not available</p>'
-                            )
-
-                        if is_available is not None:
-                            if is_available:
-                                credits_html += format_html(
-                                    '<p style="margin: 5px 0; font-size: 14px;"><span style="color: #198754;">✓ Service available</span></p>'
-                                )
-                            else:
-                                credits_html += format_html(
-                                    '<p style="margin: 5px 0; font-size: 14px;"><span style="color: #dc3545;">✗ Service unavailable</span></p>'
-                                )
-
-                        if warnings:
-                            warnings_html = format_html_join(
-                                "<br>",
-                                '<span style="color: #ffc107;">{}</span>',
-                                ((w,) for w in warnings),
-                            )
-                            credits_html += format_html(
-                                '<p style="margin: 10px 0; font-size: 13px;">{}</p>',
-                                warnings_html,
-                            )
-
-                        return credits_html
+                            return json.dumps({
+                                "error": f"Method {method_name} not implemented for {provider_instance.name}"
+                            }, indent=2, ensure_ascii=False)
                     else:
-                        return format_html(
-                            '<p style="color: #6c757d; font-style: italic; margin: 0;">Provider not loaded</p>'
-                        )
+                        return json.dumps({"error": "Provider not loaded"}, indent=2, ensure_ascii=False)
 
                 except Exception as e:
-                    return format_html(
-                        '<p style="color: #dc3545; margin: 0;">Error: {}</p>', str(e)
-                    )
+                    return json.dumps({"error": str(e)}, indent=2, ensure_ascii=False)
 
-            credits_method.short_description = _("Available Credits")
-            return credits_method
+            service_info_method.short_description = _("Service Information")
+            return service_info_method
+
+        if name.startswith("geo_") and name.endswith("_display"):
+            missive_type = name[4:-8].upper()
+
+            def geo_method(obj):
+                try:
+                    provider_class = obj._get_provider_class()
+                    if provider_class:
+                        provider_instance = provider_class()
+
+                        # Map missive type to geo attribute name
+                        geo_attr_map = {
+                            "SMS": "sms_geo",
+                            "EMAIL": "email_geo",
+                            "POSTAL": "postal_geo",
+                            "VOICE_CALL": "voice_call_geo",
+                            "NOTIFICATION": "notification_geo",
+                            "PUSH_NOTIFICATION": "push_notification_geo",
+                            "BRANDED": "branded_geo",
+                            "LRE": "lre_geo",
+                        }
+
+                        geo_attr = geo_attr_map.get(missive_type)
+
+                        if geo_attr:
+                            # Search through MRO and __dict__ to find the attribute
+                            for cls in provider_class.__mro__:
+                                if hasattr(cls, "__dict__") and geo_attr in cls.__dict__:
+                                    geo_value = cls.__dict__[geo_attr]
+                                    # Return raw value directly
+                                    try:
+                                        return ", ".join(str(v) for v in geo_value)
+                                    except (TypeError, ValueError):
+                                        return str(geo_value)
+                            # If not found in class, try instance
+                            if hasattr(provider_instance, geo_attr):
+                                geo_value = getattr(provider_instance, geo_attr)
+                                try:
+                                    return ", ".join(str(v) for v in geo_value)
+                                except (TypeError, ValueError):
+                                    return str(geo_value)
+                            return "Not configured"
+                        else:
+                            return "Not applicable"
+
+                    else:
+                        return "Provider not loaded"
+
+                except Exception as e:
+                    return f"Error: {str(e)}"
+
+            geo_method.short_description = _("Geographic Coverage")
+            return geo_method
 
         raise AttributeError(
             f"'{type(self).__name__}' object has no attribute '{name}'"
@@ -463,7 +477,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             package_statuses = []
             for package in packages:
                 try:
-                    __import__(package)
+                    importlib.import_module(package)
                     package_statuses.append(
                         f'<span style="color: #198754;">✓</span> <code>{package}</code>'
                     )

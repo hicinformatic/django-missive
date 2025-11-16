@@ -4,6 +4,8 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
+from python_missive.providers.base import BaseProvider
+
 from ..decorators import sandbox_warning, library_presence_warning
 from ..models import Recipient
 
@@ -195,7 +197,6 @@ class RecipientAdmin(admin.ModelAdmin):
     @admin.action(description=_("🔍 Validate Emails"))
     def validate_email_action(self, request, queryset):
         """Action pour valider les emails des destinataires sélectionnés."""
-        from python_missive.providers.base import BaseProvider
         provider = BaseProvider()
         invalid_count = 0
         high_risk_count = 0
@@ -229,8 +230,6 @@ class RecipientAdmin(admin.ModelAdmin):
     @admin.action(description=_("📞 Validate Phones"))
     def validate_phone_action(self, request, queryset):
         """Action pour valider les téléphones des destinataires sélectionnés."""
-        from python_missive.providers.base import BaseProvider
-
         provider = BaseProvider()
         invalid_count = 0
         non_mobile_count = 0
@@ -263,8 +262,6 @@ class RecipientAdmin(admin.ModelAdmin):
     @admin.action(description=_("✨ Validate All (email + phone)"))
     def validate_all_action(self, request, queryset):
         """Action pour valider tous les moyens de contact."""
-        from python_missive.providers.base import BaseProvider
-
         provider = BaseProvider()
         email_issues = 0
         phone_issues = 0

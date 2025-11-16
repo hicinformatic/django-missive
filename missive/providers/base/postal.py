@@ -71,8 +71,8 @@ class BasePostalMixin:
             if not result['is_complete']:
                 print("Adresse incomplète!")
         """
-        warnings = []
-        parsed = {}
+        warnings: list[str] = []
+        parsed: dict[str, Any] = {}
 
         lines = [line.strip() for line in address.split("\n") if line.strip()]
 

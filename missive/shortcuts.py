@@ -5,7 +5,7 @@ import uuid
 from typing import Dict, Optional
 
 from django.conf import settings
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy
 
 from .exceptions import MissiveValidationError
 from .models import Missive, MissiveType, Recipient
@@ -15,45 +15,45 @@ from .sender import MissiveSender
 def _validate_email(email: str) -> None:
     """Validate email format (RFC 5321 compliant)."""
     if not email:
-        raise MissiveValidationError(_("Email address cannot be empty"))
+        raise MissiveValidationError(gettext_lazy("Email address cannot be empty"))
 
     max_email_length = getattr(settings, "MISSIVE_MAX_EMAIL_LENGTH", 254)
     if len(email) > max_email_length:
-        raise MissiveValidationError(_("Email address is too long"))
+        raise MissiveValidationError(gettext_lazy("Email address is too long"))
 
     email_pattern = r"^[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]{1,253}\.[a-zA-Z]{2,63}$"
     if not re.match(email_pattern, email):
-        raise MissiveValidationError(_("Invalid email format"))
+        raise MissiveValidationError(gettext_lazy("Invalid email format"))
 
 
 def _validate_phone(phone: str) -> None:
     """Validate phone number format (E.164 standard)."""
     if not phone:
-        raise MissiveValidationError(_("Phone number cannot be empty"))
+        raise MissiveValidationError(gettext_lazy("Phone number cannot be empty"))
 
     max_phone_length = getattr(settings, "MISSIVE_MAX_PHONE_LENGTH", 16)
     if len(phone) > max_phone_length:
-        raise MissiveValidationError(_("Phone number is too long"))
+        raise MissiveValidationError(gettext_lazy("Phone number is too long"))
 
     phone_pattern = r"^\+[1-9]\d{1,14}$"
     if not re.match(phone_pattern, phone):
         raise MissiveValidationError(
-            _("Invalid phone format. Expected E.164 (e.g. +33612345678)")
+            gettext_lazy("Invalid phone format. Expected E.164 (e.g. +33612345678)")
         )
 
 
 def _validate_content(content: str, missive_type: str = "") -> None:
     """Validate missive content."""
     if not content or not content.strip():
-        msg = _("Content cannot be empty")
+        msg = gettext_lazy("Content cannot be empty")
         if missive_type:
-            msg = _("%(type)s content cannot be empty") % {"type": missive_type}
+            msg = gettext_lazy("%(type)s content cannot be empty") % {"type": missive_type}
         raise MissiveValidationError(msg)
 
     max_length = getattr(settings, "MISSIVE_MAX_CONTENT_LENGTH", 1_000_000)
     if len(content) > max_length:
         raise MissiveValidationError(
-            _("Content too long (max: %(max)s chars)") % {"max": max_length}
+            gettext_lazy("Content too long (max: %(max)s chars)") % {"max": max_length}
         )
 
 
@@ -108,17 +108,17 @@ def send_missive(
     if missive_type in ("SMS", "VOICE_CALL"):
         if not phone:
             raise MissiveValidationError(
-                _("'phone' field required for %(type)s") % {"type": missive_type}
+                gettext_lazy("'phone' field required for %(type)s") % {"type": missive_type}
             )
         _validate_phone(phone)
 
     elif missive_type == "EMAIL":
         if not email:
-            raise MissiveValidationError(_("'email' field required for EMAIL"))
+            raise MissiveValidationError(gettext_lazy("'email' field required for EMAIL"))
         _validate_email(email)
 
         if subject is not None and not subject.strip():
-            raise MissiveValidationError(_("Email subject cannot be empty"))
+            raise MissiveValidationError(gettext_lazy("Email subject cannot be empty"))
 
     elif missive_type == "BRANDED":
         if phone:
@@ -129,13 +129,13 @@ def send_missive(
     elif missive_type == "POSTAL":
         if not address or not isinstance(address, dict):
             raise MissiveValidationError(
-                _("'address' dict required for POSTAL missives")
+                gettext_lazy("'address' dict required for POSTAL missives")
             )
         required_fields = ["street", "city", "postal_code", "country"]
         missing = [f for f in required_fields if not address.get(f)]
         if missing:
             raise MissiveValidationError(
-                _("Missing address fields: %(fields)s") % {"fields": ", ".join(missing)}
+                gettext_lazy("Missing address fields: %(fields)s") % {"fields": ", ".join(missing)}
             )
 
     if sender_email:
@@ -213,12 +213,12 @@ def send_missive(
         sender_display = (
             getattr(sender, "display_name", None) or sender.name or "System"
         )
-        subject = _("Message from %(sender)s") % {"sender": sender_display}
+        subject = gettext_lazy("Message from %(sender)s") % {"sender": sender_display}
 
     max_subject_length = getattr(settings, "MISSIVE_MAX_SUBJECT_LENGTH", 998)
     if subject and len(subject) > max_subject_length:
         raise MissiveValidationError(
-            _("Subject too long (max: %(max)s chars)") % {"max": max_subject_length}
+            gettext_lazy("Subject too long (max: %(max)s chars)") % {"max": max_subject_length}
         )
 
     missive_data = {
@@ -238,10 +238,10 @@ def send_missive(
     if "provider_options" in kwargs:
         missive_data["provider_options"] = kwargs.pop("provider_options")
 
-    missive = Missive.objects.create(**missive_data)
+    missive: Missive = Missive.objects.create(**missive_data)
 
     if provider:
-        missive._provider_name = provider
+        missive._provider_name = provider  # type: ignore[attr-defined]
 
     sender_instance = MissiveSender()
     sender_instance.send(missive)

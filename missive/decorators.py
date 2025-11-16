@@ -1,5 +1,6 @@
 """Decorators for Django Missive."""
 
+import importlib
 from functools import wraps
 
 from django.conf import settings
@@ -77,7 +78,7 @@ def library_presence_warning(admin_class, *, module_name: str = "python_missive"
 
     def _warn_if_missing(request):
         try:
-            __import__(module_name)
+            importlib.import_module(module_name)
             return
         except Exception:
             messages.warning(
