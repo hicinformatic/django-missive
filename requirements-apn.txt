@@ -1,9 +1,0 @@
-# Provider Apple Push Notification (Push Notifications)
-# Install with: pip install -r requirements-apn.txt
-
-# Required core dependencies
--r requirements.txt
-
-# Package Apple Push Notification
-aioapns>=3.1
-

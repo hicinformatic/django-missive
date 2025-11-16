@@ -4,9 +4,5 @@
 # Core
 Django>=3.2
 
-# Validation
-phonenumbers>=8.13
-email-validator>=2.1
-
-# HTTP requests (pour certains providers)
-requests>=2.31
+# Messaging backend (python-missive)
+python-missive>=0.1.0
