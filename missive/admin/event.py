@@ -3,7 +3,7 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
-from ..decorators import sandbox_warning
+from ..decorators import sandbox_warning, library_presence_warning
 from ..models import MissiveEvent
 
 
@@ -31,6 +31,7 @@ class MissiveEventInline(admin.TabularInline):
 
 
 @sandbox_warning
+@library_presence_warning
 @admin.register(MissiveEvent)
 class MissiveEventAdmin(admin.ModelAdmin):
     """Administration des événements (lecture seule)."""

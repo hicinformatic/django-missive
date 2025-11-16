@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
-from ..decorators import sandbox_warning
+from ..decorators import sandbox_warning, library_presence_warning
 from ..helpers import get_all_provider_choices, get_providers_from_config
 from ..models import Missive, Recipient
 
@@ -93,6 +93,7 @@ class MissiveAdminForm(forms.ModelForm):
 
 
 @sandbox_warning
+@library_presence_warning  # warns if 'python_missive' is not installed
 @admin.register(Missive)
 class MissiveAdmin(admin.ModelAdmin):
     """Interface d'administration pour les Missives."""

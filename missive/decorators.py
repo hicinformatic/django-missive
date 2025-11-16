@@ -64,3 +64,49 @@ def sandbox_warning(admin_class):
     admin_class.change_view = change_view_with_warning
 
     return admin_class
+
+
+def library_presence_warning(admin_class, *, module_name: str = "python_missive"):
+    """
+    Adds an admin warning if the external library is not installed.
+    Default checks for 'python_missive' importability.
+    """
+    original_changelist_view = admin_class.changelist_view
+    original_add_view = admin_class.add_view
+    original_change_view = admin_class.change_view
+
+    def _warn_if_missing(request):
+        try:
+            __import__(module_name)
+            return
+        except Exception:
+            messages.warning(
+                request,
+                _(
+                    "External library '%(module)s' is not installed. "
+                    "Some provider features may be unavailable. "
+                    "Install it or configure providers accordingly."
+                )
+                % {"module": module_name},
+            )
+
+    @wraps(original_changelist_view)
+    def changelist_view_with_lib_check(self, request, extra_context=None):
+        _warn_if_missing(request)
+        return original_changelist_view(self, request, extra_context=extra_context)
+
+    @wraps(original_add_view)
+    def add_view_with_lib_check(self, request, form_url="", extra_context=None):
+        _warn_if_missing(request)
+        return original_add_view(self, request, form_url, extra_context)
+
+    @wraps(original_change_view)
+    def change_view_with_lib_check(self, request, object_id, form_url="", extra_context=None):
+        _warn_if_missing(request)
+        return original_change_view(self, request, object_id, form_url, extra_context)
+
+    admin_class.changelist_view = changelist_view_with_lib_check
+    admin_class.add_view = add_view_with_lib_check
+    admin_class.change_view = change_view_with_lib_check
+
+    return admin_class

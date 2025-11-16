@@ -4,11 +4,12 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
-from ..decorators import sandbox_warning
+from ..decorators import sandbox_warning, library_presence_warning
 from ..models import Recipient
 
 
 @sandbox_warning
+@library_presence_warning
 @admin.register(Recipient)
 class RecipientAdmin(admin.ModelAdmin):
     """Administration des destinataires."""

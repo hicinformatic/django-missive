@@ -3,11 +3,12 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
-from ..decorators import sandbox_warning
+from ..decorators import sandbox_warning, library_presence_warning
 from ..models import MissiveTemplate
 
 
 @sandbox_warning
+@library_presence_warning
 @admin.register(MissiveTemplate)
 class MissiveTemplateAdmin(admin.ModelAdmin):
     """Administration des modèles de missive."""

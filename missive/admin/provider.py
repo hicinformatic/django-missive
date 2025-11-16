@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 
-from ..decorators import sandbox_warning
+from ..decorators import sandbox_warning, library_presence_warning
 from ..models import MissiveType, ProviderInfo
 from ..models.provider import ProviderInfoQuerySet
 
@@ -35,6 +35,7 @@ class MissiveTypeFilter(admin.SimpleListFilter):
 
 
 @sandbox_warning
+@library_presence_warning
 @admin.register(ProviderInfo)
 class ProviderInfoAdmin(admin.ModelAdmin):
     """Administration en lecture seule pour consulter le statut des providers."""

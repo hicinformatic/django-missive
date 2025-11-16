@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
-from ..decorators import sandbox_warning
+from ..decorators import sandbox_warning, library_presence_warning
 from ..models import MissiveAttachment
 
 
@@ -91,6 +91,7 @@ class MissiveAttachmentInline(admin.StackedInline):
 
 
 @sandbox_warning
+@library_presence_warning
 @admin.register(MissiveAttachment)
 class MissiveAttachmentAdmin(admin.ModelAdmin):
     """Administration des pièces jointes."""

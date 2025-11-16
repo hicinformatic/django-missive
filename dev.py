@@ -185,20 +185,37 @@ def task_install_dev():
 
 
 def task_update_python_missive():
-    """Install or update the local python-missive package inside the venv."""
+    """Install or update the python-missive package inside the venv.
+    
+    Usage:
+      python dev.py update-python-missive [path_to_python_missive]
+    
+    - If a path is provided, it is used (editable install).
+    - Otherwise defaults to the sibling directory ../python-missive.
+    """
     if not venv_exists() and not task_venv():
         return False
 
-    if not PYTHON_MISSIVE_DIR.exists():
+    # Optional path argument
+    custom_path = None
+    if len(sys.argv) >= 3:
+        custom_path = Path(sys.argv[2]).expanduser().resolve()
+        target_dir = custom_path
+    else:
+        target_dir = PYTHON_MISSIVE_DIR.resolve()
+
+    if not target_dir.exists():
         print_error(
-            f"python-missive directory not found at {PYTHON_MISSIVE_DIR}. "
-            "Ensure the library project is available alongside django-missive."
+            f"python-missive directory not found at {target_dir}. "
+            "Provide a correct path: python dev.py update-python-missive /path/to/python-missive"
         )
         return False
 
     print_info("Installing python-missive into the virtual environment...")
-    if run_command([str(PIP), 'install', '--upgrade', '-e', str(PYTHON_MISSIVE_DIR)]):
+    if run_command([str(PIP), 'install', '--upgrade', '-e', str(target_dir)]):
         print_success("python-missive installed/updated successfully.")
+        if custom_path:
+            print_info(f"Installed from custom path: {target_dir}")
         return True
 
     print_error("Failed to install/update python-missive.")
