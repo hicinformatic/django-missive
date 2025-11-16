@@ -1,27 +1,10 @@
-"""Missive providers for sending and webhook processing."""
+"""Legacy local providers module.
 
-from .base import BaseProvider
-from .brevo import BrevoProvider
-from .django_email import DjangoEmailProvider
-from .laposte import LaPosteProvider
-from .mailgun import MailgunProvider
-from .notification import InAppNotificationProvider
-from .sendgrid import SendGridProvider
-from .ses import SESProvider
-from .smspartner import SMSPartnerProvider
-from .twilio import TwilioProvider
-from .vonage import VonageProvider
+Local provider implementations have been archived.
+Use `python_missive.providers` instead.
+This file keeps DjangoEmail provider available for local sending.
+"""
 
-__all__ = [
-    "BaseProvider",
-    "SendGridProvider",
-    "MailgunProvider",
-    "SESProvider",
-    "DjangoEmailProvider",
-    "TwilioProvider",
-    "VonageProvider",
-    "SMSPartnerProvider",
-    "LaPosteProvider",
-    "BrevoProvider",
-    "InAppNotificationProvider",
-]
+from .django_email import DjangoEmailProvider  # noqa: F401
+
+__all__ = ["DjangoEmailProvider"]

@@ -124,18 +124,27 @@ class ProviderInfoManager(models.Manager):
     """Custom manager that returns our in-memory QuerySet"""
 
     def get_queryset(self):
-        # Load providers from config
-        from ..helpers import get_providers_from_config
-
-        providers_by_type = get_providers_from_config()
+        # Load providers from settings using python-missive helper
+        try:
+            from python_missive.helpers import get_provider_paths_from_config
+            from django.conf import settings as dj_settings
+            configured = getattr(dj_settings, "MISSIVE_PROVIDERS", None) or []
+            provider_paths = (
+                list(configured.keys()) if isinstance(configured, dict) else configured
+            )
+            mapping = get_provider_paths_from_config(provider_paths)
+            providers_by_type = {k: v for k, v in mapping.items()}
+        except Exception:
+            providers_by_type = {}
 
         # Group providers by name (a provider can support multiple types)
         providers_dict = {}
-        for missive_type, provider_names in sorted(providers_by_type.items()):
-            for provider_name in provider_names:
-                if provider_name not in providers_dict:
-                    providers_dict[provider_name] = []
-                providers_dict[provider_name].append(missive_type)
+        for missive_type, provider_paths in sorted(providers_by_type.items()):
+            for path in provider_paths:
+                name = path.split(".")[-2] if "." in path else path
+                if name not in providers_dict:
+                    providers_dict[name] = []
+                providers_dict[name].append(missive_type)
 
         # Créer la liste des providers avec leurs types multiples
         providers_list = []
@@ -194,59 +203,23 @@ class ProviderInfo(models.Model):
         Helper to retrieve the provider class dynamically.
         Returns None if the provider cannot be loaded.
 
-        Searches in MISSIVE_PROVIDERS (list format), otherwise uses a fallback.
+        Searches in MISSIVE_PROVIDERS and loads through python-missive loader.
         """
         try:
             from django.conf import settings
-            from django.utils.module_loading import import_string
+            from python_missive.providers import load_provider_class
 
-            # Normalize the name (lowercase, no spaces or dashes)
-            normalized_name = (
-                self.name.lower().replace(" ", "").replace("-", "").replace("_", "")
+            providers_config = getattr(settings, "MISSIVE_PROVIDERS", None) or []
+            candidate_paths = (
+                list(providers_config.keys())
+                if isinstance(providers_config, dict)
+                else providers_config
             )
-
-            # Get MISSIVE_PROVIDERS (must be a list)
-            providers_config = getattr(settings, "MISSIVE_PROVIDERS", None)
-
-            # Search for the provider in config
-            provider_path = None
-
-            if isinstance(providers_config, list):
-                for path in providers_config:
-                    # Extract provider name from path
-                    path_lower = path.lower()
-                    if normalized_name in path_lower:
-                        provider_path = path
-                        break
-
-            # If found in config, import directly
-            if provider_path:
-                return import_string(provider_path)
-
-            # Fallback: Try to construct the path automatically
-            # Special cases for non-standard class names
-            class_name_map = {
-                "djangoemail": "DjangoEmailProvider",
-                "smspartner": "SMSPartnerProvider",
-                "laposte": "LaPosteProvider",
-                "sendgrid": "SendGridProvider",
-                "ses": "SESProvider",
-                "ar24": "AR24Provider",
-                "fcm": "FCMProvider",
-                "apn": "APNProvider",
-                "notification": "InAppNotificationProvider",
-            }
-
-            class_name = class_name_map.get(normalized_name)
-            if not class_name:
-                # Fallback: capitalize the name
-                class_name = f"{normalized_name.capitalize()}Provider"
-
-            # Construct the provider path
-            provider_path = f"missive.providers.{normalized_name}.{class_name}"
-
-            # Import the class
-            return import_string(provider_path)
+            name_token = self.name.lower().replace(" ", "")
+            for path in candidate_paths:
+                if name_token in path.lower():
+                    return load_provider_class(path)
+            return None
 
         except Exception:
             return None

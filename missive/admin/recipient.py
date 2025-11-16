@@ -195,7 +195,7 @@ class RecipientAdmin(admin.ModelAdmin):
     @admin.action(description=_("🔍 Validate Emails"))
     def validate_email_action(self, request, queryset):
         """Action pour valider les emails des destinataires sélectionnés."""
-        from ..providers.base import BaseProvider
+from python_missive.providers.base import BaseProvider
 
         provider = BaseProvider()
         invalid_count = 0
@@ -230,7 +230,7 @@ class RecipientAdmin(admin.ModelAdmin):
     @admin.action(description=_("📞 Validate Phones"))
     def validate_phone_action(self, request, queryset):
         """Action pour valider les téléphones des destinataires sélectionnés."""
-        from ..providers.base import BaseProvider
+        from python_missive.providers.base import BaseProvider
 
         provider = BaseProvider()
         invalid_count = 0
@@ -264,7 +264,7 @@ class RecipientAdmin(admin.ModelAdmin):
     @admin.action(description=_("✨ Validate All (email + phone)"))
     def validate_all_action(self, request, queryset):
         """Action pour valider tous les moyens de contact."""
-        from ..providers.base import BaseProvider
+        from python_missive.providers.base import BaseProvider
 
         provider = BaseProvider()
         email_issues = 0
