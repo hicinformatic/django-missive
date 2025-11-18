@@ -101,6 +101,8 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
         # Add service info fieldsets for each supported missive type
         missive_types = obj.missive_types_list
+        attachment_types = {"EMAIL", "POSTAL", "BRANDED"}
+        
         for missive_type in missive_types:
             try:
                 label = MissiveType(missive_type).label
@@ -109,11 +111,19 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
             service_info_field = f"service_info_{missive_type.lower()}_display"
             geo_field = f"geo_{missive_type.lower()}_display"
+            
+            fields = [service_info_field, geo_field]
+            
+            # Add attachment limits for types that support attachments
+            if missive_type in attachment_types:
+                attachment_field = f"attachment_limits_{missive_type.lower()}_display"
+                fields.append(attachment_field)
+            
             fieldsets.append(
                 (
                     label,
                     {
-                        "fields": (service_info_field, geo_field),
+                        "fields": tuple(fields),
                         "description": f"Service information for {label}",
                     },
                 )
@@ -155,6 +165,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         readonly = list(self.readonly_fields)
 
         if obj:
+            attachment_types = {"EMAIL", "POSTAL", "BRANDED"}
             for missive_type in obj.missive_types_list:
                 service_info_field = f"service_info_{missive_type.lower()}_display"
                 geo_field = f"geo_{missive_type.lower()}_display"
@@ -162,6 +173,12 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                     readonly.append(service_info_field)
                 if geo_field not in readonly:
                     readonly.append(geo_field)
+                
+                # Add attachment limits for types that support attachments
+                if missive_type in attachment_types:
+                    attachment_field = f"attachment_limits_{missive_type.lower()}_display"
+                    if attachment_field not in readonly:
+                        readonly.append(attachment_field)
 
         return readonly
 
@@ -257,6 +274,56 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
             geo_method.short_description = _("Geographic Coverage")
             return geo_method
+
+        if name.startswith("attachment_limits_") and name.endswith("_display"):
+            missive_type = name[18:-8].upper()
+
+            def attachment_limits_method(obj):
+                try:
+                    provider_class = obj._get_provider_class()
+                    if provider_class:
+                        provider_instance = provider_class()
+
+                        limits_info = {}
+
+                        # EMAIL attachments
+                        if missive_type == "EMAIL":
+                            if hasattr(provider_instance, "max_email_attachment_size_mb"):
+                                limits_info["max_size_mb"] = provider_instance.max_email_attachment_size_mb
+                                limits_info["max_size_bytes"] = provider_instance.max_email_attachment_size_bytes
+                            if hasattr(provider_instance, "allowed_attachment_mime_types"):
+                                limits_info["allowed_mime_types"] = provider_instance.allowed_attachment_mime_types
+
+                        # POSTAL attachments
+                        elif missive_type == "POSTAL":
+                            if hasattr(provider_instance, "max_postal_pages"):
+                                limits_info["max_pages"] = provider_instance.max_postal_pages
+                            if hasattr(provider_instance, "allowed_attachment_mime_types"):
+                                limits_info["allowed_mime_types"] = provider_instance.allowed_attachment_mime_types
+                            if hasattr(provider_instance, "allowed_page_formats"):
+                                limits_info["allowed_page_formats"] = provider_instance.allowed_page_formats
+
+                        # BRANDED attachments
+                        elif missive_type == "BRANDED":
+                            if hasattr(provider_instance, "max_attachment_size_mb"):
+                                limits_info["max_size_mb"] = provider_instance.max_attachment_size_mb
+                                limits_info["max_size_bytes"] = provider_instance.max_attachment_size_bytes
+                            if hasattr(provider_instance, "allowed_attachment_mime_types"):
+                                limits_info["allowed_mime_types"] = provider_instance.allowed_attachment_mime_types
+
+                        if limits_info:
+                            return json.dumps(limits_info, indent=2, ensure_ascii=False)
+                        else:
+                            return json.dumps({"message": "No attachment limits configured"}, indent=2, ensure_ascii=False)
+
+                    else:
+                        return json.dumps({"error": "Provider not loaded"}, indent=2, ensure_ascii=False)
+
+                except Exception as e:
+                    return json.dumps({"error": str(e)}, indent=2, ensure_ascii=False)
+
+            attachment_limits_method.short_description = _("Attachment Limits")
+            return attachment_limits_method
 
         raise AttributeError(
             f"'{type(self).__name__}' object has no attribute '{name}'"
