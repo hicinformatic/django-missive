@@ -9,6 +9,8 @@ from django.db.models.query import QuerySet
 from django.db.models.sql import Query
 from django.utils.translation import gettext_lazy as _
 
+from ..providers import normalize_provider_path
+
 
 class ProviderInfoQuerySet(QuerySet):
     """In-memory QuerySet for provider info."""
@@ -148,7 +150,7 @@ class ProviderInfoManager(models.Manager):
                     providers_dict[name] = []
                 providers_dict[name].append(missive_type)
 
-        # Créer la liste des providers avec leurs types multiples
+        # Build provider list with all their missive types
         providers_list = []
         pk = 1
         for provider_name, missive_types in sorted(providers_dict.items()):
@@ -157,12 +159,12 @@ class ProviderInfoManager(models.Manager):
                 name=provider_name,
                 missive_type=",".join(
                     missive_types
-                ),  # Stocker tous les types séparés par virgule
+                ),  # Store type list for display
             )
             providers_list.append(provider)
             pk += 1
 
-        # Retourner un QuerySet en mémoire
+        # Return an in-memory QuerySet clone
         return ProviderInfoQuerySet(model=self.model, data=providers_list)
 
 
@@ -324,6 +326,7 @@ class ProviderInfo(models.Model):
         sensitive_keywords = ["password", "secret", "key", "token", "credential"]
         config_vars = {}
         for key in self.required_config_keys:
+            # B105: getattr on settings is safe, settings are controlled
             value = getattr(settings, key, None)  # nosec B105
             is_sensitive = any(
                 keyword in key.lower() for keyword in sensitive_keywords
@@ -337,7 +340,8 @@ class ProviderInfo(models.Model):
     @property
     def is_configured(self):
         """Checks if the main credentials are configured"""
-        config_keys = {  # nosec B105
+        # Dictionary of configuration key names (not passwords, just key names)
+        config_keys = {
             "sendgrid": "SENDGRID_API_KEY",
             "mailgun": "MAILGUN_API_KEY",
             "ses": "AWS_ACCESS_KEY_ID",
@@ -361,6 +365,7 @@ class ProviderInfo(models.Model):
         if key is None:
             return True
 
+        # B105: getattr on settings is safe, settings are controlled
         return hasattr(settings, key) and bool(getattr(settings, key, None))  # nosec B105
 
     @property
@@ -436,20 +441,22 @@ class ProviderInfo(models.Model):
 
             # Construire le chemin du provider
             provider_path = (
-                f"missive.providers.{self.name}.{self.name.capitalize()}Provider"
+                f"python_missive.providers.{self.name}.{self.name.capitalize()}Provider"
             )
 
-            # Cas spéciaux pour les noms avec underscore ou espaces
+            # Special cases for names using underscores or multiple words
             if self.name == "django_email":
-                provider_path = "missive.providers.django_email.DjangoEmailProvider"
+                provider_path = "python_missive.providers.django_email.DjangoEmailProvider"
             elif self.name == "smspartner":
-                provider_path = "missive.providers.smspartner.SMSPartnerProvider"
+                provider_path = "python_missive.providers.smspartner.SMSPartnerProvider"
+
+            provider_path = normalize_provider_path(provider_path)
 
             # Importer et instancier le provider
             provider_class = import_string(provider_path)
             provider_instance = provider_class()
 
-            # Récupérer le statut du service
+            # Fetch service status to expose credits information
             status_info = provider_instance.get_service_status()
 
             return status_info.get("credits")

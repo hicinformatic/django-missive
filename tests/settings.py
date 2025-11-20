@@ -77,21 +77,21 @@ STATIC_URL = "/static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # =============================================================================
-# Configuration des providers (NOUVEAU FORMAT - auto-catégorisation)
+# Provider configuration (auto categorization)
 # =============================================================================
-# Liste simple : chaque provider déclare ses supported_types et est automatiquement catégorisé
-# Plus de duplication ! Twilio n'est listé qu'une fois au lieu de 4 fois
+# Simple list: each provider declares `supported_types` and is automatically categorized.
+# No more duplication—Twilio is listed once instead of four times.
 
 MISSIVE_PROVIDERS = [
     # Providers Email
-    "missive.providers.django_email.DjangoEmailProvider",  # local Django backend
+    "python_missive.providers.django_email.DjangoEmailProvider",  # local Django backend
     "python_missive.providers.sendgrid.SendGridProvider",
     "python_missive.providers.mailgun.MailgunProvider",
     "python_missive.providers.ses.SESProvider",
-    "python_missive.providers.brevo.BrevoProvider",  # Auto-catégorisé: EMAIL + SMS
+    "python_missive.providers.brevo.BrevoProvider",  # Auto categorized: EMAIL + SMS
     # Providers SMS/Voice (multi-types)
-    "python_missive.providers.twilio.TwilioProvider",  # Auto-catégorisé: SMS + BRANDED + VOICE_CALL
-    "python_missive.providers.vonage.VonageProvider",  # Auto-catégorisé: SMS + VOICE_CALL
+    "python_missive.providers.twilio.TwilioProvider",  # Auto categorized: SMS + BRANDED + VOICE_CALL
+    "python_missive.providers.vonage.VonageProvider",  # Auto categorized: SMS + VOICE_CALL
     "python_missive.providers.smspartner.SMSPartnerProvider",  # Auto-categorized: SMS + EMAIL + VOICE_CALL
     # Branded messaging providers (BRANDED)
     "python_missive.providers.slack.SlackProvider",
@@ -101,6 +101,7 @@ MISSIVE_PROVIDERS = [
     "python_missive.providers.messenger.MessengerProvider",
     # Providers Postal/LRE
     "python_missive.providers.laposte.LaPosteProvider",
+    "python_missive.providers.maileva.MailevaProvider",
     "python_missive.providers.ar24.AR24Provider",
     "python_missive.providers.certeurope.CerteuropeProvider",
     # Providers Notifications
@@ -109,28 +110,28 @@ MISSIVE_PROVIDERS = [
     "python_missive.providers.notification.InAppNotificationProvider",
 ]
 
-# Note: Les providers multi-types (Twilio, Brevo, SMSPartner) sont automatiquement
-# ajoutés à chaque catégorie selon leurs supported_types. Plus besoin de les répéter !
+# Note: multi-type providers (Twilio, Brevo, SMSPartner) are automatically
+# added to all supported categories. No need to repeat them!
 
 # =============================================================================
 # Configuration globale Missive
 # =============================================================================
 
-# Mode sandbox : si True, tous les envois sont en mode test (aucun envoi réel)
+# Sandbox mode: if True, every send is executed in test mode (no real deliveries)
 MISSIVE_SANDBOX = bool(os.getenv("MISSIVE_SANDBOX"))
 MISSIVE_SANDBOX = True
 
 # Base URL pour les webhooks (domaine accessible par les providers)
 # Exemples :
 #   - Production : "https://api.monapp.com"
-#   - Développement : "https://1234.ngrok.io" (tunnel ngrok)
-#   - Local : "http://192.168.1.100:8000" (IP locale sur réseau)
+#   - Development: "https://1234.ngrok.io" (ngrok tunnel)
+#   - Local: "http://192.168.1.100:8000" (local network IP)
 MISSIVE_WEBHOOK_BASE_URL = os.getenv(
     "MISSIVE_WEBHOOK_BASE_URL", "http://127.0.0.1:8000"
 )
 
 # =============================================================================
-# Configuration des clés API (depuis variables d'environnement)
+# API key configuration (loaded from environment variables)
 # =============================================================================
 
 # Email providers
@@ -180,7 +181,7 @@ TEAMS_CLIENT_ID = os.getenv("TEAMS_CLIENT_ID")
 TEAMS_CLIENT_SECRET = os.getenv("TEAMS_CLIENT_SECRET")
 TEAMS_TENANT_ID = os.getenv("TEAMS_TENANT_ID")
 
-# Configuration Email Django par défaut
+# Default Django email configuration
 EMAIL_BACKEND = os.getenv(
     "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
 )

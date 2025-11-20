@@ -12,6 +12,97 @@ from ..models import MissiveType, ProviderInfo
 from ..models.provider import ProviderInfoQuerySet
 
 
+ATTACHMENT_LIMIT_FIELDS = {
+    "EMAIL": [
+        {
+            "suffix": "max_size_bytes",
+            "label": _("Max attachment size"),
+            "attr": "max_email_attachment_size_bytes",
+            "unit": _("bytes"),
+        },
+        {
+            "suffix": "allowed_mime_types",
+            "label": _("Allowed MIME types"),
+            "attr": "allowed_attachment_mime_types",
+            "empty_label": _("No restriction"),
+        },
+    ],
+    "POSTAL": [
+        {
+            "suffix": "max_pages",
+            "label": _("Max pages per document"),
+            "attr": "max_postal_pages",
+        },
+        {
+            "suffix": "allowed_mime_types",
+            "label": _("Allowed MIME types"),
+            "attr": "allowed_attachment_mime_types",
+            "empty_label": _("No restriction"),
+        },
+        {
+            "suffix": "allowed_page_formats",
+            "label": _("Allowed page formats"),
+            "attr": "allowed_page_formats",
+            "empty_label": _("No restriction"),
+        },
+    ],
+    "BRANDED": [
+        {
+            "suffix": "max_size_bytes",
+            "label": _("Max attachment size"),
+            "attr": "max_attachment_size_bytes",
+            "unit": _("bytes"),
+        },
+        {
+            "suffix": "allowed_mime_types",
+            "label": _("Allowed MIME types"),
+            "attr": "allowed_attachment_mime_types",
+            "empty_label": _("No restriction"),
+        },
+    ],
+}
+
+
+def _format_bytes_human_readable(bytes_value: int) -> str:
+    """Convert bytes to human-readable format (B, KB, MB, GB)."""
+    if bytes_value is None:
+        return "-"
+    if bytes_value < 1024:
+        return f"{bytes_value} B"
+    elif bytes_value < 1024 * 1024:
+        return f"{bytes_value / 1024:.1f} KB"
+    elif bytes_value < 1024 * 1024 * 1024:
+        return f"{bytes_value / (1024 * 1024):.1f} MB"
+    else:
+        return f"{bytes_value / (1024 * 1024 * 1024):.1f} GB"
+
+
+def _format_attachment_limit_value(value, *, unit=None, empty_label=None):
+    if value is None:
+        return _("Not configured")
+    if isinstance(value, (list, tuple, set)):
+        if not value:
+            return empty_label or _("No restriction")
+        # Display list items with line breaks for better readability
+        return format_html("<br>".join(str(item) for item in value))
+    if isinstance(value, dict):
+        return json.dumps(value, indent=2, ensure_ascii=False)
+    if unit:
+        # Convert bytes to human-readable format
+        if unit == _("bytes") or unit == "bytes":
+            try:
+                bytes_value = int(value)
+                return _format_bytes_human_readable(bytes_value)
+            except (ValueError, TypeError):
+                return f"{value} {unit}"
+        return f"{value} {unit}"
+    return str(value)
+
+
+def _build_attachment_limit_field_name(missive_type: str, suffix: str) -> str:
+    return f"attachment_limits_{missive_type.lower()}_{suffix}_display"
+
+
 class MissiveTypeFilter(admin.SimpleListFilter):
     """Filtre personnalisé pour afficher les types avec leurs labels traduits."""
 
@@ -101,8 +192,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
         # Add service info fieldsets for each supported missive type
         missive_types = obj.missive_types_list
-        attachment_types = {"EMAIL", "POSTAL", "BRANDED"}
-        
+
         for missive_type in missive_types:
             try:
                 label = MissiveType(missive_type).label
@@ -111,14 +201,16 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
             service_info_field = f"service_info_{missive_type.lower()}_display"
             geo_field = f"geo_{missive_type.lower()}_display"
-            
+
             fields = [service_info_field, geo_field]
-            
-            # Add attachment limits for types that support attachments
-            if missive_type in attachment_types:
-                attachment_field = f"attachment_limits_{missive_type.lower()}_display"
+
+            attachment_configs = ATTACHMENT_LIMIT_FIELDS.get(missive_type.upper(), [])
+            for config in attachment_configs:
+                attachment_field = _build_attachment_limit_field_name(
+                    missive_type, config["suffix"]
+                )
                 fields.append(attachment_field)
-            
+
             fieldsets.append(
                 (
                     label,
@@ -165,7 +257,6 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         readonly = list(self.readonly_fields)
 
         if obj:
-            attachment_types = {"EMAIL", "POSTAL", "BRANDED"}
             for missive_type in obj.missive_types_list:
                 service_info_field = f"service_info_{missive_type.lower()}_display"
                 geo_field = f"geo_{missive_type.lower()}_display"
@@ -173,10 +264,14 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                     readonly.append(service_info_field)
                 if geo_field not in readonly:
                     readonly.append(geo_field)
-                
-                # Add attachment limits for types that support attachments
-                if missive_type in attachment_types:
-                    attachment_field = f"attachment_limits_{missive_type.lower()}_display"
+
+                attachment_configs = ATTACHMENT_LIMIT_FIELDS.get(
+                    missive_type.upper(), []
+                )
+                for config in attachment_configs:
+                    attachment_field = _build_attachment_limit_field_name(
+                        missive_type, config["suffix"]
+                    )
                     if attachment_field not in readonly:
                         readonly.append(attachment_field)
 
@@ -219,8 +314,9 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 except Exception as e:
                     return json.dumps({"error": str(e)}, indent=2, ensure_ascii=False)
 
-            service_info_method.short_description = _("Service Information")
-            return service_info_method
+            return admin.display(description=_("Service Information"))(
+                service_info_method
+            )
 
         if name.startswith("geo_") and name.endswith("_display"):
             missive_type = name[4:-8].upper()
@@ -272,13 +368,73 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 except Exception as e:
                     return f"Error: {str(e)}"
 
-            geo_method.short_description = _("Geographic Coverage")
-            return geo_method
+            return admin.display(description=_("Geographic Coverage"))(geo_method)
 
         if name.startswith("attachment_limits_") and name.endswith("_display"):
-            missive_type = name[18:-8].upper()
+            core_name = name[18:-8]
+            missive_type = None
+            suffix = ""
 
-            def attachment_limits_method(obj):
+            for candidate in ATTACHMENT_LIMIT_FIELDS.keys():
+                candidate_lower = candidate.lower()
+                if core_name == candidate_lower:
+                    missive_type = candidate
+                    break
+                prefix = f"{candidate_lower}_"
+                if core_name.startswith(prefix):
+                    missive_type = candidate
+                    suffix = core_name[len(prefix) :]
+                    break
+
+            if missive_type is None:
+                missive_type = core_name.upper()
+            else:
+                missive_type = missive_type.upper()
+
+            if suffix:
+                config = next(
+                    (
+                        cfg
+                        for cfg in ATTACHMENT_LIMIT_FIELDS.get(missive_type, [])
+                        if cfg["suffix"] == suffix
+                    ),
+                    None,
+                )
+
+                if not config:
+                    raise AttributeError(
+                        f"No attachment limit config for {missive_type}.{suffix}"
+                    )
+
+                def attachment_limit_method(obj, missive_type=missive_type, config=config):
+                    try:
+                        provider_class = obj._get_provider_class()
+                        if not provider_class:
+                            return _("Provider not loaded")
+
+                        provider_instance = provider_class()
+                        value = None
+                        attr_name = config.get("attr")
+                        if attr_name:
+                            value = getattr(provider_instance, attr_name, None)
+                        value_getter = config.get("value_getter")
+                        if value_getter:
+                            value = value_getter(provider_instance)
+
+                        return _format_attachment_limit_value(
+                            value,
+                            unit=config.get("unit"),
+                            empty_label=config.get("empty_label"),
+                        )
+
+                    except Exception as exc:
+                        return _("Error: %s") % exc
+
+                return admin.display(description=config["label"])(
+                    attachment_limit_method
+                )
+
+            def attachment_limits_method(obj, missive_type=missive_type):
                 try:
                     provider_class = obj._get_provider_class()
                     if provider_class:
@@ -289,41 +445,64 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                         # EMAIL attachments
                         if missive_type == "EMAIL":
                             if hasattr(provider_instance, "max_email_attachment_size_mb"):
-                                limits_info["max_size_mb"] = provider_instance.max_email_attachment_size_mb
-                                limits_info["max_size_bytes"] = provider_instance.max_email_attachment_size_bytes
+                                limits_info[
+                                    "max_size_mb"
+                                ] = provider_instance.max_email_attachment_size_mb
+                                limits_info[
+                                    "max_size_bytes"
+                                ] = provider_instance.max_email_attachment_size_bytes
                             if hasattr(provider_instance, "allowed_attachment_mime_types"):
-                                limits_info["allowed_mime_types"] = provider_instance.allowed_attachment_mime_types
+                                limits_info[
+                                    "allowed_mime_types"
+                                ] = provider_instance.allowed_attachment_mime_types
 
                         # POSTAL attachments
                         elif missive_type == "POSTAL":
                             if hasattr(provider_instance, "max_postal_pages"):
                                 limits_info["max_pages"] = provider_instance.max_postal_pages
                             if hasattr(provider_instance, "allowed_attachment_mime_types"):
-                                limits_info["allowed_mime_types"] = provider_instance.allowed_attachment_mime_types
+                                limits_info[
+                                    "allowed_mime_types"
+                                ] = provider_instance.allowed_attachment_mime_types
                             if hasattr(provider_instance, "allowed_page_formats"):
-                                limits_info["allowed_page_formats"] = provider_instance.allowed_page_formats
+                                limits_info[
+                                    "allowed_page_formats"
+                                ] = provider_instance.allowed_page_formats
 
                         # BRANDED attachments
                         elif missive_type == "BRANDED":
                             if hasattr(provider_instance, "max_attachment_size_mb"):
-                                limits_info["max_size_mb"] = provider_instance.max_attachment_size_mb
-                                limits_info["max_size_bytes"] = provider_instance.max_attachment_size_bytes
+                                limits_info[
+                                    "max_size_mb"
+                                ] = provider_instance.max_attachment_size_mb
+                                limits_info[
+                                    "max_size_bytes"
+                                ] = provider_instance.max_attachment_size_bytes
                             if hasattr(provider_instance, "allowed_attachment_mime_types"):
-                                limits_info["allowed_mime_types"] = provider_instance.allowed_attachment_mime_types
+                                limits_info[
+                                    "allowed_mime_types"
+                                ] = provider_instance.allowed_attachment_mime_types
 
                         if limits_info:
                             return json.dumps(limits_info, indent=2, ensure_ascii=False)
                         else:
-                            return json.dumps({"message": "No attachment limits configured"}, indent=2, ensure_ascii=False)
+                            return json.dumps(
+                                {"message": "No attachment limits configured"},
+                                indent=2,
+                                ensure_ascii=False,
+                            )
 
                     else:
-                        return json.dumps({"error": "Provider not loaded"}, indent=2, ensure_ascii=False)
+                        return json.dumps(
+                            {"error": "Provider not loaded"}, indent=2, ensure_ascii=False
+                        )
 
                 except Exception as e:
                     return json.dumps({"error": str(e)}, indent=2, ensure_ascii=False)
 
-            attachment_limits_method.short_description = _("Attachment Limits")
-            return attachment_limits_method
+            return admin.display(description=_("Attachment Limits"))(
+                attachment_limits_method
+            )
 
         raise AttributeError(
             f"'{type(self).__name__}' object has no attribute '{name}'"
@@ -372,6 +551,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
         return filtered_qs, False
 
+    @admin.display(description=_("Provider"))
     def name_display(self, obj):
         """Displays provider name with description."""
         description = obj.description_text
@@ -384,8 +564,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         else:
             return format_html("<strong>{}</strong>", obj.name.capitalize())
 
-    name_display.short_description = _("Provider")
-
+    @admin.display(description=_("Types supportés"))
     def missive_type_display(self, obj):
         """Badges colorés pour tous les types supportés."""
         colors = {
@@ -419,13 +598,11 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
         return format_html(" ".join(badges))
 
-    missive_type_display.short_description = _("Types supportés")
-
+    @admin.display(description=_("Types supportés"))
     def missive_type_display_detail(self, obj):
         return self.missive_type_display(obj)
 
-    missive_type_display_detail.short_description = _("Types supportés")
-
+    @admin.display(description=_("Supported Brands"))
     def brands_display(self, obj):
         """Displays supported messaging brands (for BRANDED providers)."""
         brands = obj.brands
@@ -458,8 +635,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
         return format_html('<span style="white-space: nowrap;">{}</span>', badges_html)
 
-    brands_display.short_description = _("Supported Brands")
-
+    @admin.display(description=_("Status"))
     def status_display(self, obj):
         """Badge pour le statut global."""
         if obj.status == "ready":
@@ -478,8 +654,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 'border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap;">❌ Not Installed</span>'
             )
 
-    status_display.short_description = _("Status")
-
+    @admin.display(description=_("Credits"))
     def credits_display(self, obj):
         """Displays available credits."""
         credits_info = obj.credits_info
@@ -534,8 +709,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 '<span style="white-space: nowrap;">{}</span>', str(remaining)
             )
 
-    credits_display.short_description = _("Credits")
-
+    @admin.display(description=_("Packages"))
     def installation_display(self, obj):
         """Displays required packages and installation status."""
         packages = obj.required_packages
@@ -565,8 +739,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 '<span style="color: #6c757d; white-space: nowrap; font-style: italic;">None (always available)</span>'
             )
 
-    installation_display.short_description = _("Packages")
-
+    @admin.display(description=_("Credentials"))
     def configuration_display(self, obj):
         """Indique si les identifiants sont configurés."""
         if obj.is_configured:
@@ -578,8 +751,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 '<span style="color: #ffc107; white-space: nowrap;">✗ Missing</span>'
             )
 
-    configuration_display.short_description = _("Credentials")
-
+    @admin.display(description=_("SLA Status"))
     def status_url_display(self, obj):
         """Displays provider status/SLA page link."""
         url = obj.status_url
@@ -596,8 +768,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 '<span style="color: #6c757d; font-style: italic; white-space: nowrap;">Not available</span>'
             )
 
-    status_url_display.short_description = _("SLA Status")
-
+    @admin.display(description=_("Documentation"))
     def documentation_url_display(self, obj):
         """Displays provider API documentation link."""
         url = obj.documentation_url
@@ -614,6 +785,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 '<span style="color: #6c757d; font-style: italic; white-space: nowrap;">Not available</span>'
             )
 
+    @admin.display(description=_("Official Site"))
     def site_url_display(self, obj):
         """Displays provider official website link."""
         url = obj.site_url
@@ -630,9 +802,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 '<span style="color: #6c757d; font-style: italic; white-space: nowrap;">Not available</span>'
             )
 
-    site_url_display.short_description = _("Official Site")
-    documentation_url_display.short_description = _("Documentation")
-
+    @admin.display(description=_("Webhook URLs"))
     def webhook_urls_display(self, obj):
         """Displays unique webhook URL for this provider."""
         from django.conf import settings
@@ -701,8 +871,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
         return format_html("".join(html_parts))
 
-    webhook_urls_display.short_description = _("Webhook URLs")
-
+    @admin.display(description=_("Usage"))
     def usage_display(self, obj):
         """Displays usage count."""
         count = obj.usage_count
@@ -717,13 +886,11 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 '<span style="color: #ccc; white-space: nowrap;">Never used</span>'
             )
 
-    usage_display.short_description = _("Usage")
-
+    @admin.display(description=_("Status"))
     def status_display_detail(self, obj):
         return self.status_display(obj)
 
-    status_display_detail.short_description = _("Status")
-
+    @admin.display(description=_("Variables"))
     def config_vars_display(self, obj):
         """Displays config variables in list."""
         config_vars = obj.required_config_keys
@@ -742,8 +909,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             vars_html,
         )
 
-    config_vars_display.short_description = _("Variables")
-
+    @admin.display(description=_("Configuration Variables"))
     def config_vars_display_detail(self, obj):
         """Displays all config variables in edit page."""
         config_vars = obj.required_config_keys
@@ -814,8 +980,6 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         )
 
         return format_html(table_html)
-
-    config_vars_display_detail.short_description = _("Configuration Variables")
 
     def changelist_view(self, request, extra_context=None):
         """Ajoute du contexte à la vue liste."""

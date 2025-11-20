@@ -33,10 +33,6 @@ def __getattr__(name):
         from .models import MissiveTemplate
 
         return MissiveTemplate
-    elif name == "Recipient":
-        from .models import Recipient
-
-        return Recipient
     elif name == "RecipientType":
         from .models import RecipientType
 
@@ -117,7 +113,6 @@ __all__ = [
     "MissiveAttachment",
     "MissiveEvent",
     "MissiveTemplate",
-    "Recipient",
     "RecipientType",
     "MissiveSender",
     "MissiveBuilder",

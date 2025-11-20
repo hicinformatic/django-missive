@@ -50,6 +50,7 @@ class MissiveAttachmentInline(admin.StackedInline):
         ),
     )
 
+    @admin.display(description=_("Link"))
     def file_url_display(self, obj):
         """Displays file link."""
         if obj and obj.file_url:
@@ -61,8 +62,7 @@ class MissiveAttachmentInline(admin.StackedInline):
             )
         return "-"
 
-    file_url_display.short_description = _("Link")
-
+    @admin.display(description=_("Attached to"))
     def attached_to_display(self, obj):
         """Displays attached object."""
         if not obj or not obj.pk:
@@ -87,7 +87,7 @@ class MissiveAttachmentInline(admin.StackedInline):
 
         return str(attached)
 
-    attached_to_display.short_description = _("Attached to")
+        return str(attached)
 
 
 @sandbox_warning
@@ -151,6 +151,7 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
         ),
     )
 
+    @admin.display(description=_("Storage"))
     def storage_type_badge(self, obj):
         """Badge du type de stockage."""
         if obj.is_external:
@@ -164,8 +165,7 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
                 'border-radius: 3px; font-size: 10px; white-space: nowrap;">📎 Local</span>'
             )
 
-    storage_type_badge.short_description = _("Storage")
-
+    @admin.display(description=_("Attached to"))
     def attached_to_display(self, obj):
         """Displays attached object."""
         attached = obj.attached_to
@@ -192,8 +192,7 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
 
         return str(attached)
 
-    attached_to_display.short_description = _("Attached to")
-
+    @admin.display(description=_("Size"))
     def file_size_display(self, obj):
         """Displays formatted size."""
         if obj.file_size:
@@ -205,8 +204,7 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
                 return f"{obj.file_size / (1024 * 1024):.1f} MB"
         return "-"
 
-    file_size_display.short_description = _("Size")
-
+    @admin.display(description=_("Link"))
     def file_url_display(self, obj):
         """Displays file link."""
         if obj.file_url:
@@ -217,5 +215,3 @@ class MissiveAttachmentAdmin(admin.ModelAdmin):
                 icon,
             )
         return "-"
-
-    file_url_display.short_description = _("Link")

@@ -41,16 +41,34 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    # Testing framework
     "pytest>=7.0",
     "pytest-django>=4.5",
     "pytest-cov>=4.0",
+    # Testing utilities
+    "pytest-xdist>=3.0",  # Parallel test execution
+    "pytest-mock>=3.10",  # Better mocking support
+    "pytest-timeout>=2.1",  # Detect slow/hanging tests
+    "pytest-sugar>=0.9",  # Improved test output
+    "pytest-html>=3.1",  # HTML test reports
+    "pytest-randomly>=3.12",  # Random test execution order
+    "pytest-repeat>=0.9",  # Repeat tests to find flaky tests
+    # Test data generation
+    "factory-boy>=3.3",  # Django model factories
+    "faker>=19.0",  # Generate realistic fake data
+    "hypothesis>=6.68",  # Property-based testing
+    # Code quality
     "black>=23.0",
     "flake8>=6.0",
     "isort>=5.12",
     "mypy>=1.0",
+    "django-stubs>=5.0.0",
+    "django-stubs-ext>=5.0.0",
+    # Security
     "bandit>=1.7",  # Security linter
     "safety>=3.0",  # Dependency vulnerability scanner
     "pip-audit>=2.6",  # PyPI vulnerability auditor
+    # Code cleanup
     "vulture>=2.10",  # Dead code detector
     "autoflake>=2.2",  # Remove unused imports and variables
     "pylint>=3.0",  # Code quality and redundancy checker
@@ -139,4 +157,12 @@ python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
+plugins = ["mypy_django_plugin.main"]
+
+[[tool.mypy.overrides]]
+module = "python_missive.*"
+ignore_missing_imports = true
+
+[tool.django-stubs]
+django_settings_module = "tests.settings"
 

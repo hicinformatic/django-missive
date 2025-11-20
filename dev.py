@@ -19,7 +19,19 @@ if platform.system() == 'Windows' and not os.environ.get('ANSICON'):
 
 PROJECT_ROOT = Path(__file__).parent
 PYTHON_MISSIVE_DIR = PROJECT_ROOT.parent / 'python-missive'
-VENV_DIR = PROJECT_ROOT / 'venv'
+
+
+def _resolve_venv_dir() -> Path:
+    """Find the virtual env directory, preferring .venv over venv."""
+    preferred_names = ['.venv', 'venv']
+    for name in preferred_names:
+        candidate = PROJECT_ROOT / name
+        if candidate.exists():
+            return candidate
+    return PROJECT_ROOT / preferred_names[0]
+
+
+VENV_DIR = _resolve_venv_dir()
 VENV_BIN = VENV_DIR / ('Scripts' if platform.system() == 'Windows' else 'bin')
 PYTHON = VENV_BIN / ('python.exe' if platform.system() == 'Windows' else 'python')
 PIP = VENV_BIN / ('pip.exe' if platform.system() == 'Windows' else 'pip')
@@ -62,6 +74,35 @@ def run_command(cmd, check=True, **kwargs):
 def venv_exists():
     """Checks if virtual environment exists."""
     return VENV_DIR.exists() and PYTHON.exists()
+
+
+def ensure_venv_activation(command: str):
+    """
+    Re-executes this script inside the project virtualenv (.venv/venv) if present.
+
+    Skipped for commands that manage the virtualenv itself (venv, venv-clean).
+    """
+    venv_management_commands = {'venv', 'venv-clean'}
+    if command in venv_management_commands:
+        return
+
+    if not venv_exists():
+        return
+
+    current_python = Path(sys.executable).resolve()
+    desired_python = PYTHON.resolve()
+    if current_python == desired_python:
+        return
+
+    print_info(
+        f"Activating virtual environment at {VENV_DIR} before running '{command}'..."
+    )
+    env = os.environ.copy()
+    env['VIRTUAL_ENV'] = str(VENV_DIR)
+    env['PATH'] = f"{VENV_BIN}{os.pathsep}{env.get('PATH', '')}"
+
+    args = [str(desired_python), str(Path(__file__).resolve()), *sys.argv[1:]]
+    os.execve(str(desired_python), args, env)
 
 
 def task_help():
@@ -961,7 +1002,9 @@ def main():
         print_error(f"Unknown command: {command}")
         print_info("Run 'python dev.py help' to see available commands")
         return 1
-    
+
+    ensure_venv_activation(command)
+
     try:
         success = COMMANDS[command]()
         return 0 if success else 1

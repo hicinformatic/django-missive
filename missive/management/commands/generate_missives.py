@@ -2,7 +2,7 @@
 
 from django.core.management.base import BaseCommand
 
-from missive.models import Missive, Recipient
+from missive.models import Missive
 
 
 class Command(BaseCommand):
@@ -21,30 +21,53 @@ class Command(BaseCommand):
             Missive.objects.all().delete()
             self.stdout.write(self.style.WARNING(f"✓ {count} missives deleted"))
 
-        sender = Recipient.objects.filter(can_be_sender=True).first()
-        if not sender:
-            self.stdout.write(
-                self.style.ERROR(
-                    '❌ No sender available. Run "python dev.py generate_recipients" first.'
-                )
-            )
-            return
+        # Default sender data
+        sender_data = {
+            "sender_name": "MonEntreprise SAS",
+            "sender_email": "contact@monentreprise.fr",
+            "sender_phone": "+33 6 12 34 56 78",
+            "sender_address_line1": "123 Avenue des Champs-Élysées",
+            "sender_postal_code": "75008",
+            "sender_city": "Paris",
+            "sender_country": "FR",
+        }
 
-        email_recipients = (
-            Recipient.objects.exclude(email="")
-            .exclude(email__isnull=True)
-            .filter(can_be_sender=False)[:3]
-        )
-        mobile_recipients = (
-            Recipient.objects.exclude(mobile="")
-            .exclude(mobile__isnull=True)
-            .filter(can_be_sender=False)[:3]
-        )
-        postal_recipients = (
-            Recipient.objects.exclude(address_line1="")
-            .exclude(address_line1__isnull=True)
-            .filter(can_be_sender=False)[:3]
-        )
+        # Sample recipients data
+        email_recipients = [
+            {"name": "Jean Dupont", "email": "jean.dupont@example.com"},
+            {"name": "Marie Martin", "email": "marie.martin@example.com"},
+            {"name": "TechCorp SAS", "email": "contact@techcorp.fr"},
+        ]
+        mobile_recipients = [
+            {"name": "Luc Bernard", "phone": "+33 6 11 22 33 44"},
+            {"name": "Sophie Leroy", "phone": "+33 6 55 66 77 88"},
+            {"name": "Service Client", "phone": "+33 6 99 88 77 66"},
+        ]
+        postal_recipients = [
+            {
+                "name": "François Dubois",
+                "address_line1": "45 Rue de la République",
+                "address_line2": "Appartement 12",
+                "postal_code": "69002",
+                "city": "Lyon",
+                "country": "FR",
+            },
+            {
+                "name": "Claire Lambert",
+                "address_line1": "78 Boulevard Saint-Germain",
+                "postal_code": "75005",
+                "city": "Paris",
+                "country": "FR",
+            },
+            {
+                "name": "Cabinet Juridique",
+                "address_line1": "12 Place Bellecour",
+                "address_line2": "3ème étage",
+                "postal_code": "69002",
+                "city": "Lyon",
+                "country": "FR",
+            },
+        ]
 
         missives = []
 
@@ -52,13 +75,14 @@ class Command(BaseCommand):
             missives.append(
                 {
                     "missive_type": "EMAIL",
-                    "sender": sender,
-                    "recipient": recipient,
                     "subject": f"Email {i} - Information importante",
-                    "body": f"<h1>Bonjour {recipient.full_name}</h1><p>Ceci est un email de test numéro {i}.</p>",
-                    "body_text": f"Bonjour {recipient.full_name}, Ceci est un email de test numéro {i}.",
+                    "body": f"<h1>Bonjour {recipient['name']}</h1><p>Ceci est un email de test numéro {i}.</p>",
+                    "body_text": f"Bonjour {recipient['name']}, Ceci est un email de test numéro {i}.",
                     "priority": ["NORMAL", "HIGH", "URGENT"][i % 3],
                     "status": ["DRAFT", "PENDING", "SENT"][i % 3],
+                    "recipient_name": recipient["name"],
+                    "recipient_email": recipient["email"],
+                    **sender_data,
                 }
             )
 
@@ -66,12 +90,13 @@ class Command(BaseCommand):
             missives.append(
                 {
                     "missive_type": "SMS",
-                    "sender": sender,
-                    "recipient": recipient,
                     "subject": f"SMS {i}",
-                    "body": f"Bonjour {recipient.full_name}, message SMS {i}",
+                    "body": f"Bonjour {recipient['name']}, message SMS {i}",
                     "priority": ["NORMAL", "HIGH", "URGENT"][i % 3],
                     "status": ["DRAFT", "PENDING", "SENT"][i % 3],
+                    "recipient_name": recipient["name"],
+                    "recipient_phone": recipient["phone"],
+                    **sender_data,
                 }
             )
 
@@ -79,12 +104,13 @@ class Command(BaseCommand):
             missives.append(
                 {
                     "missive_type": "BRANDED",
-                    "sender": sender,
-                    "recipient": recipient,
                     "subject": f"Message App {i}",
-                    "body": f"Bonjour {recipient.full_name}, message via messagerie {i}",
+                    "body": f"Bonjour {recipient['name']}, message via messagerie {i}",
                     "priority": "NORMAL",
                     "status": ["DRAFT", "SENT"][i % 2],
+                    "recipient_name": recipient["name"],
+                    "recipient_phone": recipient["phone"],
+                    **sender_data,
                 }
             )
 
@@ -92,29 +118,35 @@ class Command(BaseCommand):
             missives.append(
                 {
                     "missive_type": "POSTAL",
-                    "sender": sender,
-                    "recipient": recipient,
                     "subject": f"Courrier recommandé {i}",
-                    "body": f"<h2>Lettre recommandée</h2><p>Destinataire: {recipient.full_name}</p><p>Contenu du courrier {i}.</p>",
-                    "body_text": f"Lettre recommandée pour {recipient.full_name}. Contenu du courrier {i}.",
+                    "body": f"<h2>Lettre recommandée</h2><p>Destinataire: {recipient['name']}</p><p>Contenu du courrier {i}.</p>",
+                    "body_text": f"Lettre recommandée pour {recipient['name']}. Contenu du courrier {i}.",
                     "is_registered": i % 2 == 0,
                     "requires_signature": i % 3 == 0,
                     "priority": "HIGH",
                     "status": ["DRAFT", "PENDING", "SENT"][i % 3],
+                    "recipient_name": recipient["name"],
+                    "recipient_address_line1": recipient["address_line1"],
+                    "recipient_address_line2": recipient.get("address_line2", ""),
+                    "recipient_postal_code": recipient["postal_code"],
+                    "recipient_city": recipient["city"],
+                    "recipient_country": recipient["country"],
+                    **sender_data,
                 }
             )
 
-        notif_recipients = list(email_recipients[:2])
+        notif_recipients = email_recipients[:2]
         for i, recipient in enumerate(notif_recipients, 1):
             missives.append(
                 {
                     "missive_type": "NOTIFICATION",
-                    "sender": sender,
-                    "recipient": recipient,
                     "subject": f"Notification {i}",
                     "body": f"Vous avez une nouvelle notification numéro {i}.",
                     "priority": ["NORMAL", "HIGH"][i % 2],
                     "status": ["DRAFT", "SENT"][i % 2],
+                    "recipient_name": recipient["name"],
+                    "recipient_email": recipient["email"],
+                    **sender_data,
                 }
             )
 
@@ -148,9 +180,15 @@ class Command(BaseCommand):
             }
             icon = icons.get(missive.missive_type, "📋")
 
+            recipient_display = (
+                missive.recipient_name
+                or missive.recipient_email
+                or missive.recipient_phone
+                or "Unknown"
+            )
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"  {icon} {missive.get_missive_type_display()} → {missive.recipient.full_name} - {missive.subject}"
+                    f"  {icon} {missive.get_missive_type_display()} → {recipient_display} - {missive.subject}"
                 )
             )
 

@@ -98,19 +98,19 @@ This will create the following URLs:
 # Nouveau système avec fallback automatique
 MISSIVE_PROVIDERS = {
     'EMAIL': [
-        'missive.providers.sendgrid.SendGridProvider',        # Priorité 1
-        'missive.providers.mailgun.MailgunProvider',          # Priorité 2 (fallback)
-        'missive.providers.django_email.DjangoEmailProvider', # Priorité 3 (ultime)
+        'python_missive.providers.sendgrid.SendGridProvider',        # Priorité 1
+        'python_missive.providers.mailgun.MailgunProvider',          # Priorité 2 (fallback)
+        'python_missive.providers.django_email.DjangoEmailProvider', # Priorité 3 (ultime)
     ],
     'SMS': [
-        'missive.providers.twilio.TwilioProvider',
-        'missive.providers.smspartner.SMSPartnerProvider',    # Fallback
+        'python_missive.providers.twilio.TwilioProvider',
+        'python_missive.providers.smspartner.SMSPartnerProvider',    # Fallback
     ],
     'WHATSAPP': [
-        'missive.providers.twilio.TwilioProvider',
+        'python_missive.providers.twilio.TwilioProvider',
     ],
     'POSTAL': [
-        'missive.providers.laposte.LaPosteProvider',
+        'python_missive.providers.laposte.LaPosteProvider',
     ],
 }
 
@@ -171,7 +171,7 @@ sms = Missive.objects.create(sender=user, recipient=recipient, ...)
 ### Monitoring des providers
 
 ```python
-from missive.providers import SendGridProvider, TwilioProvider
+from python_missive.providers import SendGridProvider, TwilioProvider
 
 # Vérifier le statut et les crédits
 provider = SendGridProvider()
@@ -196,7 +196,7 @@ if credits['needs_refill']:
 ### Valider avant envoi
 
 ```python
-from missive.providers import SendGridProvider
+from python_missive.providers import SendGridProvider
 
 provider = SendGridProvider(missive)
 

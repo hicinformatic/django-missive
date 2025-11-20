@@ -11,7 +11,6 @@ from .event import MissiveEventAdmin, MissiveEventInline
 
 from .missive import MissiveAdmin, MissiveAdminForm
 from .provider import ProviderInfoAdmin
-from .recipient import RecipientAdmin
 from .template import MissiveTemplateAdmin
 
 MissiveAdmin.inlines = [MissiveAttachmentInline, MissiveEventInline]
@@ -24,7 +23,6 @@ __all__ = [
     "MissiveAttachmentInline",
     "MissiveEventAdmin",
     "MissiveEventInline",
-    "RecipientAdmin",
     "MissiveTemplateAdmin",
     "ProviderInfoAdmin",
     "get_provider_name_from_path",

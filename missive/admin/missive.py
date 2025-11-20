@@ -1,4 +1,4 @@
-"""Administration du modèle Missive."""
+"""Admin configuration for the Missive model."""
 
 import json
 
@@ -12,11 +12,12 @@ from django.utils.translation import gettext_lazy as _
 
 from ..decorators import sandbox_warning, library_presence_warning
 from ..helpers import get_all_provider_choices, get_providers_from_config
-from ..models import Missive, Recipient
+from ..models import Missive
+from ..providers import normalize_provider_path
 
 
 class MissiveAdminForm(forms.ModelForm):
-    """Formulaire personnalisé pour l'admin Missive."""
+    """Custom admin form used to filter provider choices."""
 
     PROVIDERS_BY_TYPE = get_providers_from_config()
     PROVIDER_CHOICES = get_all_provider_choices()
@@ -57,14 +58,10 @@ class MissiveAdminForm(forms.ModelForm):
             self.fields["provider_choice"].help_text = _(
                 "Provider used for sending. Change it if necessary before sending."
             )
-            self.fields["sender"].disabled = True
+            # Sender fields are now direct fields, no need to disable
         else:
-            if not self.instance.sender_id:
-                default_sender = Recipient.objects.filter(
-                    is_default_sender=True
-                ).first()
-                if default_sender:
-                    self.fields["sender"].initial = default_sender
+            # No default sender logic needed anymore
+            pass
 
             if self.instance.missive_type:
                 compatible_providers = self.PROVIDERS_BY_TYPE.get(
@@ -101,13 +98,12 @@ class MissiveAdmin(admin.ModelAdmin):
 
     form = MissiveAdminForm
     raw_id_fields = ["recipient_user"]
-    autocomplete_fields = ["sender", "recipient"]
 
     list_display = [
         "recipient_display_short",
         "subject",
         "missive_type_badge",
-        "sender",
+        "sender_display_short",
         "related_object_display",
         "status_badge",
         "priority_badge",
@@ -131,10 +127,11 @@ class MissiveAdmin(admin.ModelAdmin):
     search_fields = [
         "subject",
         "body",
-        "sender__name",
-        "sender__email",
-        "recipient__name",
-        "recipient__email",
+        "sender_name",
+        "sender_email",
+        "recipient_name",
+        "recipient_email",
+        "recipient_phone",
         "external_id",
         "content_type__model",
         "content_type__app_label",
@@ -156,14 +153,47 @@ class MissiveAdmin(admin.ModelAdmin):
             _("General Information"),
             {
                 "fields": (
-                    "sender",
-                    "recipient",
-                    "recipient_user",
                     "subject",
                     "body",
                     "body_text",
                     "context",
+                    "recipient_user",
                 )
+            },
+        ),
+        (
+            _("Sender (Expéditeur)"),
+            {
+                "fields": (
+                    "sender_name",
+                    "sender_email",
+                    "sender_phone",
+                    "sender_address_line1",
+                    "sender_address_line2",
+                    "sender_address_line3",
+                    "sender_postal_code",
+                    "sender_city",
+                    "sender_state",
+                    "sender_country",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            _("Recipient (Destinataire)"),
+            {
+                "fields": (
+                    "recipient_name",
+                    "recipient_email",
+                    "recipient_phone",
+                    "recipient_address_line1",
+                    "recipient_address_line2",
+                    "recipient_address_line3",
+                    "recipient_postal_code",
+                    "recipient_city",
+                    "recipient_state",
+                    "recipient_country",
+                ),
             },
         ),
         (
@@ -234,8 +264,9 @@ class MissiveAdmin(admin.ModelAdmin):
         "check_delivery_risk_action",
     ]
 
+    @admin.display(description=_("Type"))
     def missive_type_badge(self, obj):
-        """Badge coloré pour le type de missive."""
+        """Colored badge describing the missive type."""
         colors = {
             # Postal
             "POSTAL": "#6c757d",
@@ -261,10 +292,9 @@ class MissiveAdmin(admin.ModelAdmin):
             obj.get_missive_type_display(),
         )
 
-    missive_type_badge.short_description = _("Type")
-
+    @admin.display(description=_("Status"))
     def status_badge(self, obj):
-        """Badge coloré pour le statut."""
+        """Colored badge describing the current status."""
         colors = {
             "DRAFT": "#6c757d",
             "PENDING": "#ffc107",
@@ -283,10 +313,9 @@ class MissiveAdmin(admin.ModelAdmin):
             obj.get_status_display(),
         )
 
-    status_badge.short_description = _("Status")
-
+    @admin.display(description=_("Priority"))
     def priority_badge(self, obj):
-        """Badge pour la priorité."""
+        """Colored badge describing the current priority."""
         colors = {
             "LOW": "#6c757d",
             "NORMAL": "#0d6efd",
@@ -301,17 +330,36 @@ class MissiveAdmin(admin.ModelAdmin):
             obj.get_priority_display(),
         )
 
-    priority_badge.short_description = _("Priority")
-
+    @admin.display(description=_("Recipient"))
     def recipient_display_short(self, obj):
-        """Affichage court du destinataire."""
-        display = obj.recipient_display
+        """Short recipient display."""
+        if obj.recipient_name:
+            return obj.recipient_name
+        elif obj.recipient_email:
+            return obj.recipient_email
+        elif obj.recipient_phone:
+            return obj.recipient_phone
+        elif obj.recipient_user:
+            return str(obj.recipient_user)
+        return _("Unknown recipient")
+
+    @admin.display(description=_("Sender"))
+    def sender_display_short(self, obj):
+        """Short sender display."""
+        if obj.sender_name:
+            display = obj.sender_name
+        elif obj.sender_email:
+            display = obj.sender_email
+        elif obj.sender_phone:
+            display = obj.sender_phone
+        else:
+            return _("Unknown sender")
+
         if len(display) > 30:
             return display[:27] + "..."
         return display
 
-    recipient_display_short.short_description = _("Recipient")
-
+    @admin.display(description=_("Related Object"))
     def related_object_display(self, obj):
         """Displays related object."""
         if obj.content_object:
@@ -332,8 +380,7 @@ class MissiveAdmin(admin.ModelAdmin):
                 return label
         return "-"
 
-    related_object_display.short_description = _("Related Object")
-
+    @admin.display(description=_("Proof of Delivery"))
     def proof_of_delivery_display(self, obj):
         """Displays all proof of delivery links."""
         if not obj.pk:
@@ -397,8 +444,6 @@ class MissiveAdmin(admin.ModelAdmin):
                 str(e),
             )
 
-    proof_of_delivery_display.short_description = _("Proof of Delivery")
-
     def _get_provider_instance(self, obj):
         """Gets provider instance for this missive."""
         try:
@@ -419,17 +464,20 @@ class MissiveAdmin(admin.ModelAdmin):
                 if provider_path:
                     break
 
-            if not provider_path:
+            if provider_path:
+                provider_path = normalize_provider_path(provider_path)
+            else:
                 # Fallback to python-missive providers (except local django_email)
                 if provider_name.lower() == "django_email":
                     provider_path = (
-                        "missive.providers.django_email.DjangoEmailProvider"
+                        "python_missive.providers.django_email.DjangoEmailProvider"
                     )
                 else:
                     provider_path = (
                         f"python_missive.providers.{provider_name.lower()}."
                         f"{provider_name.capitalize()}Provider"
                     )
+                provider_path = normalize_provider_path(provider_path)
 
             provider_class = import_string(provider_path)
             return provider_class(missive=obj)
@@ -439,7 +487,7 @@ class MissiveAdmin(admin.ModelAdmin):
 
     @admin.action(description=_("🚀 Send Now"))
     def send_now_action(self, request, queryset):
-        """Action pour envoyer les missives sélectionnées immédiatement."""
+        """Admin action to send the selected missives immediately."""
         from ..sender import MissiveSender
 
         sender = MissiveSender()
@@ -519,7 +567,7 @@ class MissiveAdmin(admin.ModelAdmin):
 
     @admin.action(description=_("🔍 Analyze Delivery Risk"))
     def check_delivery_risk_action(self, request, queryset):
-        """Action pour analyser le risque de livraison des missives sélectionnées."""
+        """Admin action to analyze delivery risk for selected missives."""
         from ..sender import MissiveSender
 
         low_risk = 0

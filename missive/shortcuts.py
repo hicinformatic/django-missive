@@ -2,13 +2,14 @@
 
 import re
 import uuid
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 from django.conf import settings
+from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy
 
 from .exceptions import MissiveValidationError
-from .models import Missive, MissiveType, Recipient
+from .models import Missive, MissiveType
 from .sender import MissiveSender
 
 
@@ -45,7 +46,7 @@ def _validate_phone(phone: str) -> None:
 def _validate_content(content: str, missive_type: str = "") -> None:
     """Validate missive content."""
     if not content or not content.strip():
-        msg = gettext_lazy("Content cannot be empty")
+        msg: Union[Promise, str] = gettext_lazy("Content cannot be empty")
         if missive_type:
             msg = gettext_lazy("%(type)s content cannot be empty") % {"type": missive_type}
         raise MissiveValidationError(msg)
@@ -143,32 +144,16 @@ def send_missive(
     if sender_phone:
         _validate_phone(sender_phone)
 
-    sender = None
+    # Extract sender data
+    default_email = sender_email or getattr(
+        settings, "DEFAULT_FROM_EMAIL", "noreply@example.com"
+    )
+    default_phone = sender_phone or getattr(settings, "MISSIVE_DEFAULT_PHONE", None)
+    default_name = sender_name or getattr(
+        settings, "MISSIVE_DEFAULT_SENDER_NAME", "System"
+    )
 
-    if sender_email or sender_phone:
-        sender = Recipient.objects.filter(
-            email=sender_email, mobile=sender_phone
-        ).first()
-
-    if not sender:
-        default_email = sender_email or getattr(
-            settings, "DEFAULT_FROM_EMAIL", "noreply@example.com"
-        )
-        default_phone = sender_phone or getattr(settings, "MISSIVE_DEFAULT_PHONE", None)
-        default_name = sender_name or getattr(
-            settings, "MISSIVE_DEFAULT_SENDER_NAME", "System"
-        )
-
-        sender, _ = Recipient.objects.get_or_create(
-            email=default_email,
-            defaults={
-                "name": default_name,
-                "mobile": default_phone,
-                "is_active": True,
-                "can_be_sender": True,
-            },
-        )
-
+    # Extract recipient name
     recipient_name = ""
     if first_name and last_name:
         recipient_name = f"{first_name} {last_name}"
@@ -182,37 +167,8 @@ def send_missive(
         unique_id = str(uuid.uuid4())
         recipient_name = f"User_{unique_id}"
 
-    recipient_data = {
-        "is_active": True,
-        "name": recipient_name,
-    }
-
-    if phone:
-        recipient_data["mobile"] = phone
-    if email:
-        recipient_data["email"] = email
-    if address:
-        recipient_data["address_line1"] = address.get("street", "")
-        recipient_data["city"] = address.get("city", "")
-        recipient_data["postal_code"] = address.get("postal_code", "")
-        recipient_data["country"] = address.get("country", "FR")
-
-    lookup_fields = {}
-    if email:
-        lookup_fields["email"] = email
-    elif phone:
-        lookup_fields["mobile"] = phone
-    else:
-        lookup_fields["name"] = recipient_name
-
-    recipient, _ = Recipient.objects.get_or_create(
-        **lookup_fields, defaults=recipient_data
-    )
-
     if missive_type == "EMAIL" and not subject:
-        sender_display = (
-            getattr(sender, "display_name", None) or sender.name or "System"
-        )
+        sender_display = sender_name or default_name or "System"
         subject = gettext_lazy("Message from %(sender)s") % {"sender": sender_display}
 
     max_subject_length = getattr(settings, "MISSIVE_MAX_SUBJECT_LENGTH", 998)
@@ -223,11 +179,22 @@ def send_missive(
 
     missive_data = {
         "missive_type": missive_type,
-        "sender": sender,
-        "recipient": recipient,
+        "sender_name": default_name,
+        "sender_email": default_email,
+        "sender_phone": default_phone,
+        "recipient_name": recipient_name,
+        "recipient_email": email,
+        "recipient_phone": phone,
         "body": content,
         "subject": subject or "",
     }
+
+    # Add recipient address fields if provided
+    if address:
+        missive_data["recipient_address_line1"] = address.get("street", "")
+        missive_data["recipient_city"] = address.get("city", "")
+        missive_data["recipient_postal_code"] = address.get("postal_code", "")
+        missive_data["recipient_country"] = address.get("country", "FR")
 
     if "priority" in kwargs:
         missive_data["priority"] = kwargs.pop("priority")

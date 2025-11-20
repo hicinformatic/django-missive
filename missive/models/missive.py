@@ -9,28 +9,142 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from .choices import MissivePriority, MissiveStatus, MissiveType
-from .recipient import Recipient
+from ..providers import normalize_provider_path
 
 
 class Missive(models.Model):
     """Multi-channel missive model (email, SMS, postal, WhatsApp, etc.)."""
 
-    sender = models.ForeignKey(
-        Recipient,
-        on_delete=models.PROTECT,
-        related_name="sent_missives",
-        verbose_name=_("Sender"),
-        help_text=_("Sender of this missive (uses the Recipient model)"),
+    # =============================================================================
+    # Sender (Expéditeur) fields
+    # =============================================================================
+    sender_name = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("Sender Name"),
+        help_text=_("Sender's full name or company name"),
+    )
+    sender_email = models.EmailField(
+        blank=True,
+        null=True,
+        verbose_name=_("Sender Email"),
+        help_text=_("Sender's email address"),
+    )
+    sender_phone = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        verbose_name=_("Sender Phone"),
+        help_text=_("Sender's phone number in international format (e.g., +33 6 12 34 56 78)"),
+    )
+    sender_address_line1 = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("Sender Address Line 1"),
+        help_text=_("Street number and name"),
+    )
+    sender_address_line2 = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("Sender Address Line 2"),
+        help_text=_("Building, apartment, floor (optional)"),
+    )
+    sender_address_line3 = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("Sender Address Line 3"),
+        help_text=_("Additional address info (optional)"),
+    )
+    sender_postal_code = models.CharField(
+        max_length=20,
+        blank=True,
+        verbose_name=_("Sender Postal Code"),
+        help_text=_("Postal code"),
+    )
+    sender_city = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("Sender City"),
+        help_text=_("City"),
+    )
+    sender_state = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("Sender State/Region"),
+        help_text=_("Region, department or state"),
+    )
+    sender_country = models.CharField(
+        max_length=2,
+        blank=True,
+        default="FR",
+        verbose_name=_("Sender Country (ISO code)"),
+        help_text=_("ISO country code (FR, BE, CH, etc.)"),
     )
 
-    recipient = models.ForeignKey(
-        Recipient,
-        on_delete=models.PROTECT,
-        null=True,
+    # =============================================================================
+    # Recipient (Destinataire) fields
+    # =============================================================================
+    recipient_name = models.CharField(
+        max_length=255,
         blank=True,
-        related_name="received_missives",
-        verbose_name=_("Recipient"),
-        help_text=_("Recipient of this missive (uses the Recipient model)"),
+        verbose_name=_("Recipient Name"),
+        help_text=_("Recipient's full name or company name"),
+    )
+    recipient_email = models.EmailField(
+        blank=True,
+        null=True,
+        verbose_name=_("Recipient Email"),
+        help_text=_("Recipient's email address"),
+    )
+    recipient_phone = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        verbose_name=_("Recipient Phone"),
+        help_text=_("Recipient's phone number in international format (e.g., +33 6 12 34 56 78)"),
+    )
+    recipient_address_line1 = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("Recipient Address Line 1"),
+        help_text=_("Street number and name"),
+    )
+    recipient_address_line2 = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("Recipient Address Line 2"),
+        help_text=_("Building, apartment, floor (optional)"),
+    )
+    recipient_address_line3 = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_("Recipient Address Line 3"),
+        help_text=_("Additional address info (optional)"),
+    )
+    recipient_postal_code = models.CharField(
+        max_length=20,
+        blank=True,
+        verbose_name=_("Recipient Postal Code"),
+        help_text=_("Postal code"),
+    )
+    recipient_city = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("Recipient City"),
+        help_text=_("City"),
+    )
+    recipient_state = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("Recipient State/Region"),
+        help_text=_("Region, department or state"),
+    )
+    recipient_country = models.CharField(
+        max_length=2,
+        blank=True,
+        default="FR",
+        verbose_name=_("Recipient Country (ISO code)"),
+        help_text=_("ISO country code (FR, BE, CH, etc.)"),
     )
 
     recipient_user = models.ForeignKey(
@@ -40,7 +154,7 @@ class Missive(models.Model):
         blank=True,
         related_name="received_missives",
         verbose_name=_("Recipient (user)"),
-        help_text=_("Optional if 'recipient' is provided"),
+        help_text=_("Optional: link to a user account"),
     )
 
     content_type = models.ForeignKey(
@@ -209,7 +323,9 @@ class Missive(models.Model):
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["-created_at"]),
-            models.Index(fields=["sender", "-created_at"]),
+            models.Index(fields=["sender_email", "-created_at"]),
+            models.Index(fields=["recipient_email", "-created_at"]),
+            models.Index(fields=["recipient_phone", "-created_at"]),
             models.Index(fields=["recipient_user", "-created_at"]),
             models.Index(fields=["status", "-created_at"]),
             models.Index(fields=["missive_type", "status"]),
@@ -235,7 +351,8 @@ class Missive(models.Model):
         from django.conf import settings
 
         # Force sandbox mode if enabled globally
-        if getattr(settings, "MISSIVE_SANDBOX", False):
+        # B110: getattr on settings is safe, settings are controlled
+        if getattr(settings, "MISSIVE_SANDBOX", False):  # nosec B110
             if not self.provider_options:
                 self.provider_options = {}
             # Force sandbox=True (unless explicitly disabled)
@@ -247,31 +364,83 @@ class Missive(models.Model):
     @property
     def recipient_display(self):
         """Returns the recipient identifier"""
-        if self.recipient:
-            return self.recipient.display_name
+        if self.recipient_name:
+            return self.recipient_name
+        elif self.recipient_email:
+            return self.recipient_email
+        elif self.recipient_phone:
+            return self.recipient_phone
         elif self.recipient_user:
             return str(self.recipient_user)
         return _("Unknown recipient")
 
     def get_recipient_email(self):
         """Get the recipient's email"""
-        if self.recipient and self.recipient.email:
-            return self.recipient.email
+        if self.recipient_email:
+            return self.recipient_email
         elif self.recipient_user and hasattr(self.recipient_user, "email"):
             return self.recipient_user.email
         return None
 
     def get_recipient_phone(self):
         """Get the recipient's phone number"""
-        if self.recipient:
-            return self.recipient.mobile or self.recipient.phone
-        return None
+        return self.recipient_phone
 
     def get_recipient_address(self):
         """Get the recipient's postal address"""
-        if self.recipient and self.recipient.postal_address:
-            return self.recipient.postal_address
-        return None
+        lines = []
+        if self.recipient_name:
+            lines.append(self.recipient_name)
+        if self.recipient_address_line1:
+            lines.append(self.recipient_address_line1)
+        if self.recipient_address_line2:
+            lines.append(self.recipient_address_line2)
+        if self.recipient_address_line3:
+            lines.append(self.recipient_address_line3)
+        city_line = []
+        if self.recipient_postal_code:
+            city_line.append(self.recipient_postal_code)
+        if self.recipient_city:
+            city_line.append(self.recipient_city)
+        if city_line:
+            lines.append(" ".join(city_line))
+        if self.recipient_state:
+            lines.append(self.recipient_state)
+        if self.recipient_country and self.recipient_country != "FR":
+            lines.append(self.recipient_country)
+        return "\n".join(lines) if lines else None
+
+    def get_sender_email(self):
+        """Get the sender's email"""
+        return self.sender_email
+
+    def get_sender_phone(self):
+        """Get the sender's phone number"""
+        return self.sender_phone
+
+    def get_sender_address(self):
+        """Get the sender's postal address"""
+        lines = []
+        if self.sender_name:
+            lines.append(self.sender_name)
+        if self.sender_address_line1:
+            lines.append(self.sender_address_line1)
+        if self.sender_address_line2:
+            lines.append(self.sender_address_line2)
+        if self.sender_address_line3:
+            lines.append(self.sender_address_line3)
+        city_line = []
+        if self.sender_postal_code:
+            city_line.append(self.sender_postal_code)
+        if self.sender_city:
+            city_line.append(self.sender_city)
+        if city_line:
+            lines.append(" ".join(city_line))
+        if self.sender_state:
+            lines.append(self.sender_state)
+        if self.sender_country and self.sender_country != "FR":
+            lines.append(self.sender_country)
+        return "\n".join(lines) if lines else None
 
     @property
     def is_sent(self):
@@ -329,12 +498,12 @@ class Missive(models.Model):
         in the body with values from the context field.
 
         Example:
-            body = "Bonjour {{ nom }}, votre commande #{{ numero }} est prête."
-            context = {"nom": "Jean", "numero": "12345"}
-            render_body() => "Bonjour Jean, votre commande #12345 est prête."
+            body = "Hello {{ name }}, your order #{{ number }} is ready."
+            context = {"name": "Jane", "number": "12345"}
+            render_body() => "Hello Jane, your order #12345 is ready."
 
         Returns:
-            Le corps rendu avec les variables remplacées
+            The rendered body with context variables applied
         """
         from django.template import Context, Template
 
@@ -346,15 +515,12 @@ class Missive(models.Model):
             context = Context(self.context)
             return template.render(context)
         except Exception:
-            # En cas d'erreur de template, retourner le body original
+            # In case of template errors, return the original body
             return self.body
 
     def render_body_text(self):
         """
-        Rend la version texte du corps avec les variables de contexte.
-
-        Returns:
-            Le corps texte rendu avec les variables remplacées
+        Render the plain-text version of the body with context variables.
         """
         from django.template import Context, Template
 
@@ -369,15 +535,12 @@ class Missive(models.Model):
             context = Context(self.context)
             return template.render(context)
         except Exception:
-            # En cas d'erreur de template, retourner le body_text original
+            # In case of template errors, return the original plain text
             return self.body_text
 
     def render_subject(self):
         """
-        Rend le sujet avec les variables de contexte.
-
-        Returns:
-            Le sujet rendu avec les variables remplacées
+        Render the subject with context variables.
         """
         from django.template import Context, Template
 
@@ -434,17 +597,20 @@ class Missive(models.Model):
                 if provider_path:
                     break
 
-            if not provider_path:
+            if provider_path:
+                provider_path = normalize_provider_path(provider_path)
+            else:
                 # Fallback: try to construct the path (python-missive, except local django_email)
                 if provider_name.lower() == "django_email":
                     provider_path = (
-                        "missive.providers.django_email.DjangoEmailProvider"
+                        "python_missive.providers.django_email.DjangoEmailProvider"
                     )
                 else:
                     provider_path = (
                         f"python_missive.providers.{provider_name.lower()}."
                         f"{provider_name.capitalize()}Provider"
                     )
+                provider_path = normalize_provider_path(provider_path)
 
             # Import and instantiate the provider
             provider_class = import_string(provider_path)
@@ -495,17 +661,20 @@ class Missive(models.Model):
                     if provider_path:
                         break
 
-                if not provider_path:
+                if provider_path:
+                    provider_path = normalize_provider_path(provider_path)
+                else:
                     # Fallback: try to construct the path (python-missive, except local django_email)
                     if self.provider.lower() == "django_email":
                         provider_path = (
-                            "missive.providers.django_email.DjangoEmailProvider"
+                            "python_missive.providers.django_email.DjangoEmailProvider"
                         )
                     else:
                         provider_path = (
                             f"python_missive.providers.{self.provider.lower()}."
                             f"{self.provider.capitalize()}Provider"
                         )
+                    provider_path = normalize_provider_path(provider_path)
 
                 # Import and instantiate the provider
                 provider_class = import_string(provider_path)
