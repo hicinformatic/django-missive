@@ -8,6 +8,11 @@ from django.conf import settings
 from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy
 
+try:
+    from python_missive import format_phone_international
+except ImportError:
+    format_phone_international = None
+
 from .exceptions import MissiveValidationError
 from .models import Missive, MissiveType
 from .sender import MissiveSender
@@ -27,20 +32,47 @@ def _validate_email(email: str) -> None:
         raise MissiveValidationError(gettext_lazy("Invalid email format"))
 
 
-def _validate_phone(phone: str) -> None:
-    """Validate phone number format (E.164 standard)."""
+def _clean_phone(phone: str, country_code: Optional[str] = None) -> str:
+    """Clean and format phone number to international E.164 format.
+
+    Uses format_phone_international from python-missive if available,
+    otherwise returns the phone as-is.
+    """
+    if not phone:
+        return phone
+
+    if format_phone_international:
+        try:
+            return format_phone_international(phone, country_code)
+        except Exception:
+            # If formatting fails, return original phone
+            return phone
+
+    return phone
+
+
+def _validate_phone(phone: str, country_code: Optional[str] = None) -> str:
+    """Clean, format and validate phone number (E.164 standard).
+
+    Returns the cleaned phone number in international format.
+    """
     if not phone:
         raise MissiveValidationError(gettext_lazy("Phone number cannot be empty"))
 
+    # Clean and format the phone number
+    cleaned_phone = _clean_phone(phone, country_code)
+
     max_phone_length = getattr(settings, "MISSIVE_MAX_PHONE_LENGTH", 16)
-    if len(phone) > max_phone_length:
+    if len(cleaned_phone) > max_phone_length:
         raise MissiveValidationError(gettext_lazy("Phone number is too long"))
 
     phone_pattern = r"^\+[1-9]\d{1,14}$"
-    if not re.match(phone_pattern, phone):
+    if not re.match(phone_pattern, cleaned_phone):
         raise MissiveValidationError(
             gettext_lazy("Invalid phone format. Expected E.164 (e.g. +33612345678)")
         )
+
+    return cleaned_phone
 
 
 def _validate_content(content: str, missive_type: str = "") -> None:
@@ -82,8 +114,11 @@ def send_missive(
             "EMAIL": "EMAIL",
             "MAIL": "EMAIL",
             "POSTAL": "POSTAL",
+            "POSTAL_REGISTERED": "POSTAL_REGISTERED",
             "LETTER": "POSTAL",
             "COURRIER": "POSTAL",
+            "REGISTERED": "POSTAL_REGISTERED",
+            "RECOMMANDE": "POSTAL_REGISTERED",
             "LRE": "LRE",
             "NOTIFICATION": "NOTIFICATION",
             "NOTIF": "NOTIFICATION",
@@ -106,12 +141,17 @@ def send_missive(
 
     _validate_content(content, missive_type)
 
+    # Get country code from address if available (for phone formatting)
+    country_code = None
+    if address and isinstance(address, dict):
+        country_code = address.get("country")
+
     if missive_type in ("SMS", "VOICE_CALL"):
         if not phone:
             raise MissiveValidationError(
                 gettext_lazy("'phone' field required for %(type)s") % {"type": missive_type}
             )
-        _validate_phone(phone)
+        phone = _validate_phone(phone, country_code)
 
     elif missive_type == "EMAIL":
         if not email:
@@ -123,14 +163,15 @@ def send_missive(
 
     elif missive_type == "BRANDED":
         if phone:
-            _validate_phone(phone)
+            phone = _validate_phone(phone, country_code)
         if email:
             _validate_email(email)
 
-    elif missive_type == "POSTAL":
+    elif missive_type in ("POSTAL", "POSTAL_REGISTERED"):
         if not address or not isinstance(address, dict):
             raise MissiveValidationError(
-                gettext_lazy("'address' dict required for POSTAL missives")
+                gettext_lazy("'address' dict required for %(type)s missives")
+                % {"type": missive_type}
             )
         required_fields = ["street", "city", "postal_code", "country"]
         missing = [f for f in required_fields if not address.get(f)]
@@ -138,11 +179,13 @@ def send_missive(
             raise MissiveValidationError(
                 gettext_lazy("Missing address fields: %(fields)s") % {"fields": ", ".join(missing)}
             )
+        if missive_type == "POSTAL_REGISTERED":
+            kwargs.setdefault("is_registered", True)
 
     if sender_email:
         _validate_email(sender_email)
     if sender_phone:
-        _validate_phone(sender_phone)
+        sender_phone = _validate_phone(sender_phone)
 
     # Extract sender data
     default_email = sender_email or getattr(

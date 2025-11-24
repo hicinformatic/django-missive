@@ -15,6 +15,10 @@ DEFAULT_PROVIDERS = {
     "EMAIL": ["python_missive.providers.django_email.DjangoEmailProvider"],
     "SMS": ["python_missive.providers.twilio.TwilioProvider"],
     "POSTAL": ["python_missive.providers.laposte.LaPosteProvider"],
+    "POSTAL_REGISTERED": [
+        "python_missive.providers.laposte.LaPosteProvider",
+        "python_missive.providers.maileva.MailevaProvider",
+    ],
     "NOTIFICATION": ["python_missive.providers.notification.InAppNotificationProvider"],
     "BRANDED": ["python_missive.providers.twilio.TwilioProvider"],
 }

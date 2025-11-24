@@ -270,6 +270,7 @@ class MissiveAdmin(admin.ModelAdmin):
         colors = {
             # Postal
             "POSTAL": "#6c757d",
+            "POSTAL_REGISTERED": "#495057",
             "LRE": "#495057",
             # Email
             "EMAIL": "#0d6efd",

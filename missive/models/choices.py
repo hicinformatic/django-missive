@@ -16,6 +16,7 @@ class MissiveType(models.TextChoices):
     """Missive types."""
 
     POSTAL = "POSTAL", _("Postal mail")
+    POSTAL_REGISTERED = "POSTAL_REGISTERED", _("Registered postal mail")
     LRE = "LRE", _("Electronic registered letter")
     EMAIL = "EMAIL", _("Email")
     SMS = "SMS", _("SMS")

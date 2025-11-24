@@ -112,6 +112,10 @@ MISSIVE_PROVIDERS = {
     'POSTAL': [
         'python_missive.providers.laposte.LaPosteProvider',
     ],
+    'POSTAL_REGISTERED': [
+        'python_missive.providers.laposte.LaPosteProvider',
+        'python_missive.providers.maileva.MailevaProvider',
+    ],
 }
 
 # Configuration des API keys
@@ -222,6 +226,7 @@ MISSIVE_CONFIG = {
         'SMS': 'twilio',
         'WHATSAPP': 'twilio',
         'POSTAL': 'laposte',
+        'POSTAL_REGISTERED': 'laposte',
         'NOTIFICATION': 'inapp',
     },
     

@@ -115,13 +115,14 @@ class Command(BaseCommand):
             )
 
         for i, recipient in enumerate(postal_recipients, 1):
+            missive_type = "POSTAL_REGISTERED" if i % 2 == 0 else "POSTAL"
             missives.append(
                 {
-                    "missive_type": "POSTAL",
+                    "missive_type": missive_type,
                     "subject": f"Courrier recommandé {i}",
                     "body": f"<h2>Lettre recommandée</h2><p>Destinataire: {recipient['name']}</p><p>Contenu du courrier {i}.</p>",
                     "body_text": f"Lettre recommandée pour {recipient['name']}. Contenu du courrier {i}.",
-                    "is_registered": i % 2 == 0,
+                    "is_registered": missive_type == "POSTAL_REGISTERED" or i % 2 == 0,
                     "requires_signature": i % 3 == 0,
                     "priority": "HIGH",
                     "status": ["DRAFT", "PENDING", "SENT"][i % 3],
@@ -159,6 +160,7 @@ class Command(BaseCommand):
                 "SMS": "twilio",
                 "BRANDED": "twilio",
                 "POSTAL": "laposte",
+                "POSTAL_REGISTERED": "laposte",
                 "NOTIFICATION": "custom",
             }
 
@@ -176,6 +178,7 @@ class Command(BaseCommand):
                 "SMS": "📱",
                 "BRANDED": "💬",
                 "POSTAL": "📮",
+                "POSTAL_REGISTERED": "📮",
                 "NOTIFICATION": "🔔",
             }
             icon = icons.get(missive.missive_type, "📋")
@@ -203,6 +206,7 @@ class Command(BaseCommand):
             ("SMS", "SMS"),
             ("BRANDED", "App Messaging"),
             ("POSTAL", "Postal"),
+            ("POSTAL_REGISTERED", "Registered Mail"),
             ("NOTIFICATION", "Notification"),
         ]:
             count = Missive.objects.filter(missive_type=missive_type).count()

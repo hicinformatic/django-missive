@@ -38,6 +38,7 @@ def system_status_view(request):
         "EMAIL": "email_geo",
         "SMS": "sms_geo",
         "POSTAL": "postal_geo",
+        "POSTAL_REGISTERED": "postal_geo",
         "LRE": "lre_geo",
         "RCS": "rcs_geo",
         "VOICE_CALL": "voice_call_geo",

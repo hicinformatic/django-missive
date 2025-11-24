@@ -320,6 +320,7 @@ DEFAULT_PROVIDERS_BY_TYPE = {
     "SMS": ["twilio", "vonage", "smspartner", "brevo"],
     "RCS": ["twilio"],
     "POSTAL": ["laposte"],
+    "POSTAL_REGISTERED": ["laposte", "maileva", "ar24"],
     "LRE": ["ar24", "certeurope"],
     "VOICE_CALL": ["twilio", "vonage", "smspartner"],
     "NOTIFICATION": ["notification"],
@@ -344,6 +345,11 @@ DEFAULT_PROVIDER_PATHS_BY_TYPE = {
     ],
     "RCS": ["python_missive.providers.twilio.TwilioProvider"],
     "POSTAL": ["python_missive.providers.laposte.LaPosteProvider"],
+    "POSTAL_REGISTERED": [
+        "python_missive.providers.laposte.LaPosteProvider",
+        "python_missive.providers.maileva.MailevaProvider",
+        "python_missive.providers.ar24.AR24Provider",
+    ],
     "LRE": [
         "python_missive.providers.ar24.AR24Provider",
         "python_missive.providers.certeurope.CertEuropeProvider",

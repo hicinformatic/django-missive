@@ -2,15 +2,40 @@
 
 import importlib
 import json
+from decimal import Decimal, InvalidOperation
 
+from django.conf import settings
 from django.contrib import admin
 from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 
 from ..decorators import sandbox_warning, library_presence_warning
+from ..helpers import _normalize_providers_config, _provider_error_logger
 from ..models import MissiveType, ProviderInfo
 from ..models.provider import ProviderInfoQuerySet
+from ..providers import normalize_provider_path
 
+
+# Shared postal attachment limit fields
+_POSTAL_ATTACHMENT_LIMIT_FIELDS = [
+    {
+        "suffix": "max_pages",
+        "label": _("Max pages per document"),
+        "attr": "max_postal_pages",
+    },
+    {
+        "suffix": "allowed_mime_types",
+        "label": _("Allowed MIME types"),
+        "attr": "allowed_attachment_mime_types",
+        "empty_label": _("No restriction"),
+    },
+    {
+        "suffix": "allowed_page_formats",
+        "label": _("Allowed page formats"),
+        "attr": "allowed_page_formats",
+        "empty_label": _("No restriction"),
+    },
+]
 
 ATTACHMENT_LIMIT_FIELDS = {
     "EMAIL": [
@@ -27,25 +52,8 @@ ATTACHMENT_LIMIT_FIELDS = {
             "empty_label": _("No restriction"),
         },
     ],
-    "POSTAL": [
-        {
-            "suffix": "max_pages",
-            "label": _("Max pages per document"),
-            "attr": "max_postal_pages",
-        },
-        {
-            "suffix": "allowed_mime_types",
-            "label": _("Allowed MIME types"),
-            "attr": "allowed_attachment_mime_types",
-            "empty_label": _("No restriction"),
-        },
-        {
-            "suffix": "allowed_page_formats",
-            "label": _("Allowed page formats"),
-            "attr": "allowed_page_formats",
-            "empty_label": _("No restriction"),
-        },
-    ],
+    "POSTAL": _POSTAL_ATTACHMENT_LIMIT_FIELDS,
+    "POSTAL_REGISTERED": _POSTAL_ATTACHMENT_LIMIT_FIELDS,
     "BRANDED": [
         {
             "suffix": "max_size_bytes",
@@ -60,6 +68,109 @@ ATTACHMENT_LIMIT_FIELDS = {
             "empty_label": _("No restriction"),
         },
     ],
+}
+
+# Shared postal fields configuration
+_POSTAL_SUMMARY_FIELDS = [
+    {
+        "name": "postal_price",
+        "label": _("Unit price (€)"),
+        "attr": "postal_price",
+        "formatter": "currency",
+    },
+    {
+        "name": "postal_page_limit",
+        "label": _("Page limit"),
+        "attr": "postal_page_limit",
+        "formatter": "integer",
+    },
+    {
+        "name": "postal_page_price_color",
+        "label": _("Price per page (color) (€)"),
+        "attr": "postal_page_price_color",
+        "formatter": "currency",
+    },
+    {
+        "name": "postal_page_price_black_white",
+        "label": _("Price per page (B&W) (€)"),
+        "attr": "postal_page_price_black_white",
+        "formatter": "currency",
+    },
+    {
+        "name": "postal_page_price_single_sided",
+        "label": _("Price per page (single-sided) (€)"),
+        "attr": "postal_page_price_single_sided",
+        "formatter": "currency",
+    },
+    {
+        "name": "postal_page_price_duplex",
+        "label": _("Price per page (duplex) (€)"),
+        "attr": "postal_page_price_duplex",
+        "formatter": "currency",
+    },
+    {
+        "name": "postal_color_printing_available",
+        "label": _("Color printing"),
+        "attr": "postal_color_printing_available",
+        "formatter": "boolean",
+    },
+    {
+        "name": "postal_duplex_printing_available",
+        "label": _("Recto/Verso"),
+        "attr": "postal_duplex_printing_available",
+        "formatter": "boolean",
+    },
+]
+
+TYPE_SUMMARY_FIELDS = {
+    "EMAIL": [
+        {
+            "name": "email_price",
+            "label": _("Unit price (€)"),
+            "attr": "email_price",
+            "formatter": "currency",
+        },
+        {
+            "name": "email_max_attachment_size_mb",
+            "label": _("Max attachment size"),
+            "attr": "email_max_attachment_size_mb",
+            "formatter": "megabytes",
+        },
+        {
+            "name": "email_allowed_attachment_mime_types",
+            "label": _("Allowed MIME types"),
+            "attr": "email_allowed_attachment_mime_types",
+            "formatter": "list",
+        },
+    ],
+    "POSTAL": _POSTAL_SUMMARY_FIELDS,
+    "POSTAL_REGISTERED": _POSTAL_SUMMARY_FIELDS,
+    "SMS": [
+        {
+            "name": "sms_price",
+            "label": _("Unit price (€)"),
+            "attr": "sms_price",
+            "formatter": "currency",
+        },
+        {
+            "name": "sms_character_limit",
+            "label": _("Characters / SMS"),
+            "attr": "sms_character_limit",
+            "formatter": "integer",
+        },
+        {
+            "name": "sms_unicode_character_limit",
+            "label": _("Unicode characters / SMS"),
+            "attr": "sms_unicode_character_limit",
+            "formatter": "integer",
+        },
+    ],
+}
+
+TYPE_SUMMARY_FIELD_LOOKUP = {
+    spec["name"]: spec
+    for specs in TYPE_SUMMARY_FIELDS.values()
+    for spec in specs
 }
 
 
@@ -104,7 +215,39 @@ def _build_attachment_limit_field_name(missive_type: str, suffix: str) -> str:
 
 
 class MissiveTypeFilter(admin.SimpleListFilter):
-    """Filtre personnalisé pour afficher les types avec leurs labels traduits."""
+    """Filtre personnalisé pour afficher les types avec leurs labels traduits.
+    
+    Utilise get_providers_for_type avec les options d'ordonnancement configurées
+    dans MISSIVE_PROVIDER_ORDERING pour trier les providers.
+    
+    Configuration dans settings.py:
+    
+    # Option 1: Ordonnancement par attributs de classe (ex: postal_page_limit)
+    MISSIVE_PROVIDER_ORDERING = {
+        'POSTAL': ['postal_page_limit'],  # Tri croissant par nombre de pages max
+        'POSTAL_REGISTERED': ['-postal_page_limit'],  # Tri décroissant
+        'EMAIL': ['email_price'],  # Tri par prix
+    }
+    
+    # Option 2: Avec métadonnées dans MISSIVE_PROVIDERS
+    MISSIVE_PROVIDERS = {
+        'python_missive.providers.laposte.LaPosteProvider': {
+            'postal_price': 0.50,
+            'postal_page_limit': 200,
+        },
+        'python_missive.providers.maileva.MailevaProvider': {
+            'postal_price': 0.30,
+            'postal_page_limit': 100,
+        },
+    }
+    MISSIVE_PROVIDER_ORDERING = {
+        'POSTAL_REGISTERED': ['postal_price'],  # Trier par prix croissant
+    }
+
+    Les colonnes dynamiques utilisent les attributs exposés par python-missive
+    (email_max_attachment_size_mb, sms_price, postal_page_limit, etc.), déclarés
+    dans les mixins de base via les listes *_config_fields.
+    """
 
     title = _("Missive Type")
     parameter_name = "missive_type"
@@ -113,10 +256,84 @@ class MissiveTypeFilter(admin.SimpleListFilter):
         return [(choice.value, choice.label) for choice in MissiveType]
 
     def queryset(self, request, queryset):
-        if self.value():
+        if not self.value():
+            return queryset
+
+        missive_type = self.value()
+
+        # Get provider configuration from settings
+        try:
+            from python_missive.helpers import get_providers_for_type
+
+            providers_config = getattr(settings, "MISSIVE_PROVIDERS", None)
+            
+            # Normalize config: handle both list and dict formats
+            if isinstance(providers_config, dict):
+                # Dict format: {provider_path: metadata_dict}
+                provider_metadata = {}
+                provider_paths = []
+                for path, metadata in providers_config.items():
+                    normalized_path = normalize_provider_path(path)
+                    provider_paths.append(normalized_path)
+                    if isinstance(metadata, dict):
+                        provider_metadata[normalized_path] = metadata
+                providers_config = provider_paths
+            else:
+                # List format: [provider_path, ...]
+                normalized_config = _normalize_providers_config()
+                providers_config = normalized_config or []
+                provider_metadata = None
+
+            # Get ordering configuration from settings
+            ordering_config = getattr(
+                settings, "MISSIVE_PROVIDER_ORDERING", {}
+            )
+            ordering = ordering_config.get(missive_type)
+
+            # Get ordered providers for this type
+            ordered_provider_names = get_providers_for_type(
+                providers_config,
+                missive_type,
+                ordering=ordering,
+                provider_metadata=provider_metadata,
+                on_error=_provider_error_logger,
+            )
+
+            # Build a mapping from normalized provider names to ProviderInfo objects
+            # Since ProviderInfoManager now uses get_provider_name_from_path,
+            # provider.name should match the normalized names from get_providers_for_type
+            provider_dict = {p.name.lower(): p for p in queryset}
+            
+            filtered = []
+            
+            # Add providers in the order returned by get_providers_for_type
+            for provider_name in ordered_provider_names:
+                # Match by case-insensitive comparison
+                provider = provider_dict.get(provider_name.lower())
+                if provider and missive_type in provider.missive_types_list:
+                    if provider not in filtered:
+                        filtered.append(provider)
+            
+            # Add any remaining providers that support this type but weren't in the ordered list
+            for provider in queryset:
+                if (
+                    missive_type in provider.missive_types_list
+                    and provider not in filtered
+                ):
+                    filtered.append(provider)
+
+            return ProviderInfoQuerySet(
+                model=queryset.model,
+                data=filtered,
+                query=queryset.query,
+                using=queryset._db,
+                hints=queryset._hints,
+            )
+        except Exception:
+            # Fallback to original behavior if get_providers_for_type fails
             filtered = []
             for provider in queryset:
-                if self.value() in provider.missive_types_list:
+                if missive_type in provider.missive_types_list:
                     filtered.append(provider)
             return ProviderInfoQuerySet(
                 model=queryset.model,
@@ -125,7 +342,6 @@ class MissiveTypeFilter(admin.SimpleListFilter):
                 using=queryset._db,
                 hints=queryset._hints,
             )
-        return queryset
 
 
 @sandbox_warning
@@ -150,6 +366,8 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
     list_filter = [MissiveTypeFilter]
 
+    _provider_metadata_cache: dict[str, dict] | None = None
+
     search_fields = ["name", "missive_type"]
 
     readonly_fields = [
@@ -167,6 +385,15 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         "usage_count",
         "requirements_file",
     ]
+
+    def get_list_display(self, request):
+        base = list(super().get_list_display(request))
+        missive_type = (request.GET.get("missive_type") or "").upper()
+        for spec in TYPE_SUMMARY_FIELDS.get(missive_type, []):
+            field_name = spec["name"]
+            if field_name not in base:
+                base.append(field_name)
+        return tuple(base)
 
     def get_fieldsets(self, request, obj=None):
         """Génère les fieldsets dynamiquement selon les types de missive."""
@@ -292,6 +519,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                             "SMS": "get_sms_service_info",
                             "EMAIL": "get_email_service_info",
                             "POSTAL": "get_postal_service_info",
+                            "POSTAL_REGISTERED": "get_postal_service_info",
                             "VOICE_CALL": "get_voice_call_service_info",
                             "NOTIFICATION": "get_notification_service_info",
                             "PUSH_NOTIFICATION": "get_push_notification_service_info",
@@ -318,6 +546,15 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 service_info_method
             )
 
+        summary_spec = TYPE_SUMMARY_FIELD_LOOKUP.get(name)
+        if summary_spec:
+            description = summary_spec.get("label", name)
+
+            def summary_method(obj, spec=summary_spec):
+                return self._render_type_summary_field(obj, spec)
+
+            return admin.display(description=description)(summary_method)
+
         if name.startswith("geo_") and name.endswith("_display"):
             missive_type = name[4:-8].upper()
 
@@ -332,6 +569,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                             "SMS": "sms_geo",
                             "EMAIL": "email_geo",
                             "POSTAL": "postal_geo",
+                            "POSTAL_REGISTERED": "postal_geo",
                             "VOICE_CALL": "voice_call_geo",
                             "NOTIFICATION": "notification_geo",
                             "PUSH_NOTIFICATION": "push_notification_geo",
@@ -457,7 +695,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                                 ] = provider_instance.allowed_attachment_mime_types
 
                         # POSTAL attachments
-                        elif missive_type == "POSTAL":
+                        elif missive_type in ("POSTAL", "POSTAL_REGISTERED"):
                             if hasattr(provider_instance, "max_postal_pages"):
                                 limits_info["max_pages"] = provider_instance.max_postal_pages
                             if hasattr(provider_instance, "allowed_attachment_mime_types"):
@@ -569,6 +807,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         """Badges colorés pour tous les types supportés."""
         colors = {
             "POSTAL": "#6c757d",
+            "POSTAL_REGISTERED": "#495057",
             "LRE": "#495057",
             "EMAIL": "#0d6efd",
             "SMS": "#198754",
@@ -837,6 +1076,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             "VOICE_CALL": "Voice Calls",
             "BRANDED": "Messaging",
             "POSTAL": "Postal",
+            "POSTAL_REGISTERED": "Postal (Registered)",
             "LRE": "LRE",
             "NOTIFICATION": "Notifications",
             "PUSH_NOTIFICATION": "Push",
@@ -981,8 +1221,103 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
         return format_html(table_html)
 
+    def _render_type_summary_field(self, obj, spec):
+        """Resolve a provider config attribute for summary display."""
+        attr_name = spec.get("attr") or spec.get("name")
+        provider_class = obj._get_provider_class()
+        value = None
+        if provider_class and attr_name:
+            value = getattr(provider_class, attr_name, None)
+        if value in (None, ""):
+            metadata = self._get_metadata_for_provider(obj.name)
+            if metadata and attr_name:
+                value = metadata.get(attr_name)
+        return self._format_summary_value(value, spec)
+
+    def _format_summary_value(self, value, spec):
+        placeholder = format_html(
+            '<span style="color: #6c757d; font-style: italic;">—</span>'
+        )
+
+        if value in (None, ""):
+            return placeholder
+
+        formatter = spec.get("formatter")
+
+        if formatter == "currency":
+            try:
+                amount = Decimal(str(value))
+                return format_html("€{:.2f}", amount)
+            except (InvalidOperation, TypeError, ValueError):
+                return format_html("{}", value)
+
+        if formatter == "boolean":
+            if isinstance(value, str):
+                truthy = value.strip().lower() in {"1", "true", "yes", "y", "on"}
+            else:
+                truthy = bool(value)
+            label = _("Yes") if truthy else _("No")
+            color = "#198754" if truthy else "#6c757d"
+            return format_html('<span style="color: {};">{}</span>', color, label)
+
+        if formatter == "megabytes":
+            try:
+                mb_value = Decimal(str(value))
+                return format_html("{} MB", mb_value.normalize())
+            except (InvalidOperation, TypeError, ValueError):
+                return format_html("{} MB", value)
+
+        if formatter == "integer":
+            try:
+                return format_html("{}", int(value))
+            except (TypeError, ValueError):
+                return format_html("{}", value)
+
+        if formatter == "list":
+            if isinstance(value, (list, tuple, set)):
+                return format_html_join("<br>", "{}", ((v,) for v in value))
+            return format_html("{}", value)
+
+        return format_html("{}", value)
+
+    def _get_metadata_for_provider(self, provider_name: str):
+        metadata_map = self._get_provider_metadata_map()
+        return metadata_map.get((provider_name or "").lower(), {})
+
+    def _get_provider_metadata_map(self):
+        if self._provider_metadata_cache is not None:
+            return self._provider_metadata_cache
+
+        metadata_map: dict[str, dict] = {}
+
+        dedicated_metadata = getattr(settings, "MISSIVE_PROVIDER_METADATA", {})
+        if isinstance(dedicated_metadata, dict):
+            for provider_name, metadata in dedicated_metadata.items():
+                if isinstance(metadata, dict):
+                    metadata_map[provider_name.lower()] = dict(metadata)
+
+        providers_config = getattr(settings, "MISSIVE_PROVIDERS", None)
+        if isinstance(providers_config, dict):
+            try:
+                from python_missive.providers import get_provider_name_from_path
+            except ImportError:
+
+                def get_provider_name_from_path(path: str) -> str:
+                    return path.split(".")[-2] if "." in path else path
+
+            for path, metadata in providers_config.items():
+                if not isinstance(metadata, dict):
+                    continue
+                normalized_path = normalize_provider_path(path)
+                provider_name = get_provider_name_from_path(normalized_path)
+                metadata_map.setdefault(provider_name.lower(), {}).update(metadata)
+
+        self._provider_metadata_cache = metadata_map
+        return metadata_map
+
     def changelist_view(self, request, extra_context=None):
         """Ajoute du contexte à la vue liste."""
+        self._provider_metadata_cache = None
         extra_context = extra_context or {}
 
         from ..models import Missive

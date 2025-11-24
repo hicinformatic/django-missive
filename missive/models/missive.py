@@ -8,6 +8,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+try:
+    from python_missive import format_phone_international
+except ImportError:
+    format_phone_international = None
+
 from .choices import MissivePriority, MissiveStatus, MissiveType
 from ..providers import normalize_provider_path
 
@@ -345,10 +350,35 @@ class Missive(models.Model):
         """
         Save the missive.
 
+        Automatically cleans phone numbers to international format.
         If MISSIVE_SANDBOX=True in settings, automatically forces
         sandbox=True in provider_options for ALL providers.
         """
         from django.conf import settings
+
+        # Clean phone numbers to international format
+        if format_phone_international:
+            if self.recipient_phone:
+                try:
+                    # Use recipient country if available, otherwise default to FR
+                    country_code = self.recipient_country or "FR"
+                    self.recipient_phone = format_phone_international(
+                        self.recipient_phone, country_code
+                    )
+                except Exception:
+                    # If formatting fails, keep original phone
+                    pass
+
+            if self.sender_phone:
+                try:
+                    # Use sender country if available, otherwise default to FR
+                    country_code = self.sender_country or "FR"
+                    self.sender_phone = format_phone_international(
+                        self.sender_phone, country_code
+                    )
+                except Exception:
+                    # If formatting fails, keep original phone
+                    pass
 
         # Force sandbox mode if enabled globally
         # B110: getattr on settings is safe, settings are controlled

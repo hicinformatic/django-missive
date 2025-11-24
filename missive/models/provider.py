@@ -131,6 +131,7 @@ class ProviderInfoManager(models.Manager):
         # Load providers from settings using python-missive helper
         try:
             from python_missive.helpers import get_provider_paths_from_config
+            from python_missive.providers import get_provider_name_from_path
             from django.conf import settings as dj_settings
             configured = getattr(dj_settings, "MISSIVE_PROVIDERS", None) or []
             provider_paths = (
@@ -140,12 +141,16 @@ class ProviderInfoManager(models.Manager):
             providers_by_type = {k: v for k, v in mapping.items()}
         except Exception:
             providers_by_type = {}
+            # Fallback name extraction if python-missive is not available
+            def get_provider_name_from_path(path):
+                return path.split(".")[-2] if "." in path else path
 
         # Group providers by name (a provider can support multiple types)
+        # Use get_provider_name_from_path for consistent name normalization
         providers_dict = {}
         for missive_type, provider_paths in sorted(providers_by_type.items()):
             for path in provider_paths:
-                name = path.split(".")[-2] if "." in path else path
+                name = get_provider_name_from_path(path)
                 if name not in providers_dict:
                     providers_dict[name] = []
                 providers_dict[name].append(missive_type)

@@ -34,6 +34,11 @@
             optional: ['name', 'recipient_type', 'content_type', 'object_id', 'civility', 'address_line2', 'address_line3', 'state', 'notes', 'metadata', 'is_active'],
             hidden: ['email', 'mobile']
         },
+        'POSTAL_REGISTERED': {
+            required: ['address_line1', 'postal_code', 'city', 'country'],
+            optional: ['name', 'recipient_type', 'content_type', 'object_id', 'civility', 'address_line2', 'address_line3', 'state', 'notes', 'metadata', 'is_active'],
+            hidden: ['email', 'mobile']
+        },
         'NOTIFICATION': {
             required: ['email'],
             optional: ['name', 'recipient_type', 'content_type', 'object_id', 'civility', 'notes', 'metadata', 'is_active'],
@@ -111,6 +116,7 @@
             'SMS': '📱 Mode SMS : Seuls les champs liés au téléphone sont affichés',
             'BRANDED': '💬 Mode Messagerie : Seuls les champs liés au téléphone/identifiant sont affichés',
             'POSTAL': '📮 Mode Courrier : Seuls les champs liés à l\'adresse postale sont affichés',
+            'POSTAL_REGISTERED': '📮 Mode Courrier recommandé : Seuls les champs liés à l\'adresse postale sont affichés',
             'NOTIFICATION': '🔔 Mode Notification : Seuls les champs liés à l\'email sont affichés'
         };
 

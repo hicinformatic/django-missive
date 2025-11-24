@@ -34,6 +34,7 @@
                         'SMS': ['twilio', 'custom'],
                         'BRANDED': ['twilio', 'slack', 'telegram', 'custom'],
                         'POSTAL': ['laposte', 'custom'],
+                        'POSTAL_REGISTERED': ['laposte', 'maileva', 'custom'],
                         'NOTIFICATION': ['custom']
                     };
                 }
@@ -95,6 +96,8 @@
                     } else if (selectedType === 'BRANDED' && compatibleProviders.includes('twilio')) {
                         $providerChoice.val('twilio');
                     } else if (selectedType === 'POSTAL' && compatibleProviders.includes('laposte')) {
+                        $providerChoice.val('laposte');
+                    } else if (selectedType === 'POSTAL_REGISTERED' && compatibleProviders.includes('laposte')) {
                         $providerChoice.val('laposte');
                     } else {
                         $providerChoice.val(compatibleProviders[0]);
