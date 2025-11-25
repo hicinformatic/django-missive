@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ImproperlyConfigured
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from python_missive.helpers import (
     get_provider_paths_from_config as pm_get_provider_paths_from_config,
@@ -314,67 +316,8 @@ def get_missives_stats_for_object(obj: Any) -> Dict[str, int]:
 # ==============================================================================
 
 
-# Default choices when settings.MISSIVE_PROVIDERS is empty
-DEFAULT_PROVIDERS_BY_TYPE = {
-    "EMAIL": ["django_email", "sendgrid", "mailgun", "ses", "brevo", "smspartner"],
-    "SMS": ["twilio", "vonage", "smspartner", "brevo"],
-    "RCS": ["twilio"],
-    "POSTAL": ["laposte"],
-    "POSTAL_REGISTERED": ["laposte", "maileva", "ar24"],
-    "LRE": ["ar24", "certeurope"],
-    "VOICE_CALL": ["twilio", "vonage", "smspartner"],
-    "NOTIFICATION": ["notification"],
-    "PUSH_NOTIFICATION": ["fcm", "apn"],
-    "BRANDED": ["twilio", "slack", "teams", "telegram", "signal", "messenger"],
-}
-
-DEFAULT_PROVIDER_PATHS_BY_TYPE = {
-    "EMAIL": [
-        "python_missive.providers.django_email.DjangoEmailProvider",
-        "python_missive.providers.sendgrid.SendGridProvider",
-        "python_missive.providers.mailgun.MailgunProvider",
-        "python_missive.providers.ses.SESProvider",
-        "python_missive.providers.brevo.BrevoProvider",
-        "python_missive.providers.smspartner.SMSPartnerProvider",
-    ],
-    "SMS": [
-        "python_missive.providers.twilio.TwilioProvider",
-        "python_missive.providers.vonage.VonageProvider",
-        "python_missive.providers.smspartner.SMSPartnerProvider",
-        "python_missive.providers.brevo.BrevoProvider",
-    ],
-    "RCS": ["python_missive.providers.twilio.TwilioProvider"],
-    "POSTAL": ["python_missive.providers.laposte.LaPosteProvider"],
-    "POSTAL_REGISTERED": [
-        "python_missive.providers.laposte.LaPosteProvider",
-        "python_missive.providers.maileva.MailevaProvider",
-        "python_missive.providers.ar24.AR24Provider",
-    ],
-    "LRE": [
-        "python_missive.providers.ar24.AR24Provider",
-        "python_missive.providers.certeurope.CertEuropeProvider",
-    ],
-    "VOICE_CALL": [
-        "python_missive.providers.twilio.TwilioProvider",
-        "python_missive.providers.vonage.VonageProvider",
-        "python_missive.providers.smspartner.SMSPartnerProvider",
-    ],
-    "NOTIFICATION": [
-        "python_missive.providers.notification.InAppNotificationProvider"
-    ],
-    "PUSH_NOTIFICATION": [
-        "python_missive.providers.fcm.FCMProvider",
-        "python_missive.providers.apn.APNProvider",
-    ],
-    "BRANDED": [
-        "python_missive.providers.twilio.TwilioProvider",
-        "python_missive.providers.slack.SlackProvider",
-        "python_missive.providers.teams.TeamsProvider",
-        "python_missive.providers.telegram.TelegramProvider",
-        "python_missive.providers.signal.SignalProvider",
-        "python_missive.providers.messenger.MessengerProvider",
-    ],
-}
+DEFAULT_PROVIDERS_BY_TYPE: Dict[str, list[str]] = {}
+DEFAULT_PROVIDER_PATHS_BY_TYPE: Dict[str, list[str]] = {}
 
 
 def _normalize_providers_config() -> Optional[list[str]]:
@@ -426,7 +369,12 @@ def get_providers_from_config():
         normalized_config, on_error=_provider_error_logger
     )
 
-    return providers_by_type or DEFAULT_PROVIDERS_BY_TYPE
+    if not providers_by_type:
+        raise ImproperlyConfigured(
+            "MISSIVE_PROVIDERS must declare at least one provider."
+        )
+
+    return providers_by_type
 
 
 def get_provider_paths_from_config():
@@ -441,7 +389,12 @@ def get_provider_paths_from_config():
         normalized_config, on_error=_provider_error_logger
     )
 
-    return providers_by_type or DEFAULT_PROVIDER_PATHS_BY_TYPE
+    if not providers_by_type:
+        raise ImproperlyConfigured(
+            "MISSIVE_PROVIDERS must declare at least one provider path."
+        )
+
+    return providers_by_type
 
 
 # Re-export python-missive helper for backward compatibility
@@ -530,3 +483,121 @@ def get_all_provider_choices():
         choices.append((provider, label))
 
     return choices
+
+
+# ==============================================================================
+# Delayed send helpers
+# ==============================================================================
+
+
+def send_delayed_missives(
+    max_missives: Optional[int] = None,
+    skip_health_check: bool = False,
+    enable_fallback: bool = True,
+) -> Dict[str, Any]:
+    """
+    Send all missives that have reached their delayed_send_at datetime.
+
+    This function is designed to be called by any queue backend (Celery, RQ, etc.)
+    as a periodic task.
+
+    Args:
+        max_missives: Maximum number of missives to process in one run.
+                     If None, processes all eligible missives.
+        skip_health_check: Whether to skip provider health checks (faster but less safe).
+        enable_fallback: Whether to enable automatic provider fallback on failure.
+
+    Returns:
+        dict: Summary with keys:
+            - 'processed': Total number of missives processed
+            - 'success': Number of successfully sent missives
+            - 'failed': Number of failed missives
+            - 'errors': List of error details (missive_id, error message)
+
+    Example with Celery:
+        @shared_task
+        def send_delayed_missives_task():
+            from missive.helpers import send_delayed_missives
+            return send_delayed_missives(max_missives=100)
+
+    Example with RQ:
+        from missive.helpers import send_delayed_missives
+        job = queue.enqueue(send_delayed_missives, max_missives=50)
+    """
+    from .models import MissiveStatus
+    from .sender import MissiveSender
+
+    now = timezone.now()
+
+    # Find missives that should be sent now
+    queryset = Missive.objects.filter(
+        delayed_send_at__isnull=False,
+        delayed_send_at__lte=now,
+        status__in=[MissiveStatus.DRAFT, MissiveStatus.PENDING],
+    ).order_by("delayed_send_at", "priority", "created_at")
+
+    if max_missives:
+        queryset = queryset[:max_missives]
+
+    missives = list(queryset)
+    total = len(missives)
+
+    if total == 0:
+        logger.info("No delayed missives to send")
+        return {
+            "processed": 0,
+            "success": 0,
+            "failed": 0,
+            "errors": [],
+        }
+
+    logger.info(f"Processing {total} delayed missive(s)")
+
+    results: Dict[str, Any] = {
+        "processed": total,
+        "success": 0,
+        "failed": 0,
+        "errors": [],
+    }
+
+    for missive in missives:
+        try:
+            logger.info(
+                f"Processing delayed missive {missive.id} "
+                f"(delayed_send_at={missive.delayed_send_at})"
+            )
+
+            success = MissiveSender.send(
+                missive,
+                skip_health_check=skip_health_check,
+                enable_fallback=enable_fallback,
+            )
+
+            if success:
+                results["success"] += 1
+                logger.info(f"Successfully sent delayed missive {missive.id}")
+            else:
+                results["failed"] += 1
+                error_msg = f"Send returned False for missive {missive.id}"
+                results["errors"].append(
+                    {"missive_id": missive.id, "error": error_msg}
+                )
+                logger.warning(error_msg)
+
+        except Exception as e:
+            results["failed"] += 1
+            error_msg = str(e)
+            results["errors"].append(
+                {"missive_id": missive.id, "error": error_msg}
+            )
+            logger.error(
+                f"Error sending delayed missive {missive.id}: {error_msg}",
+                exc_info=True,
+            )
+
+    logger.info(
+        f"Delayed send completed: {results['success']} success, "
+        f"{results['failed']} failed out of {results['processed']} processed"
+    )
+
+    return results

@@ -11,25 +11,20 @@ from .models import Missive
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_PROVIDERS = {
-    "EMAIL": ["python_missive.providers.django_email.DjangoEmailProvider"],
-    "SMS": ["python_missive.providers.twilio.TwilioProvider"],
-    "POSTAL": ["python_missive.providers.laposte.LaPosteProvider"],
-    "POSTAL_REGISTERED": [
-        "python_missive.providers.laposte.LaPosteProvider",
-        "python_missive.providers.maileva.MailevaProvider",
-    ],
-    "NOTIFICATION": ["python_missive.providers.notification.InAppNotificationProvider"],
-    "BRANDED": ["python_missive.providers.twilio.TwilioProvider"],
-}
-
-
 class MissiveSender:
     """Sends missives with automatic provider fallback."""
 
     @staticmethod
     def get_provider_classes(missive: Missive) -> List[str]:
         """Returns ordered list of providers to try (by priority)."""
+        # Vérifier d'abord si un provider est explicitement défini via _provider_path
+        provider_path = getattr(missive, "_provider_path", None)
+        if provider_path:
+            logger.info(
+                f"Missive {missive.id}: Explicit provider path '{provider_path}'"
+            )
+            return [provider_path]
+
         if missive.provider:
             logger.info(
                 f"Missive {missive.id}: Explicit provider '{missive.provider}'"
@@ -44,13 +39,6 @@ class MissiveSender:
                 f"Missive {missive.id}: Configured providers for {missive.missive_type}: {provider_paths}"
             )
             return list(provider_paths) if provider_paths else []
-
-        default_providers = DEFAULT_PROVIDERS.get(missive.missive_type, [])
-        if default_providers:
-            logger.info(
-                f"Missive {missive.id}: Using default providers: {default_providers}"
-            )
-            return default_providers
 
         raise ValueError(f"No provider configured for {missive.missive_type}")
 

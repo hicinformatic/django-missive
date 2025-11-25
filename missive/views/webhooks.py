@@ -75,8 +75,8 @@ class WebhookView(View):
             for type_providers in providers_config.values():
                 for path in type_providers:
                     try:
-                        # B701: import_string is safe here, path comes from config
-                        provider_class = import_string(path)  # nosec B701
+                        # import_string is safe here, path comes from config
+                        provider_class = import_string(path)
                         provider_name = (
                             provider_class.name.lower()
                             .replace(" ", "")
@@ -97,8 +97,8 @@ class WebhookView(View):
                 )
 
             # Load provider class
-            # B701: import_string is safe here, provider_path comes from config
-            provider_class = import_string(provider_path)  # nosec B701
+            # import_string is safe here, provider_path comes from config
+            provider_class = import_string(provider_path)
             provider_instance = provider_class()
 
             # SECURITY: Validate webhook signature
@@ -167,8 +167,8 @@ def webhook_test_view(request):
             for type_providers in providers_config.values():
                 for path in type_providers:
                     try:
-                        # B701: import_string is safe here, path comes from config
-                        cls = import_string(path)  # nosec B701
+                        # import_string is safe here, path comes from config
+                        cls = import_string(path)
                         if cls.name.lower().replace(" ", "") == provider_name.lower():
                             provider_class = cls
                             break
@@ -204,8 +204,8 @@ def webhook_test_view(request):
     for provider_list in providers_config.values():
         for provider_path in provider_list:
             try:
-                # B701: import_string is safe here, path comes from config
-                provider_class = import_string(provider_path)  # nosec B701
+                # import_string is safe here, path comes from config
+                provider_class = import_string(provider_path)
                 all_providers.add(provider_class.name.lower())
             except Exception:
                 continue
