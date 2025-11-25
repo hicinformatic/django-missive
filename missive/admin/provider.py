@@ -3,12 +3,16 @@
 import importlib
 import json
 from decimal import Decimal, InvalidOperation
+from typing import Optional
 
 from django.conf import settings
 from django.contrib import admin
+from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist, PermissionDenied
+from django.http import JsonResponse
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
-
 from ..decorators import sandbox_warning, library_presence_warning
 from ..helpers import _normalize_providers_config, _provider_error_logger
 from ..models import MissiveType, ProviderInfo
@@ -143,8 +147,29 @@ TYPE_SUMMARY_FIELDS = {
             "formatter": "list",
         },
     ],
+    "EMAIL_MARKETING": [
+        {
+            "name": "email_marketing_price",
+            "label": _("Unit price (€)"),
+            "attr": "email_marketing_price",
+            "formatter": "currency",
+        },
+        {
+            "name": "email_marketing_max_attachment_size_mb",
+            "label": _("Max attachment size"),
+            "attr": "email_marketing_max_attachment_size_mb",
+            "formatter": "megabytes",
+        },
+        {
+            "name": "email_marketing_allowed_attachment_mime_types",
+            "label": _("Allowed MIME types"),
+            "attr": "email_marketing_allowed_attachment_mime_types",
+            "formatter": "list",
+        },
+    ],
     "POSTAL": _POSTAL_SUMMARY_FIELDS,
     "POSTAL_REGISTERED": _POSTAL_SUMMARY_FIELDS,
+    "POSTAL_SIGNATURE": _POSTAL_SUMMARY_FIELDS,
     "SMS": [
         {
             "name": "sms_price",
@@ -162,6 +187,22 @@ TYPE_SUMMARY_FIELDS = {
             "name": "sms_unicode_character_limit",
             "label": _("Unicode characters / SMS"),
             "attr": "sms_unicode_character_limit",
+            "formatter": "integer",
+        },
+    ],
+    "LRE": _POSTAL_SUMMARY_FIELDS,
+    "LRE_QUALIFIED": _POSTAL_SUMMARY_FIELDS,
+    "ERE": [
+        {
+            "name": "ere_price",
+            "label": _("Unit price (€)"),
+            "attr": "ere_price",
+            "formatter": "currency",
+        },
+        {
+            "name": "ere_archiving_duration",
+            "label": _("Archiving duration (days)"),
+            "attr": "ere_archiving_duration",
             "formatter": "integer",
         },
     ],
@@ -216,19 +257,19 @@ def _build_attachment_limit_field_name(missive_type: str, suffix: str) -> str:
 
 class MissiveTypeFilter(admin.SimpleListFilter):
     """Filtre personnalisé pour afficher les types avec leurs labels traduits.
-    
+
     Utilise get_providers_for_type avec les options d'ordonnancement configurées
     dans MISSIVE_PROVIDER_ORDERING pour trier les providers.
-    
+
     Configuration dans settings.py:
-    
+
     # Option 1: Ordonnancement par attributs de classe (ex: postal_page_limit)
     MISSIVE_PROVIDER_ORDERING = {
         'POSTAL': ['postal_page_limit'],  # Tri croissant par nombre de pages max
         'POSTAL_REGISTERED': ['-postal_page_limit'],  # Tri décroissant
         'EMAIL': ['email_price'],  # Tri par prix
     }
-    
+
     # Option 2: Avec métadonnées dans MISSIVE_PROVIDERS
     MISSIVE_PROVIDERS = {
         'python_missive.providers.laposte.LaPosteProvider': {
@@ -266,14 +307,14 @@ class MissiveTypeFilter(admin.SimpleListFilter):
             from python_missive.helpers import get_providers_for_type
 
             providers_config = getattr(settings, "MISSIVE_PROVIDERS", None)
-            
+
             # Normalize config: handle both list and dict formats
             if isinstance(providers_config, dict):
                 # Dict format: {provider_path: metadata_dict}
                 provider_metadata = {}
                 provider_paths = []
-                for path, metadata in providers_config.items():
-                    normalized_path = normalize_provider_path(path)
+                for provider_path, metadata in providers_config.items():
+                    normalized_path = normalize_provider_path(provider_path)
                     provider_paths.append(normalized_path)
                     if isinstance(metadata, dict):
                         provider_metadata[normalized_path] = metadata
@@ -303,9 +344,9 @@ class MissiveTypeFilter(admin.SimpleListFilter):
             # Since ProviderInfoManager now uses get_provider_name_from_path,
             # provider.name should match the normalized names from get_providers_for_type
             provider_dict = {p.name.lower(): p for p in queryset}
-            
+
             filtered = []
-            
+
             # Add providers in the order returned by get_providers_for_type
             for provider_name in ordered_provider_names:
                 # Match by case-insensitive comparison
@@ -313,7 +354,7 @@ class MissiveTypeFilter(admin.SimpleListFilter):
                 if provider and missive_type in provider.missive_types_list:
                     if provider not in filtered:
                         filtered.append(provider)
-            
+
             # Add any remaining providers that support this type but weren't in the ordered list
             for provider in queryset:
                 if (
@@ -352,7 +393,6 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
     class Media:
         js = ("admin/js/config_vars_toggle.js",)
-
     ordering = ["name"]
 
     list_display = [
@@ -364,9 +404,11 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         "requirements_file",
     ]
 
+    change_form_template = "admin/missive/providerinfo/change_form.html"
+
     list_filter = [MissiveTypeFilter]
 
-    _provider_metadata_cache: dict[str, dict] | None = None
+    _provider_metadata_cache: Optional[dict[str, dict]] = None
 
     search_fields = ["name", "missive_type"]
 
@@ -515,18 +557,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                     if provider_class:
                         provider_instance = provider_class()
 
-                        method_map = {
-                            "SMS": "get_sms_service_info",
-                            "EMAIL": "get_email_service_info",
-                            "POSTAL": "get_postal_service_info",
-                            "POSTAL_REGISTERED": "get_postal_service_info",
-                            "VOICE_CALL": "get_voice_call_service_info",
-                            "NOTIFICATION": "get_notification_service_info",
-                            "PUSH_NOTIFICATION": "get_push_notification_service_info",
-                            "BRANDED": "get_branded_service_info",
-                        }
-
-                        method_name = method_map.get(missive_type)
+                        method_name = f"get_{missive_type.lower()}_service_info"
 
                         if method_name and hasattr(provider_instance, method_name):
                             service_info = getattr(provider_instance, method_name)()
@@ -564,41 +595,25 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                     if provider_class:
                         provider_instance = provider_class()
 
-                        # Map missive type to geo attribute name
-                        geo_attr_map = {
-                            "SMS": "sms_geo",
-                            "EMAIL": "email_geo",
-                            "POSTAL": "postal_geo",
-                            "POSTAL_REGISTERED": "postal_geo",
-                            "VOICE_CALL": "voice_call_geo",
-                            "NOTIFICATION": "notification_geo",
-                            "PUSH_NOTIFICATION": "push_notification_geo",
-                            "BRANDED": "branded_geo",
-                            "LRE": "lre_geo",
-                        }
+                        normalized = missive_type.strip().lower()
+                        geo_attr = f"{normalized}_geographic_coverage"
 
-                        geo_attr = geo_attr_map.get(missive_type)
-
-                        if geo_attr:
-                            # Search through MRO and __dict__ to find the attribute
-                            for cls in provider_class.__mro__:
-                                if hasattr(cls, "__dict__") and geo_attr in cls.__dict__:
-                                    geo_value = cls.__dict__[geo_attr]
-                                    # Return raw value directly
-                                    try:
-                                        return ", ".join(str(v) for v in geo_value)
-                                    except (TypeError, ValueError):
-                                        return str(geo_value)
-                            # If not found in class, try instance
-                            if hasattr(provider_instance, geo_attr):
-                                geo_value = getattr(provider_instance, geo_attr)
+                        # Search through MRO and __dict__ to find the attribute
+                        for cls in provider_class.__mro__:
+                            if hasattr(cls, "__dict__") and geo_attr in cls.__dict__:
+                                geo_value = cls.__dict__[geo_attr]
                                 try:
                                     return ", ".join(str(v) for v in geo_value)
                                 except (TypeError, ValueError):
                                     return str(geo_value)
-                            return "Not configured"
-                        else:
-                            return "Not applicable"
+                        # If not found in class, try instance
+                        if hasattr(provider_instance, geo_attr):
+                            geo_value = getattr(provider_instance, geo_attr)
+                            try:
+                                return ", ".join(str(v) for v in geo_value)
+                            except (TypeError, ValueError):
+                                return str(geo_value)
+                        return "Not configured"
 
                     else:
                         return "Provider not loaded"
@@ -754,6 +769,33 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return True
+
+    def get_object(self, request, object_id, from_field=None):
+        """Récupère l'objet provider par son name (qui est maintenant le pk)."""
+        if object_id is None:
+            return None
+
+        try:
+            # Le pk est maintenant le name, donc on peut chercher directement
+            queryset = self.get_queryset(request)
+            try:
+                # Essayer de trouver par pk (qui est le name)
+                return queryset.get(pk=object_id)
+            except (ObjectDoesNotExist, MultipleObjectsReturned):
+                # Fallback: chercher par name (insensible à la casse)
+                for provider in queryset:
+                    if provider.name.lower() == object_id.lower():
+                        return provider
+                    # Vérifier aussi par display_name si disponible
+                    provider_class = provider._get_provider_class()
+                    if provider_class:
+                        display_name = getattr(provider_class, "display_name", None)
+                        if display_name and display_name.lower() == object_id.lower():
+                            return provider
+                return None
+        except Exception:
+            # Fallback vers le comportement par défaut
+            return super().get_object(request, object_id, from_field)
 
     def get_search_results(self, request, queryset, search_term):
         """Implémente la recherche manuelle pour le QuerySet personnalisé."""
@@ -1070,20 +1112,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             '<small style="color: #6c757d;">✅ One URL for all service types:'
         )
 
-        type_labels = {
-            "EMAIL": "Email",
-            "SMS": "SMS",
-            "VOICE_CALL": "Voice Calls",
-            "BRANDED": "Messaging",
-            "POSTAL": "Postal",
-            "POSTAL_REGISTERED": "Postal (Registered)",
-            "LRE": "LRE",
-            "NOTIFICATION": "Notifications",
-            "PUSH_NOTIFICATION": "Push",
-            "RCS": "RCS",
-        }
-
-        type_names = [type_labels.get(t, t) for t in types]
+        type_names = [t.replace("_", " ").title() for t in types]
         html_parts.append(f' {", ".join(type_names)}</small>')
         html_parts.append("</div></div>")
 
@@ -1305,15 +1334,170 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 def get_provider_name_from_path(path: str) -> str:
                     return path.split(".")[-2] if "." in path else path
 
-            for path, metadata in providers_config.items():
+            for provider_path, metadata in providers_config.items():
                 if not isinstance(metadata, dict):
                     continue
-                normalized_path = normalize_provider_path(path)
+                normalized_path = normalize_provider_path(provider_path)
                 provider_name = get_provider_name_from_path(normalized_path)
                 metadata_map.setdefault(provider_name.lower(), {}).update(metadata)
 
         self._provider_metadata_cache = metadata_map
         return metadata_map
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "<str:provider_name>/test/",
+                self.admin_site.admin_view(self.provider_test_view),
+                name="missive_provider_test",
+            ),
+            path(
+                "<str:provider_name>/test/send/",
+                self.admin_site.admin_view(self.provider_test_send_view),
+                name="missive_provider_test_send",
+            ),
+        ]
+        return custom_urls + urls
+
+    def _get_provider_info(self, provider_name: str):
+        """Récupère le ProviderInfo par son name."""
+        try:
+            return ProviderInfo.objects.get(pk=provider_name)
+        except (ObjectDoesNotExist, MultipleObjectsReturned):
+            return None
+
+    def _get_provider_path(self, provider_name: str):
+        """Récupère le chemin du provider depuis la config."""
+        providers_config = getattr(settings, "MISSIVE_PROVIDERS", None)
+        if not providers_config:
+            return None
+
+        try:
+            from python_missive.helpers import get_provider_by_attribute
+
+            provider_paths = (
+                list(providers_config.keys())
+                if isinstance(providers_config, dict)
+                else list(providers_config)
+            )
+
+            provider_class = get_provider_by_attribute(
+                provider_paths,
+                "name",
+                provider_name,
+                on_error=_provider_error_logger,
+            )
+
+            if provider_class:
+                return f"{provider_class.__module__}.{provider_class.__name__}"
+
+            return None
+        except Exception:
+            return None
+
+    def provider_test_view(self, request, provider_name):
+        """Vue de test pour un provider spécifique."""
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+
+        provider_info = self._get_provider_info(provider_name)
+        if provider_info is None:
+            from django.http import Http404
+            raise Http404(_("Provider not found"))
+
+        provider_path = self._get_provider_path(provider_name)
+        can_test = provider_path is not None and provider_info.status == "ready"
+
+        # Déterminer le type de missive par défaut
+        default_type = "EMAIL"
+        if provider_info.missive_types_list:
+            default_type = provider_info.missive_types_list[0]
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": _("Test provider"),
+            "provider": provider_info,
+            "provider_path": provider_path,
+            "provider_configured": can_test,
+            "can_test": can_test,
+            "default_type": default_type,
+            "missive_types": provider_info.missive_types_list,
+            "send_url": reverse("admin:missive_provider_test_send", args=[provider_name]),
+            "opts": ProviderInfo._meta,
+        }
+        return TemplateResponse(
+            request, "admin/missive/providerinfo/test.html", context
+        )
+
+    def provider_test_send_view(self, request, provider_name):
+        """Vue AJAX pour envoyer un missive de test avec le provider spécifié."""
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+
+        if request.method != "POST":
+            return JsonResponse({"error": "Method not allowed"}, status=405)
+
+        provider_info = self._get_provider_info(provider_name)
+        if provider_info is None:
+            return JsonResponse({"error": "Provider not found"}, status=404)
+
+        provider_path = self._get_provider_path(provider_name)
+        if not provider_path:
+            return JsonResponse({"error": "Provider path not found"}, status=404)
+
+        try:
+            from ..shortcuts import send_missive
+
+            missive_type = request.POST.get("missive_type", "EMAIL").upper()
+            content = request.POST.get("content", "").strip()
+            recipient_email = request.POST.get("recipient_email", "").strip()
+            recipient_phone = request.POST.get("recipient_phone", "").strip()
+            subject = request.POST.get("subject", "").strip()
+
+            if not content:
+                return JsonResponse({"error": "Content is required"}, status=400)
+
+            # Valider selon le type
+            if missive_type == "EMAIL":
+                if not recipient_email:
+                    return JsonResponse(
+                        {"error": "Recipient email is required for EMAIL"}, status=400
+                    )
+                if not subject:
+                    return JsonResponse(
+                        {"error": "Subject is required for EMAIL"}, status=400
+                    )
+            elif missive_type in ("SMS", "VOICE_CALL"):
+                if not recipient_phone:
+                    return JsonResponse(
+                        {"error": f"Recipient phone is required for {missive_type}"},
+                        status=400,
+                    )
+
+            # Envoyer avec le provider spécifié
+            # On utilise send_missive mais on force le provider après création
+            missive = send_missive(
+                missive_type=missive_type,
+                content=content,
+                recipient_email=recipient_email or None,
+                recipient_phone=recipient_phone or None,
+                subject=subject or None,
+            )
+            # Forcer l'utilisation de ce provider uniquement
+            missive._provider_path = provider_path  # type: ignore[attr-defined]
+
+            return JsonResponse(
+                {
+                    "success": True,
+                    "missive_id": missive.id,
+                    "status": missive.status,
+                    "provider_used": missive.provider or provider_path,
+                    "error_message": missive.error_message,
+                }
+            )
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
 
     def changelist_view(self, request, extra_context=None):
         """Ajoute du contexte à la vue liste."""

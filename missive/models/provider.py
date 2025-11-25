@@ -142,6 +142,7 @@ class ProviderInfoManager(models.Manager):
         except Exception:
             providers_by_type = {}
             # Fallback name extraction if python-missive is not available
+
             def get_provider_name_from_path(path):
                 return path.split(".")[-2] if "." in path else path
 
@@ -156,18 +157,17 @@ class ProviderInfoManager(models.Manager):
                 providers_dict[name].append(missive_type)
 
         # Build provider list with all their missive types
+        # Use name as pk for URL generation
         providers_list = []
-        pk = 1
         for provider_name, missive_types in sorted(providers_dict.items()):
             provider = ProviderInfo(
-                pk=pk,
+                pk=provider_name,  # Use name as pk for URL generation
                 name=provider_name,
                 missive_type=",".join(
                     missive_types
                 ),  # Store type list for display
             )
             providers_list.append(provider)
-            pk += 1
 
         # Return an in-memory QuerySet clone
         return ProviderInfoQuerySet(model=self.model, data=providers_list)
