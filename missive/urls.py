@@ -1,6 +1,12 @@
 from django.urls import path
 
-from .views import WebhookView, webhook_status_view, webhook_test_view, system_status_view
+from .views import (
+    WebhookView,
+    address_backends_status_view,
+    system_status_view,
+    webhook_status_view,
+    webhook_test_view,
+)
 
 app_name = "missive"
 
@@ -9,4 +15,9 @@ urlpatterns = [
     path("webhooks/<str:provider>/", WebhookView.as_view(), name="webhook"),
     path("webhook/test/", webhook_test_view, name="webhook-test"),
     path("diagnostics/", system_status_view, name="system-status"),
+    path(
+        "diagnostics/address-backends/",
+        address_backends_status_view,
+        name="address-backends-status",
+    ),
 ]

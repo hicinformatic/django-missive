@@ -226,7 +226,11 @@ class Missive(models.Model):
             "Provider-specific options (e.g., {'scheduled_time': 14, 'track_clicks': true, 'priority': 'high'})"
         ),
     )
-
+    archiving_duration_days = models.PositiveIntegerField(
+        default=0,
+        verbose_name=_("Archiving Duration (days)"),
+        help_text=_("Number of days the provider keeps proofs or message records"),
+    )
     # Specific options
     is_registered = models.BooleanField(
         default=False,
@@ -237,6 +241,16 @@ class Missive(models.Model):
         default=False,
         verbose_name=_("Signature Required"),
         help_text=_("For registered mail with signature"),
+    )
+    color_printing = models.BooleanField(
+        default=False,
+        verbose_name=_("Color Printing"),
+        help_text=_("Request color printing when supported by the provider"),
+    )
+    duplex_printing = models.BooleanField(
+        default=True,
+        verbose_name=_("Duplex Printing"),
+        help_text=_("Request double-sided printing when supported by the provider"),
     )
 
     # Status and tracking
@@ -264,6 +278,12 @@ class Missive(models.Model):
         blank=True,
         verbose_name=_("Scheduled Send Date"),
         help_text=_("Leave blank for immediate sending"),
+    )
+    delayed_send_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_("Delayed Send At"),
+        help_text=_("When set, the missive is deferred until this exact date/time."),
     )
     sent_at = models.DateTimeField(
         null=True,

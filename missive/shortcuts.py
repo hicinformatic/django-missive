@@ -43,7 +43,8 @@ def _clean_phone(phone: str, country_code: Optional[str] = None) -> str:
 
     if format_phone_international:
         try:
-            return format_phone_international(phone, country_code)
+            result = format_phone_international(phone, country_code)
+            return str(result) if result is not None else phone
         except Exception:
             # If formatting fails, return original phone
             return phone
@@ -109,35 +110,9 @@ def send_missive(
     """Sends missive with minimal info. Auto-generates missing fields."""
     missive_type = missive_type.upper()
     if not hasattr(MissiveType, missive_type):
-        type_mapping = {
-            "SMS": "SMS",
-            "EMAIL": "EMAIL",
-            "MAIL": "EMAIL",
-            "POSTAL": "POSTAL",
-            "POSTAL_REGISTERED": "POSTAL_REGISTERED",
-            "LETTER": "POSTAL",
-            "COURRIER": "POSTAL",
-            "REGISTERED": "POSTAL_REGISTERED",
-            "RECOMMANDE": "POSTAL_REGISTERED",
-            "LRE": "LRE",
-            "NOTIFICATION": "NOTIFICATION",
-            "NOTIF": "NOTIFICATION",
-            "PUSH": "PUSH_NOTIFICATION",
-            "PUSH_NOTIFICATION": "PUSH_NOTIFICATION",
-            "VOICE": "VOICE_CALL",
-            "VOICE_CALL": "VOICE_CALL",
-            "CALL": "VOICE_CALL",
-            "VOCAL": "VOICE_CALL",
-            "BRANDED": "BRANDED",
-            "WHATSAPP": "BRANDED",
-            "SLACK": "BRANDED",
-            "TEAMS": "BRANDED",
-            "TELEGRAM": "BRANDED",
-            "MESSENGER": "BRANDED",
-            "SIGNAL": "BRANDED",
-            "DISCORD": "BRANDED",
-        }
-        missive_type = type_mapping.get(missive_type, "EMAIL")
+        raise MissiveValidationError(
+            gettext_lazy("Unsupported missive type: %(type)s") % {"type": missive_type}
+        )
 
     _validate_content(content, missive_type)
 

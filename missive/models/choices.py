@@ -17,8 +17,12 @@ class MissiveType(models.TextChoices):
 
     POSTAL = "POSTAL", _("Postal mail")
     POSTAL_REGISTERED = "POSTAL_REGISTERED", _("Registered postal mail")
+    POSTAL_SIGNATURE = "POSTAL_SIGNATURE", _("Registered postal mail with signature")
     LRE = "LRE", _("Electronic registered letter")
+    LRE_QUALIFIED = "LRE_QUALIFIED", _("Qualified electronic registered letter")
+    ERE = "ERE", _("Electronic registered email (ERE)")
     EMAIL = "EMAIL", _("Email")
+    EMAIL_MARKETING = "EMAIL_MARKETING", _("Marketing email")
     SMS = "SMS", _("SMS")
     RCS = "RCS", _("RCS (Rich SMS)")
     VOICE_CALL = "VOICE_CALL", _("Automated voice call")

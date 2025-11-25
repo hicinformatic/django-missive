@@ -86,6 +86,21 @@ class Command(BaseCommand):
                 }
             )
 
+        for i, recipient in enumerate(email_recipients, 1):
+            missives.append(
+                {
+                    "missive_type": "EMAIL_MARKETING",
+                    "subject": f"Newsletter {i}",
+                    "body": f"<p>Bonjour {recipient['name']}, voici la newsletter n°{i}.</p>",
+                    "body_text": f"Newsletter marketing pour {recipient['name']} (n°{i})",
+                    "priority": "NORMAL",
+                    "status": ["DRAFT", "PENDING", "SENT"][i % 3],
+                    "recipient_name": recipient["name"],
+                    "recipient_email": recipient["email"],
+                    **sender_data,
+                }
+            )
+
         for i, recipient in enumerate(mobile_recipients, 1):
             missives.append(
                 {
@@ -115,7 +130,8 @@ class Command(BaseCommand):
             )
 
         for i, recipient in enumerate(postal_recipients, 1):
-            missive_type = "POSTAL_REGISTERED" if i % 2 == 0 else "POSTAL"
+            types_cycle = ["POSTAL", "POSTAL_REGISTERED", "POSTAL_SIGNATURE"]
+            missive_type = types_cycle[i % len(types_cycle)]
             missives.append(
                 {
                     "missive_type": missive_type,
@@ -132,6 +148,55 @@ class Command(BaseCommand):
                     "recipient_postal_code": recipient["postal_code"],
                     "recipient_city": recipient["city"],
                     "recipient_country": recipient["country"],
+                    **sender_data,
+                }
+            )
+
+        for i, recipient in enumerate(postal_recipients, 1):
+            missives.append(
+                {
+                    "missive_type": "LRE",
+                    "subject": f"LRE {i}",
+                    "body": f"Lettre recommandée électronique pour {recipient['name']}",
+                    "body_text": f"LRE destinée à {recipient['name']}",
+                    "priority": "HIGH",
+                    "status": ["DRAFT", "PENDING", "SENT"][i % 3],
+                    "recipient_name": recipient["name"],
+                    "recipient_email": f"lre_{i}@example.com",
+                    "recipient_address_line1": recipient["address_line1"],
+                    "recipient_postal_code": recipient["postal_code"],
+                    "recipient_city": recipient["city"],
+                    "recipient_country": recipient["country"],
+                    **sender_data,
+                }
+            )
+
+        for i, recipient in enumerate(postal_recipients[:2], 1):
+            missives.append(
+                {
+                    "missive_type": "LRE_QUALIFIED",
+                    "subject": f"LRE qualifiée {i}",
+                    "body": f"LRE qualifiée destinée à {recipient['name']}",
+                    "body_text": f"LRE qualifiée pour {recipient['name']}",
+                    "priority": "HIGH",
+                    "status": ["DRAFT", "SENT"][i % 2],
+                    "recipient_name": recipient["name"],
+                    "recipient_email": f"lreq_{i}@example.com",
+                    **sender_data,
+                }
+            )
+
+        for i, recipient in enumerate(email_recipients[:2], 1):
+            missives.append(
+                {
+                    "missive_type": "ERE",
+                    "subject": f"ERE {i}",
+                    "body": f"Envoi recommandé électronique {i}",
+                    "body_text": f"ERE {i} pour {recipient['name']}",
+                    "priority": "NORMAL",
+                    "status": ["DRAFT", "PENDING", "SENT"][i % 3],
+                    "recipient_name": recipient["name"],
+                    "recipient_email": recipient["email"],
                     **sender_data,
                 }
             )
@@ -154,19 +219,8 @@ class Command(BaseCommand):
         created_count = 0
         for missive_data in missives:
             missive = Missive.objects.create(**missive_data)
-
-            provider_map = {
-                "EMAIL": "django_email",
-                "SMS": "twilio",
-                "BRANDED": "twilio",
-                "POSTAL": "laposte",
-                "POSTAL_REGISTERED": "laposte",
-                "NOTIFICATION": "custom",
-            }
-
-            provider = provider_map.get(missive.missive_type, "custom")
             missive.create_send_event(
-                provider=provider,
+                provider="custom",
                 status=missive.status,
                 description=f"Missive {missive.missive_type} created",
             )
@@ -175,10 +229,15 @@ class Command(BaseCommand):
 
             icons = {
                 "EMAIL": "✉️",
+                "EMAIL_MARKETING": "📰",
                 "SMS": "📱",
                 "BRANDED": "💬",
                 "POSTAL": "📮",
                 "POSTAL_REGISTERED": "📮",
+                "POSTAL_SIGNATURE": "✍️",
+                "LRE": "📧",
+                "LRE_QUALIFIED": "✅",
+                "ERE": "📨",
                 "NOTIFICATION": "🔔",
             }
             icon = icons.get(missive.missive_type, "📋")
@@ -203,10 +262,15 @@ class Command(BaseCommand):
         self.stdout.write("\n📊 Statistics by type:")
         for missive_type, label in [
             ("EMAIL", "Email"),
+            ("EMAIL_MARKETING", "Email Marketing"),
             ("SMS", "SMS"),
             ("BRANDED", "App Messaging"),
             ("POSTAL", "Postal"),
             ("POSTAL_REGISTERED", "Registered Mail"),
+            ("POSTAL_SIGNATURE", "Registered w/ Signature"),
+            ("LRE", "LRE"),
+            ("LRE_QUALIFIED", "LRE Qualifiée"),
+            ("ERE", "ERE"),
             ("NOTIFICATION", "Notification"),
         ]:
             count = Missive.objects.filter(missive_type=missive_type).count()

@@ -13,6 +13,12 @@ try:
 except ImportError:
     print("⚠️ python-dotenv not installed. Install with: pip install python-dotenv")
 
+
+def _env(key: str, default: str = "") -> str:
+    """Shortcut to fetch environment variables with defaults."""
+    return os.getenv(key, default)
+
+
 SECRET_KEY = os.getenv("SECRET_KEY", "test-secret-key-for-django-missive")
 
 DEBUG = True
@@ -83,31 +89,78 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # No more duplication—Twilio is listed once instead of four times.
 
 MISSIVE_PROVIDERS = [
-    # Providers Email
-    "python_missive.providers.django_email.DjangoEmailProvider",  # local Django backend
+    # Email providers
+    "python_missive.providers.django_email.DjangoEmailProvider",
+    "python_missive.providers.smtp.SMTPProvider",
     "python_missive.providers.sendgrid.SendGridProvider",
     "python_missive.providers.mailgun.MailgunProvider",
     "python_missive.providers.ses.SESProvider",
-    "python_missive.providers.brevo.BrevoProvider",  # Auto categorized: EMAIL + SMS
-    # Providers SMS/Voice (multi-types)
-    "python_missive.providers.twilio.TwilioProvider",  # Auto categorized: SMS + BRANDED + VOICE_CALL
-    "python_missive.providers.vonage.VonageProvider",  # Auto categorized: SMS + VOICE_CALL
-    "python_missive.providers.smspartner.SMSPartnerProvider",  # Auto-categorized: SMS + EMAIL + VOICE_CALL
-    # Branded messaging providers (BRANDED)
+    "python_missive.providers.brevo.BrevoProvider",
+    # SMS / Voice providers
+    "python_missive.providers.twilio.TwilioProvider",
+    "python_missive.providers.vonage.VonageProvider",
+    "python_missive.providers.smspartner.SMSPartnerProvider",
+    # Branded messaging providers
     "python_missive.providers.slack.SlackProvider",
     "python_missive.providers.teams.TeamsProvider",
     "python_missive.providers.telegram.TelegramProvider",
     "python_missive.providers.signal.SignalProvider",
     "python_missive.providers.messenger.MessengerProvider",
-    # Providers Postal/LRE
+    # Postal / LRE providers
     "python_missive.providers.laposte.LaPosteProvider",
     "python_missive.providers.maileva.MailevaProvider",
     "python_missive.providers.ar24.AR24Provider",
     "python_missive.providers.certeurope.CerteuropeProvider",
-    # Providers Notifications
+    # Notifications / Push
     "python_missive.providers.fcm.FCMProvider",
     "python_missive.providers.apn.APNProvider",
     "python_missive.providers.notification.InAppNotificationProvider",
+]
+
+# =============================================================================
+# Address verification backends configuration
+# =============================================================================
+# Ordered list: the first working backend is used by Missive helpers/admin tools.
+
+MISSIVE_ADDRESS_BACKENDS = [
+    {
+        "class": "python_missive.address_backends.nominatim.NominatimAddressBackend",
+        "config": {
+            "NOMINATIM_USER_AGENT": _env(
+                "NOMINATIM_USER_AGENT", "django-missive/1.0"
+            ),
+            "NOMINATIM_BASE_URL": _env(
+                "NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org"
+            ),
+        },
+    },
+    {
+        "class": "python_missive.address_backends.photon.PhotonAddressBackend",
+        "config": {
+            "PHOTON_BASE_URL": _env(
+                "PHOTON_BASE_URL", "https://photon.komoot.io"
+            ),
+        },
+    },
+    {
+        "class": "python_missive.address_backends.google_maps.GoogleMapsAddressBackend",
+        "config": {
+            "GOOGLE_MAPS_API_KEY": _env("GOOGLE_MAPS_API_KEY", ""),
+        },
+    },
+    {
+        "class": "python_missive.address_backends.mapbox.MapboxAddressBackend",
+        "config": {
+            "MAPBOX_ACCESS_TOKEN": _env("MAPBOX_ACCESS_TOKEN", ""),
+        },
+    },
+    {
+        "class": "python_missive.address_backends.here.HereAddressBackend",
+        "config": {
+            "HERE_APP_ID": _env("HERE_APP_ID", ""),
+            "HERE_APP_CODE": _env("HERE_APP_CODE", ""),
+        },
+    },
 ]
 
 # Note: multi-type providers (Twilio, Brevo, SMSPartner) are automatically

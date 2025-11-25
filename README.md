@@ -92,40 +92,76 @@ This will create the following URLs:
 - `/missive/` - Interface CRUD des missives
 - `/missive/webhook/{provider}/` - Webhook unifié pour tous les providers
 
-4. Configure providers with failover in `settings.py`:
+4. Configure providers and address backends in `settings.py`:
 
 ```python
-# Nouveau système avec fallback automatique
-MISSIVE_PROVIDERS = {
-    'EMAIL': [
-        'python_missive.providers.sendgrid.SendGridProvider',        # Priorité 1
-        'python_missive.providers.mailgun.MailgunProvider',          # Priorité 2 (fallback)
-        'python_missive.providers.django_email.DjangoEmailProvider', # Priorité 3 (ultime)
-    ],
-    'SMS': [
-        'python_missive.providers.twilio.TwilioProvider',
-        'python_missive.providers.smspartner.SMSPartnerProvider',    # Fallback
-    ],
-    'WHATSAPP': [
-        'python_missive.providers.twilio.TwilioProvider',
-    ],
-    'POSTAL': [
-        'python_missive.providers.laposte.LaPosteProvider',
-    ],
-    'POSTAL_REGISTERED': [
-        'python_missive.providers.laposte.LaPosteProvider',
-        'python_missive.providers.maileva.MailevaProvider',
-    ],
-}
+# Providers automatically categorized by supported_types
+MISSIVE_PROVIDERS = [
+    # Email
+    "python_missive.providers.django_email.DjangoEmailProvider",
+    "python_missive.providers.smtp.SMTPProvider",
+    "python_missive.providers.sendgrid.SendGridProvider",
+    "python_missive.providers.mailgun.MailgunProvider",
+    "python_missive.providers.ses.SESProvider",
+    "python_missive.providers.brevo.BrevoProvider",
+    # SMS / Voice
+    "python_missive.providers.twilio.TwilioProvider",
+    "python_missive.providers.vonage.VonageProvider",
+    "python_missive.providers.smspartner.SMSPartnerProvider",
+    # Branded / messaging
+    "python_missive.providers.slack.SlackProvider",
+    "python_missive.providers.teams.TeamsProvider",
+    "python_missive.providers.telegram.TelegramProvider",
+    "python_missive.providers.signal.SignalProvider",
+    "python_missive.providers.messenger.MessengerProvider",
+    # Postal / LRE
+    "python_missive.providers.laposte.LaPosteProvider",
+    "python_missive.providers.maileva.MailevaProvider",
+    "python_missive.providers.ar24.AR24Provider",
+    "python_missive.providers.certeurope.CerteuropeProvider",
+    # Notifications / push
+    "python_missive.providers.fcm.FCMProvider",
+    "python_missive.providers.apn.APNProvider",
+    "python_missive.providers.notification.InAppNotificationProvider",
+]
 
-# Configuration des API keys
-MISSIVE_CONFIG = {
-    'DEFAULT_FROM_EMAIL': 'noreply@example.com',
-    'SENDGRID_API_KEY': 'your-api-key',
-    'MAILGUN_API_KEY': 'your-api-key',
-    'TWILIO_ACCOUNT_SID': 'your-sid',
-    'TWILIO_AUTH_TOKEN': 'your-token',
-}
+# Address verification backends (first working backend is used)
+MISSIVE_ADDRESS_BACKENDS = [
+    {
+        "class": "python_missive.address_backends.nominatim.NominatimAddressBackend",
+        "config": {
+            "NOMINATIM_USER_AGENT": os.getenv("NOMINATIM_USER_AGENT", "django-missive/1.0"),
+            "NOMINATIM_BASE_URL": os.getenv(
+                "NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org"
+            ),
+        },
+    },
+    {
+        "class": "python_missive.address_backends.photon.PhotonAddressBackend",
+        "config": {
+            "PHOTON_BASE_URL": os.getenv("PHOTON_BASE_URL", "https://photon.komoot.io"),
+        },
+    },
+    {
+        "class": "python_missive.address_backends.google_maps.GoogleMapsAddressBackend",
+        "config": {
+            "GOOGLE_MAPS_API_KEY": os.getenv("GOOGLE_MAPS_API_KEY", ""),
+        },
+    },
+    {
+        "class": "python_missive.address_backends.mapbox.MapboxAddressBackend",
+        "config": {
+            "MAPBOX_ACCESS_TOKEN": os.getenv("MAPBOX_ACCESS_TOKEN", ""),
+        },
+    },
+    {
+        "class": "python_missive.address_backends.here.HereAddressBackend",
+        "config": {
+            "HERE_APP_ID": os.getenv("HERE_APP_ID", ""),
+            "HERE_APP_CODE": os.getenv("HERE_APP_CODE", ""),
+        },
+    },
+]
 ```
 
 ## 🚀 Usage rapide

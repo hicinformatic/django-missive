@@ -3,7 +3,9 @@
 from django.conf import settings
 from django.db import models
 from django.http import JsonResponse
+from django.views.decorators.http import require_GET
 
+from ..address_backends import build_address_backends_payload
 from ..models import Missive
 from ..models.provider import ProviderInfo
 from .webhooks import WebhookView, webhook_status_view, webhook_test_view
@@ -34,19 +36,6 @@ def system_status_view(request):
 
     # Provider stats via ProviderInfo virtual model
     providers_payload = []
-    geo_attr_map = {
-        "EMAIL": "email_geo",
-        "SMS": "sms_geo",
-        "POSTAL": "postal_geo",
-        "POSTAL_REGISTERED": "postal_geo",
-        "LRE": "lre_geo",
-        "RCS": "rcs_geo",
-        "VOICE_CALL": "voice_call_geo",
-        "NOTIFICATION": "notification_geo",
-        "PUSH_NOTIFICATION": "push_notification_geo",
-        "BRANDED": "branded_geo",
-    }
-
     for provider in ProviderInfo.objects.all().order_by("name"):
         provider_data = {
             "name": provider.name,
@@ -64,34 +53,44 @@ def system_status_view(request):
         provider_class = provider._get_provider_class()
         if provider_class:
             for missive_type in provider.missive_types_list:
-                geo_attr = geo_attr_map.get(missive_type)
-                if geo_attr:
-                    geo_value = None
-                    # Search through MRO to find the attribute
-                    for cls in provider_class.__mro__:
-                        if geo_attr in cls.__dict__:
-                            attr_value = cls.__dict__[geo_attr]
-                            if not callable(attr_value):
-                                geo_value = attr_value
-                                break
-                        elif hasattr(cls, geo_attr):
-                            attr_value = getattr(cls, geo_attr)
-                            if not callable(attr_value):
-                                geo_value = attr_value
-                                break
+                normalized = missive_type.strip().lower()
+                geo_attr = f"{normalized}_geographic_coverage"
+                legacy_attr = f"{normalized}_geo"
+                geo_value = None
 
-                    # Format the value
-                    if geo_value is None:
-                        geo_value = "*"
-                    elif isinstance(geo_value, str):
-                        if geo_value == "*":
-                            provider_data["geographic_coverage"][missive_type] = "*"
-                        else:
-                            provider_data["geographic_coverage"][missive_type] = [geo_value]
-                    elif isinstance(geo_value, (list, tuple)):
-                        provider_data["geographic_coverage"][missive_type] = list(geo_value) if geo_value else "*"
+                for cls in provider_class.__mro__:
+                    if geo_attr in cls.__dict__:
+                        attr_value = cls.__dict__[geo_attr]
+                        if not callable(attr_value):
+                            geo_value = attr_value
+                            break
+                    elif hasattr(cls, geo_attr):
+                        attr_value = getattr(cls, geo_attr)
+                        if not callable(attr_value):
+                            geo_value = attr_value
+                            break
+                    elif legacy_attr in cls.__dict__:
+                        attr_value = cls.__dict__[legacy_attr]
+                        if not callable(attr_value):
+                            geo_value = attr_value
+                            break
+                    elif hasattr(cls, legacy_attr):
+                        attr_value = getattr(cls, legacy_attr)
+                        if not callable(attr_value):
+                            geo_value = attr_value
+                            break
+
+                if geo_value is None:
+                    provider_data["geographic_coverage"][missive_type] = "*"
+                elif isinstance(geo_value, str):
+                    if geo_value == "*":
+                        provider_data["geographic_coverage"][missive_type] = "*"
                     else:
-                        provider_data["geographic_coverage"][missive_type] = str(geo_value)
+                        provider_data["geographic_coverage"][missive_type] = [geo_value]
+                elif isinstance(geo_value, (list, tuple)):
+                    provider_data["geographic_coverage"][missive_type] = list(geo_value) if geo_value else "*"
+                else:
+                    provider_data["geographic_coverage"][missive_type] = str(geo_value)
 
         providers_payload.append(provider_data)
 
@@ -111,9 +110,33 @@ def system_status_view(request):
     return JsonResponse(payload, json_dumps_params={"indent": 2})
 
 
+@require_GET
+def address_backends_status_view(request):
+    backends_config = getattr(settings, "MISSIVE_ADDRESS_BACKENDS", None)
+    payload = build_address_backends_payload(
+        backends_config=backends_config,
+        operation=request.GET.get("operation", "validate"),
+        address_kwargs={
+            "address_line1": request.GET.get("address_line1"),
+            "address_line2": request.GET.get("address_line2"),
+            "address_line3": request.GET.get("address_line3"),
+            "city": request.GET.get("city"),
+            "postal_code": request.GET.get("postal_code"),
+            "state": request.GET.get("state"),
+            "country": request.GET.get("country"),
+        },
+        extra_kwargs={
+            "latitude": request.GET.get("latitude"),
+            "longitude": request.GET.get("longitude"),
+        },
+    )
+    return JsonResponse(payload, json_dumps_params={"indent": 2})
+
+
 __all__ = [
     "WebhookView",
     "webhook_status_view",
     "webhook_test_view",
     "system_status_view",
+    "address_backends_status_view",
 ]
