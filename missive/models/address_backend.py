@@ -1,0 +1,379 @@
+"""Virtual address backend model built from Django settings."""
+
+from __future__ import annotations
+
+import re
+from typing import Any, Dict, List, Optional, Tuple
+
+from django.conf import settings
+from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
+from django.db import models
+from django.db.models.query import QuerySet
+from django.db.models.sql import Query
+from django.utils.translation import gettext_lazy as _
+
+
+_slug_cleanup = re.compile(r"[^a-z0-9]+")
+
+
+def _to_slug(value: str) -> str:
+    slug_value = _slug_cleanup.sub("-", value.strip().lower()).strip("-")
+    return slug_value or "backend"
+
+
+class AddressBackendInfoQuerySet(QuerySet):
+    """In-memory queryset for address backend diagnostics."""
+
+    def __init__(self, model=None, data=None, query=None, using=None, hints=None):
+        if query is None and model is not None:
+            query = Query(model)
+        super().__init__(model=model, query=query, using=using, hints=hints)
+        self._result_cache = list(data or [])
+        self._prefetch_done = True
+
+    def __len__(self):
+        return len(self._result_cache)
+
+    def __getitem__(self, k):
+        if isinstance(k, slice):
+            return self.__class__(
+                self.model,
+                self._result_cache[k],
+                self.query.clone(),
+                using=self._db,
+                hints=self._hints,
+            )
+        return self._result_cache[k]
+
+    def _clone(self):
+        return self.__class__(
+            self.model,
+            list(self._result_cache),
+            self.query.clone(),
+            using=self._db,
+            hints=self._hints,
+        )
+
+    def all(self):
+        return self._clone()
+
+    def filter(self, *args, **kwargs):
+        rslt = self._result_cache
+
+        def _value(obj, attr):
+            return getattr(obj, attr, "")
+
+        for lookup, value in kwargs.items():
+            if "__" in lookup:
+                field_name, lookup_type = lookup.rsplit("__", 1)
+                if lookup_type == "icontains":
+                    rslt = [
+                        obj
+                        for obj in rslt
+                        if value.lower()
+                        in str(_value(obj, field_name)).lower()
+                    ]
+                elif lookup_type == "contains":
+                    rslt = [obj for obj in rslt if value in str(_value(obj, field_name))]
+                elif lookup_type == "exact":
+                    rslt = [obj for obj in rslt if _value(obj, field_name) == value]
+                elif lookup_type == "in":
+                    rslt = [obj for obj in rslt if _value(obj, field_name) in value]
+            else:
+                rslt = [obj for obj in rslt if getattr(obj, lookup, None) == value]
+        return self.__class__(
+            self.model,
+            rslt,
+            self.query.clone(),
+            using=self._db,
+            hints=self._hints,
+        )
+
+    def order_by(self, *fields):
+        rslt = self._result_cache
+        for field in reversed(fields):
+            reverse = field.startswith("-")
+            field_name = field[1:] if reverse else field
+            rslt = sorted(
+                rslt, key=lambda obj: getattr(obj, field_name, ""), reverse=reverse
+            )
+        return self.__class__(
+            self.model,
+            rslt,
+            self.query.clone(),
+            using=self._db,
+            hints=self._hints,
+        )
+
+    def get(self, **kwargs):
+        rslt = self._result_cache
+        for attr, value in kwargs.items():
+            rslt = [obj for obj in rslt if getattr(obj, attr) == value]
+        if len(rslt) == 1:
+            return rslt[0]
+        if not rslt:
+            raise ObjectDoesNotExist(
+                f"{self.model.__name__} matching query does not exist."
+            )
+        raise MultipleObjectsReturned(
+            f"Multiple {self.model.__name__} objects returned."
+        )
+
+
+class AddressBackendInfoManager(models.Manager):
+    """Manager returning diagnostics data as an in-memory queryset."""
+
+    def get_queryset(self):
+        backends_config = getattr(settings, "MISSIVE_ADDRESS_BACKENDS", None)
+        if not backends_config:
+            return AddressBackendInfoQuerySet(model=self.model, data=[])
+
+        diagnostics = []
+        payload = {}
+        try:
+            from python_missive.helpers import describe_address_backends
+
+            # Skip API test for faster queryset construction
+            payload = describe_address_backends(backends_config, skip_api_test=True)
+            diagnostics = payload.get("items", [])
+        except Exception as e:
+            # Log error but still try to build items from config
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error describing address backends: {e}")
+            diagnostics = []
+            payload = {"sample_result": {}, "selected_backend": None}
+
+        items = []
+        # Build items from diagnostics if available, otherwise from config
+        if diagnostics:
+            for idx, data in enumerate(diagnostics, start=1):
+                # Ensure we have a valid backend_name
+                backend_name = data.get("backend_name") or data.get("class_name")
+                if not backend_name:
+                    class_path = data.get("class", "")
+                    class_name = class_path.split(".")[-1] if class_path else f"Backend {idx}"
+                    backend_name = class_name.replace("AddressBackend", "").replace("Backend", "").lower() or f"backend_{idx}"
+
+                base_slug_source = backend_name or data.get("class") or str(idx)
+                slug_value = _to_slug(str(base_slug_source))
+                backend = AddressBackendInfo(
+                    pk=backend_name,  # Use name as pk for URL generation
+                    name=backend_name,
+                    class_path=data.get("class") or "",
+                    status=data.get("status", "unknown"),
+                )
+                backend._diagnostic = data
+                backend._selected_backend = payload.get("selected_backend")
+                backend._sample_result = payload.get("sample_result", {})
+                backend._slug = slug_value
+                items.append(backend)
+        elif backends_config:
+            # Fallback: build items directly from config if diagnostics failed
+            # Try to load package and config info for each backend
+            for idx, backend_config in enumerate(backends_config, start=1):
+                class_path = backend_config.get("class", "")
+                config = backend_config.get("config", {}) or {}
+                class_name = class_path.split(".")[-1] if class_path else f"Backend {idx}"
+                backend_name = class_name.replace("AddressBackend", "").replace("Backend", "").lower() or f"backend_{idx}"
+                base_slug_source = backend_name or class_path or str(idx)
+                slug_value = _to_slug(str(base_slug_source))
+
+                # Try to load backend class and get package/config info
+                diagnostic = {
+                    "class": class_path,
+                    "class_name": class_name,
+                    "status": "unknown",
+                    "backend_name": backend_name,
+                    "packages": {},
+                    "config": {},
+                    "required_packages": [],
+                    "required_config_keys": [],
+                }
+
+                try:
+                    # Import backend class dynamically
+                    from importlib import import_module
+                    module_path, class_name_attr = class_path.rsplit(".", 1)
+                    module = import_module(module_path)
+                    backend_class = getattr(module, class_name_attr)
+                    backend_instance = backend_class(config=config)
+                    check = backend_instance.check_package_and_config()
+                    packages = check.get("packages", {})
+                    config_status = check.get("config", {})
+
+                    # Helper to mask sensitive values
+                    def _mask_value(value: Any) -> Optional[str]:
+                        if not value:
+                            return None
+                        value_str = str(value)
+                        if len(value_str) > 20:
+                            return value_str[:8] + "..." + value_str[-4:]
+                        return value_str[:4] + "***"
+
+                    missing_packages = [
+                        pkg for pkg, status in packages.items() if status != "installed"
+                    ]
+                    missing_config = [
+                        key
+                        for key in backend_instance.config_keys
+                        if config_status.get(key) != "present" or not config.get(key)
+                    ]
+
+                    if missing_packages:
+                        status = "missing_packages"
+                    elif missing_config:
+                        status = "missing_config"
+                    else:
+                        status = "unavailable"
+
+                    diagnostic.update({
+                        "status": status,
+                        "backend_name": getattr(backend_instance, "name", backend_name),
+                        "documentation_url": backend_instance.documentation_url,
+                        "site_url": backend_instance.site_url,
+                        "required_packages": backend_instance.required_packages,
+                        "required_config_keys": backend_instance.config_keys,
+                        "packages": packages,
+                        "config": {
+                            key: {
+                                "present": config_status.get(key) == "present",
+                                "value_preview": _mask_value(config.get(key)),
+                            }
+                            for key in (backend_instance.config_keys or config.keys())
+                        },
+                    })
+                except Exception as exc:
+                    diagnostic["error"] = str(exc)
+                    diagnostic["status"] = "error"
+
+                backend = AddressBackendInfo(
+                    pk=backend_name,
+                    name=backend_name,
+                    class_path=class_path,
+                    status=diagnostic.get("status", "unknown"),
+                )
+                backend._diagnostic = diagnostic
+                backend._selected_backend = None
+                backend._sample_result = {}
+                backend._slug = slug_value
+                items.append(backend)
+
+        return AddressBackendInfoQuerySet(model=self.model, data=items)
+
+
+class AddressBackendInfo(models.Model):
+    """Virtual model describing configured address verification backends."""
+
+    name = models.CharField(max_length=120, verbose_name=_("Backend name"))
+    class_path = models.CharField(max_length=255, verbose_name=_("Import path"))
+    status = models.CharField(max_length=32, verbose_name=_("Status"))
+
+    objects = AddressBackendInfoManager()
+
+    class Meta:
+        managed = False
+        verbose_name = _("Address backend")
+        verbose_name_plural = _("Address backends")
+        default_permissions = ()
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    # Internal helpers -------------------------------------------------
+    @property
+    def diagnostic(self) -> Dict[str, Any]:
+        diag = getattr(self, "_diagnostic", None)
+        if isinstance(diag, dict):
+            return diag
+        return {}
+
+    @property
+    def packages(self) -> Dict[str, Any]:
+        value = self.diagnostic.get("packages", {}) or {}
+        return value if isinstance(value, dict) else {}
+
+    @property
+    def required_packages(self):
+        return self.diagnostic.get("required_packages", [])
+
+    @property
+    def config_entries(self) -> List[Tuple[str, Dict[str, Any]]]:
+        config = self.diagnostic.get("config", {}) or {}
+        if not isinstance(config, dict):
+            return []
+        return [(key, details) for key, details in config.items()]
+
+    @property
+    def documentation_url(self):
+        return self.diagnostic.get("documentation_url")
+
+    @property
+    def site_url(self):
+        return self.diagnostic.get("site_url")
+
+    @property
+    def error(self):
+        return self.diagnostic.get("error")
+
+    @property
+    def class_name_token(self) -> str:
+        if self.class_path:
+            return self.class_path.split(".")[-1]
+        value = self.diagnostic.get("class_name")
+        if isinstance(value, str):
+            return value
+        return (self.name or "").replace(" ", "_")
+
+    @property
+    def slug(self) -> str:
+        cached = getattr(self, "_slug", None)
+        if cached:
+            return str(cached)
+        base = self.name or self.diagnostic.get("backend_name") or self.class_name_token
+        slug_value = _to_slug(str(base))
+        return slug_value
+
+    # Status -----------------------------------------------------------
+    @property
+    def status_display(self):
+        mapping = {
+            "working": _("✅ Working"),
+            "missing_packages": _("❌ Missing packages"),
+            "missing_config": _("⚠️ Missing configuration"),
+            "unavailable": _("⚠️ Unavailable"),
+        }
+        return mapping.get(self.status, _("❓ Unknown"))
+
+    @property
+    def is_selected(self):
+        selected = getattr(self, "_selected_backend", None)
+        return bool(selected and selected == self.diagnostic.get("backend_name"))
+
+    # Display helpers --------------------------------------------------
+    @property
+    def packages_summary(self) -> List[Tuple[str, bool]]:
+        summary: List[Tuple[str, bool]] = []
+        packages = self.packages or {}
+        if packages:
+            for name, status in packages.items():
+                summary.append((name, status == "installed"))
+        elif self.required_packages:
+            for name in self.required_packages:
+                summary.append((name, False))
+        return summary
+
+    @property
+    def config_summary(self) -> List[Tuple[str, bool, Optional[str]]]:
+        entries: List[Tuple[str, bool, Optional[str]]] = []
+        for key, details in self.config_entries:
+            present = bool(details.get("present"))
+            preview = details.get("value_preview")
+            if preview is not None:
+                preview = str(preview)
+            entries.append((key, present, preview))
+        return entries
+
+
+__all__ = ["AddressBackendInfo"]

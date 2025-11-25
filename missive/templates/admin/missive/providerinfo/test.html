@@ -1,0 +1,156 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans "Home" %}</a>
+    › <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    › <a href="{% url 'admin:missive_providerinfo_changelist' %}">{% trans "Providers" %}</a>
+    › {% blocktrans with name=provider.name %}Test "{{ name }}"{% endblocktrans %}
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div class="module">
+    <h2>
+      {% blocktrans with name=provider.name %}Test provider "{{ name }}"{% endblocktrans %}
+    </h2>
+    <p>
+      <strong>{{ provider.status_display }}</strong> —
+      {% if provider.missive_types_list %}
+        {% trans "Types:" %} {{ provider.missive_types_list|join:", " }}
+      {% endif %}
+    </p>
+    {% if not provider_configured %}
+      <p class="errornote">
+        {% trans "This provider is not fully configured; tests may fail." %}
+      </p>
+    {% endif %}
+
+    {% if not can_test %}
+      <p class="errornote">
+        {% trans "This provider cannot be tested. Check configuration and installation." %}
+      </p>
+    {% else %}
+      <form id="test-form" method="post" action="{{ send_url }}">
+        {% csrf_token %}
+        <div class="form-row">
+          <label for="missive-type">{% trans "Missive Type" %}</label>
+          <select id="missive-type" name="missive_type" class="vTextField" required>
+            {% for type in missive_types %}
+              <option value="{{ type }}" {% if type == default_type %}selected{% endif %}>{{ type }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-row" id="email-fields">
+          <label for="recipient-email">{% trans "Recipient Email" %}</label>
+          <input type="email" id="recipient-email" name="recipient_email" class="vTextField" placeholder="test@example.com">
+        </div>
+
+        <div class="form-row" id="phone-fields" style="display:none;">
+          <label for="recipient-phone">{% trans "Recipient Phone" %}</label>
+          <input type="tel" id="recipient-phone" name="recipient_phone" class="vTextField" placeholder="+33612345678">
+        </div>
+
+        <div class="form-row" id="subject-fields">
+          <label for="subject">{% trans "Subject" %}</label>
+          <input type="text" id="subject" name="subject" class="vTextField" placeholder="{% trans 'Test email subject' %}">
+        </div>
+
+        <div class="form-row">
+          <label for="content">{% trans "Content" %}</label>
+          <textarea id="content" name="content" class="vLargeTextField" rows="5" required placeholder="{% trans 'Enter message content...' %}"></textarea>
+        </div>
+
+        <div class="submit-row">
+          <button type="submit" class="default">{% trans "Send Test" %}</button>
+        </div>
+      </form>
+
+      <div id="result-container" style="margin-top:1rem; display:none;">
+        <h3>{% trans "Result" %}</h3>
+        <div id="result-message" class="messagelist"></div>
+        <pre id="result-output" style="background:#f8f9fa;border:1px solid #ddd;padding:1rem;min-height:4rem;overflow:auto;display:none;"></pre>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if can_test %}
+    <script>
+      (function() {
+        const form = document.getElementById("test-form");
+        const typeSelect = document.getElementById("missive-type");
+        const emailFields = document.getElementById("email-fields");
+        const phoneFields = document.getElementById("phone-fields");
+        const subjectFields = document.getElementById("subject-fields");
+        const resultContainer = document.getElementById("result-container");
+        const resultMessage = document.getElementById("result-message");
+        const resultOutput = document.getElementById("result-output");
+
+        function updateFields() {
+          const type = typeSelect.value.toUpperCase();
+          if (type === "EMAIL") {
+            emailFields.style.display = "block";
+            phoneFields.style.display = "none";
+            subjectFields.style.display = "block";
+            document.getElementById("recipient-email").required = true;
+            document.getElementById("recipient-phone").required = false;
+            document.getElementById("subject").required = true;
+          } else if (type === "SMS" || type === "VOICE_CALL") {
+            emailFields.style.display = "none";
+            phoneFields.style.display = "block";
+            subjectFields.style.display = "none";
+            document.getElementById("recipient-email").required = false;
+            document.getElementById("recipient-phone").required = true;
+            document.getElementById("subject").required = false;
+          } else {
+            emailFields.style.display = "none";
+            phoneFields.style.display = "none";
+            subjectFields.style.display = "none";
+            document.getElementById("recipient-email").required = false;
+            document.getElementById("recipient-phone").required = false;
+            document.getElementById("subject").required = false;
+          }
+        }
+
+        typeSelect.addEventListener("change", updateFields);
+        updateFields();
+
+        form.addEventListener("submit", function(e) {
+          e.preventDefault();
+          resultContainer.style.display = "block";
+          resultMessage.innerHTML = '<li class="info">{% trans "Sending..." %}</li>';
+          resultOutput.style.display = "none";
+
+          const formData = new FormData(form);
+          fetch(form.action, {
+            method: "POST",
+            body: formData,
+            headers: {"X-Requested-With": "XMLHttpRequest"}
+          })
+            .then(resp => resp.json())
+            .then(data => {
+              if (data.success) {
+                resultMessage.innerHTML = '<li class="success">{% trans "Missive sent successfully!" %}<br>' +
+                  '{% trans "ID:" %} ' + data.missive_id + '<br>' +
+                  '{% trans "Status:" %} ' + data.status + '<br>' +
+                  '{% trans "Provider:" %} ' + (data.provider_used || "{{ provider_path }}") +
+                  '</li>';
+                resultOutput.textContent = JSON.stringify(data, null, 2);
+                resultOutput.style.display = "block";
+              } else {
+                resultMessage.innerHTML = '<li class="error">' + (data.error || "{% trans 'Error' %}") + '</li>';
+                resultOutput.textContent = JSON.stringify(data, null, 2);
+                resultOutput.style.display = "block";
+              }
+            })
+            .catch(err => {
+              resultMessage.innerHTML = '<li class="error">{% trans "Error while sending:" %} ' + err.message + '</li>';
+            });
+        });
+      })();
+    </script>
+  {% endif %}
+{% endblock %}
+

@@ -1,5 +1,6 @@
 """Django Missive Models."""
 
+from .address_backend import AddressBackendInfo
 from .attachment import MissiveAttachment
 from .choices import MissivePriority, MissiveStatus, MissiveType, RecipientType
 from .event import MissiveEvent
@@ -17,4 +18,5 @@ __all__ = [
     "MissiveEvent",
     "MissiveTemplate",
     "ProviderInfo",
+    "AddressBackendInfo",
 ]

@@ -1,0 +1,119 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans "Home" %}</a>
+    › <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    › <a href="{% url 'admin:missive_addressbackendinfo_changelist' %}">{% trans "Address backends" %}</a>
+    › {% trans "Test" %}
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div class="module">
+    {% if backend %}
+      <h2>
+        {% blocktrans with name=backend.name %}Test backend “{{ name }}”{% endblocktrans %}
+      </h2>
+      <p>
+        <strong>{{ backend.status_display }}</strong> —
+        <code>{{ backend.class_path }}</code>
+      </p>
+      {% if not backend_configured %}
+        <p class="warning">
+          {% trans "This backend is not fully configured; tests may fail." %}
+        </p>
+      {% endif %}
+    {% else %}
+      <h2>{% trans "Test address API" %}</h2>
+    {% endif %}
+
+    {% if not can_test %}
+      <p class="errornote">
+        {% trans "No address backends configured. Define settings.MISSIVE_ADDRESS_BACKENDS." %}
+      </p>
+    {% else %}
+      <div class="form-row">
+        <label for="address-input">{% trans "Address" %}</label>
+        <input type="text" id="address-input" class="vTextField" placeholder="{% trans 'Start typing an address…' %}" autocomplete="off">
+      </div>
+      <p>
+        <a href="{{ diagnostics_url }}" target="_blank" rel="noopener">{% trans "Open JSON diagnostics endpoint" %}</a>
+      </p>
+      <div id="suggestions-container">
+        <h3>{% trans "Suggestions" %}</h3>
+        <ul id="suggestions" class="messagelist"></ul>
+      </div>
+      <div id="result-container" style="margin-top:1rem;">
+        <h3>{% trans "Result" %}</h3>
+        <pre id="result-output" style="background:#f8f9fa;border:1px solid #ddd;padding:1rem;min-height:4rem;overflow:auto;"></pre>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if can_test %}
+    <script>
+      (function() {
+        const input = document.getElementById("address-input");
+        const list = document.getElementById("suggestions");
+        const resultEl = document.getElementById("result-output");
+        const autocompleteUrl = "{{ autocomplete_url|escapejs }}";
+        let timer = null;
+
+        function renderSuggestions(items) {
+          list.innerHTML = "";
+          if (!items.length) {
+            const li = document.createElement("li");
+            li.textContent = "{% trans 'No suggestions' %}";
+            list.appendChild(li);
+            return;
+          }
+          items.forEach(item => {
+            const li = document.createElement("li");
+            li.classList.add("info");
+            li.textContent = item.label;
+            li.addEventListener("click", () => {
+              resultEl.textContent = JSON.stringify(item.raw, null, 2);
+            });
+            list.appendChild(li);
+          });
+        }
+
+        function fetchSuggestions(term) {
+          fetch(autocompleteUrl + "?term=" + encodeURIComponent(term), {
+            headers: {"X-Requested-With": "XMLHttpRequest"}
+          })
+            .then(resp => resp.json())
+            .then(data => {
+              renderSuggestions(data.results || []);
+              if (data.results && data.results[0]) {
+                resultEl.textContent = JSON.stringify(data.results[0].raw, null, 2);
+              }
+            })
+            .catch(() => {
+              list.innerHTML = "";
+              const li = document.createElement("li");
+              li.classList.add("error");
+              li.textContent = "{% trans 'Error while calling API' %}";
+              list.appendChild(li);
+            });
+        }
+
+        input.addEventListener("input", () => {
+          const term = input.value.trim();
+          if (timer) {
+            clearTimeout(timer);
+          }
+          if (!term) {
+            list.innerHTML = "";
+            resultEl.textContent = "";
+            return;
+          }
+          timer = setTimeout(() => fetchSuggestions(term), 300);
+        });
+      })();
+    </script>
+  {% endif %}
+{% endblock %}
+
