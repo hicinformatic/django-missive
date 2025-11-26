@@ -1,6 +1,6 @@
 """Main Missive model for multi-channel sending."""
 
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -14,6 +14,7 @@ except ImportError:
     format_phone_international = None
 
 from .choices import MissivePriority, MissiveStatus, MissiveType
+from ..fields import AddressField
 from ..providers import normalize_provider_path
 
 
@@ -85,6 +86,12 @@ class Missive(models.Model):
         verbose_name=_("Sender Country (ISO code)"),
         help_text=_("ISO country code (FR, BE, CH, etc.)"),
     )
+    sender_address = AddressField(
+        verbose_name=_("Sender Structured Address"),
+        help_text=_(
+            "Normalized sender address (auto-filled via python-missive backends when available)."
+        ),
+    )
 
     # =============================================================================
     # Recipient (Destinataire) fields
@@ -150,6 +157,12 @@ class Missive(models.Model):
         default="FR",
         verbose_name=_("Recipient Country (ISO code)"),
         help_text=_("ISO country code (FR, BE, CH, etc.)"),
+    )
+    recipient_address = AddressField(
+        verbose_name=_("Recipient Structured Address"),
+        help_text=_(
+            "Normalized recipient address (auto-filled via python-missive backends when available)."
+        ),
     )
 
     recipient_user = models.ForeignKey(
@@ -376,6 +389,8 @@ class Missive(models.Model):
         """
         from django.conf import settings
 
+        self._sync_structured_addresses()
+
         # Clean phone numbers to international format
         if format_phone_international:
             if self.recipient_phone:
@@ -410,6 +425,44 @@ class Missive(models.Model):
                 self.provider_options["sandbox"] = True
 
         super().save(*args, **kwargs)
+
+    def _sync_structured_addresses(self) -> None:
+        """Keep JSON and legacy address fields aligned."""
+        for prefix in ("sender", "recipient"):
+            field_name = f"{prefix}_address"
+            structured = getattr(self, field_name) or {}
+            if structured:
+                self._apply_address_dict(prefix, structured)
+            else:
+                collected = self._collect_address_fields(prefix)
+                if any(collected.values()):
+                    setattr(self, field_name, collected)
+
+    def _collect_address_fields(self, prefix: str) -> Dict[str, str]:
+        """Gather legacy address columns into a dict."""
+        return {
+            "line1": getattr(self, f"{prefix}_address_line1", "") or "",
+            "line2": getattr(self, f"{prefix}_address_line2", "") or "",
+            "line3": getattr(self, f"{prefix}_address_line3", "") or "",
+            "postal_code": getattr(self, f"{prefix}_postal_code", "") or "",
+            "city": getattr(self, f"{prefix}_city", "") or "",
+            "state": getattr(self, f"{prefix}_state", "") or "",
+            "country": getattr(self, f"{prefix}_country", "") or "",
+        }
+
+    def _apply_address_dict(self, prefix: str, data: Dict[str, Any]) -> None:
+        """Populate legacy charfields from structured data."""
+        setattr(self, f"{prefix}_address_line1", data.get("line1") or data.get("address_line1") or "")
+        setattr(self, f"{prefix}_address_line2", data.get("line2") or data.get("address_line2") or "")
+        setattr(self, f"{prefix}_address_line3", data.get("line3") or data.get("address_line3") or "")
+        if "postal_code" in data:
+            setattr(self, f"{prefix}_postal_code", data.get("postal_code") or "")
+        if "city" in data:
+            setattr(self, f"{prefix}_city", data.get("city") or "")
+        if "state" in data:
+            setattr(self, f"{prefix}_state", data.get("state") or "")
+        if "country" in data:
+            setattr(self, f"{prefix}_country", data.get("country") or "")
 
     @property
     def recipient_display(self):

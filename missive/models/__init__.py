@@ -1,6 +1,7 @@
 """Django Missive Models."""
 
 from .address_backend import AddressBackendInfo
+from .address_lookup import AddressLookup
 from .attachment import MissiveAttachment
 from .choices import MissivePriority, MissiveStatus, MissiveType, RecipientType
 from .event import MissiveEvent

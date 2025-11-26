@@ -2,29 +2,91 @@
 
 from __future__ import annotations
 
+import json
+from typing import Any, Dict, Optional
+
 from django.conf import settings
 from django.contrib import admin
-from django.core.exceptions import (
-    MultipleObjectsReturned,
-    ObjectDoesNotExist,
-    PermissionDenied,
-)
-from django.http import Http404, JsonResponse
-from django.template.response import TemplateResponse
-from django.urls import path, reverse
+from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
-from ..models.address_backend import AddressBackendInfo
+try:
+    from python_missive.helpers import get_address_from_backends as pm_get_address_from_backends
+except ImportError:  # pragma: no cover - optional dependency
+    pm_get_address_from_backends = None
+
+from ..models.address_backend import AddressBackendInfo, AddressBackendInfoQuerySet
+from ..models.address_lookup import AddressLookup, AddressLookupQuerySet
+
+
+def get_backend_configs() -> list[Dict[str, Any]]:
+    config = getattr(settings, "MISSIVE_ADDRESS_BACKENDS", None)
+    return list(config or [])
+
+
+def get_backend_config_for_path(class_path: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not class_path:
+        return None
+    for backend in get_backend_configs():
+        if backend.get("class") == class_path:
+            return backend
+    return None
+
+
+def build_address_suggestions(
+    config_list: list[Dict[str, Any]], term: str
+) -> list[Dict[str, Any]]:
+    if not config_list or not term or pm_get_address_from_backends is None:
+        return []
+
+    try:
+        result = pm_get_address_from_backends(
+            config_list,
+            operation="validate",
+            address_line1=term,
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        return [{"label": str(exc), "raw": {"error": str(exc)}}]
+
+    backend_name = result.get("backend_used") or ""
+    backend_reference = result.get("backend_reference") or ""
+
+    suggestions = result.get("suggestions") or []
+    if suggestions:
+        rows = []
+        for suggestion in suggestions:
+            raw = dict(suggestion or {})
+            if backend_name and not raw.get("backend_used"):
+                raw["backend_used"] = backend_name
+            if backend_reference and not raw.get("backend_reference"):
+                raw["backend_reference"] = backend_reference
+            label = (
+                raw.get("formatted_address")
+                or raw.get("normalized_address")
+                or term
+            )
+            rows.append({"label": label, "raw": raw})
+        return rows
+
+    normalized = result.get("normalized_address") or {}
+    label = normalized.get("formatted_address") or term
+    raw_result = dict(result)
+    if backend_name and not raw_result.get("backend_used"):
+        raw_result["backend_used"] = backend_name
+    if backend_reference and not raw_result.get("backend_reference"):
+        raw_result["backend_reference"] = backend_reference
+    return [{"label": label, "raw": raw_result}]
 
 
 @admin.register(AddressBackendInfo)
 class AddressBackendInfoAdmin(admin.ModelAdmin):
     change_list_template = "admin/missive/addressbackendinfo/change_list.html"
     ordering = ["name"]
+    actions = None
     list_display = [
-        "name",
+        "display_name_column",
         "status_display",
         "selected_display",
         "documentation_link",
@@ -48,6 +110,36 @@ class AddressBackendInfoAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = AddressBackendInfo.objects.all()
         return qs
+
+    def get_actions(self, request):
+        """Disable bulk actions/selection like Provider admin."""
+        return {}
+
+    def get_search_results(self, request, queryset, search_term):
+        if not search_term:
+            return queryset, False
+        term = search_term.strip().lower()
+        if not term:
+            return queryset, False
+
+        def _matches(obj: AddressBackendInfo) -> bool:
+            candidates = [
+                obj.display_name,
+                obj.name,
+                obj.class_path,
+                obj.status,
+            ]
+            diag = obj.diagnostic
+            candidates.append(str(diag.get("backend_name", "")))
+            candidates.append(str(diag.get("backend_display_name", "")))
+            candidates.append(str(diag.get("class", "")))
+            for value in candidates:
+                if value and term in str(value).lower():
+                    return True
+            return False
+
+        filtered = [obj for obj in queryset if _matches(obj)]
+        return AddressBackendInfoQuerySet(model=self.model, data=filtered), False
 
     def has_add_permission(self, request):
         return False
@@ -77,16 +169,10 @@ class AddressBackendInfoAdmin(admin.ModelAdmin):
 
     # Helpers ----------------------------------------------------------
     def _all_backend_configs(self):
-        config = getattr(settings, "MISSIVE_ADDRESS_BACKENDS", None)
-        return list(config or [])
+        return get_backend_configs()
 
     def _get_backend_config_for_path(self, class_path: str | None):
-        if not class_path:
-            return None
-        for backend in self._all_backend_configs():
-            if backend.get("class") == class_path:
-                return backend
-        return None
+        return get_backend_config_for_path(class_path)
 
     def _get_backend_info(self, backend_name: str):
         """Récupère le backend par son name."""
@@ -107,65 +193,40 @@ class AddressBackendInfoAdmin(admin.ModelAdmin):
             return None
 
     def _build_results(self, config_list, term):
-        if not config_list or not term:
-            return []
-        try:
-            from python_missive.helpers import get_address_from_backends
-        except ImportError:
-            return []
-
-        try:
-            result = get_address_from_backends(
-                config_list,
-                operation="validate",
-                address_line1=term,
-            )
-        except Exception as exc:  # pragma: no cover - defensive
-            return [{"label": str(exc), "raw": {"error": str(exc)}}]
-
-        suggestions = result.get("suggestions") or []
-        if suggestions:
-            rows = []
-            for suggestion in suggestions:
-                label = (
-                    suggestion.get("formatted_address")
-                    or suggestion.get("normalized_address")
-                    or term
-                )
-                rows.append({"label": label, "raw": suggestion})
-            return rows
-
-        normalized = result.get("normalized_address") or {}
-        label = normalized.get("formatted_address") or term
-        return [{"label": label, "raw": result}]
-
-    def get_urls(self):
-        urls = super().get_urls()
-        custom_urls = [
-            path(
-                "test/",
-                self.admin_site.admin_view(self.address_test_view),
-                name="missive_address_backends_test",
-            ),
-            path(
-                "test/autocomplete/",
-                self.admin_site.admin_view(self.address_test_autocomplete_view),
-                name="missive_address_backends_autocomplete",
-            ),
-            path(
-                "<str:backend_name>/test/",
-                self.admin_site.admin_view(self.address_backend_test_view),
-                name="missive_address_backend_test",
-            ),
-            path(
-                "<str:backend_name>/test/autocomplete/",
-                self.admin_site.admin_view(self.address_backend_test_autocomplete_view),
-                name="missive_address_backend_autocomplete",
-            ),
-        ]
-        return custom_urls + urls
+        return build_address_suggestions(config_list, term)
 
     # List display helpers ---------------------------------------------
+    @admin.display(description=_("Backend"))
+    def display_name_column(self, obj: AddressBackendInfo):
+        return obj.display_name
+
+    @admin.display(description=_("Status"))
+    def status_display(self, obj: AddressBackendInfo):
+        status = (obj.status or "").lower()
+        if status == "working":
+            return format_html(
+                '<span style="background-color: #d1e7dd; color: #0f5132; padding: 5px 12px; '
+                'border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap;">✅ {}</span>',
+                _("Working"),
+            )
+        if status == "missing_config":
+            return format_html(
+                '<span style="background-color: #fff3cd; color: #664d03; padding: 5px 12px; '
+                'border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap;">⚠️ {}</span>',
+                _("Config Required"),
+            )
+        if status == "missing_packages":
+            return format_html(
+                '<span style="background-color: #f8d7da; color: #842029; padding: 5px 12px; '
+                'border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap;">❌ {}</span>',
+                _("Packages Missing"),
+            )
+        return format_html(
+            '<span style="background-color: #f8d7da; color: #842029; padding: 5px 12px; '
+            'border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap;">❌ {}</span>',
+            _("Unavailable"),
+        )
+
     @admin.display(description=_("Selected"))
     def selected_display(self, obj: AddressBackendInfo):
         return _("Yes") if obj.is_selected else _("No")
@@ -329,69 +390,70 @@ class AddressBackendInfoAdmin(admin.ModelAdmin):
     def error_display(self, obj: AddressBackendInfo):
         return obj.error or "—"
 
-    def address_test_view(self, request):
-        if not self.has_view_permission(request):
-            raise PermissionDenied
 
-        has_backends = bool(self._all_backend_configs())
-        context = {
-            **self.admin_site.each_context(request),
-            "title": _("Test address API"),
-            "backend": None,
-            "backend_configured": has_backends,
-            "can_test": has_backends,
-            "autocomplete_url": reverse("admin:missive_address_backends_autocomplete"),
-            "diagnostics_url": reverse("missive:address-backends-status"),
-            "opts": AddressBackendInfo._meta,
-        }
-        return TemplateResponse(
-            request, "admin/missive/addressbackendinfo/test.html", context
-        )
+@admin.register(AddressLookup)
+class AddressLookupAdmin(admin.ModelAdmin):
+    list_display = ["label", "backend_used", "backend_reference", "raw_payload_display"]
+    search_fields = ["label", "backend_used", "backend_reference"]
+    ordering = ["label"]
+    list_per_page = 20
+    list_display_links = None
+    change_list_template = "admin/change_list.html"
 
-    def address_backend_test_view(self, request, backend_name):
-        if not self.has_view_permission(request):
-            raise PermissionDenied
+    def has_add_permission(self, request):
+        return False
 
-        backend = self._get_backend_info(backend_name)
-        if backend is None:
-            raise Http404(_("Backend not found"))
+    def has_delete_permission(self, request, obj=None):
+        return False
 
-        backend_config = self._get_backend_config_for_path(backend.class_path)
-        context = {
-            **self.admin_site.each_context(request),
-            "title": _("Test address API"),
-            "backend": backend,
-            "backend_configured": bool(backend_config),
-            "can_test": bool(backend_config),
-            "autocomplete_url": reverse(
-                "admin:missive_address_backend_autocomplete", args=[backend_name]
-            ),
-            "diagnostics_url": reverse("missive:address-backends-status"),
-            "opts": AddressBackendInfo._meta,
-        }
-        return TemplateResponse(
-            request, "admin/missive/addressbackendinfo/test.html", context
-        )
+    def has_change_permission(self, request, obj=None):
+        return False
 
-    def address_test_autocomplete_view(self, request, backend_name=None):
-        if not self.has_view_permission(request):
-            raise PermissionDenied
+    def get_list_display_links(self, request, list_display):
+        return None
 
-        term = (request.GET.get("term") or "").strip()
-        config: list[dict] = []
+    def get_queryset(self, request):
+        query = (request.GET.get("q") or "").strip()
+        backend_name = (request.GET.get("backend") or "").strip()
+        configs = []
+
         if backend_name:
-            backend = self._get_backend_info(backend_name)
-            class_path = backend.class_path if backend else None
-            entry = self._get_backend_config_for_path(class_path)
-            if entry:
-                config = [entry]
+            try:
+                backend = AddressBackendInfo.objects.get(pk=backend_name)
+            except AddressBackendInfo.DoesNotExist:
+                backend = None
+            if backend:
+                backend_config = get_backend_config_for_path(backend.class_path)
+                if backend_config:
+                    configs = [backend_config]
         else:
-            config = self._all_backend_configs()
-        results = self._build_results(config, term)
-        return JsonResponse({"results": results})
+            configs = get_backend_configs()
 
-    def address_backend_test_autocomplete_view(self, request, backend_name):
-        return self.address_test_autocomplete_view(request, backend_name=backend_name)
+        data = []
+        if configs and query:
+            for entry in build_address_suggestions(configs, query):
+                raw = entry.get("raw") or {}
+                obj = AddressLookup(
+                    label=entry.get("label") or "",
+                    backend_used=raw.get("backend_used") or raw.get("backend") or "",
+                    backend_reference=raw.get("backend_reference") or "",
+                    raw_payload=raw,
+                )
+                data.append(obj)
+
+        return AddressLookupQuerySet(model=AddressLookup, data=data)
+
+    @admin.display(description=_("Raw payload"))
+    def raw_payload_display(self, obj: AddressLookup):
+        if not obj.raw_payload:
+            return "—"
+        payload = json.dumps(obj.raw_payload, indent=2, ensure_ascii=False)
+        if len(payload) > 512:
+            payload = payload[:512] + "…"
+        return format_html(
+            '<pre style="white-space: pre-wrap; max-width: 520px;">{}</pre>',
+            payload,
+        )
 
 
-__all__ = ["AddressBackendInfoAdmin"]
+__all__ = ["AddressBackendInfoAdmin", "AddressLookupAdmin"]

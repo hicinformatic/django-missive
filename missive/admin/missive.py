@@ -40,8 +40,14 @@ class MissiveAdminForm(forms.ModelForm):
         js = ("admin/js/missive_provider_filter.js",)
 
     def __init__(self, *args, **kwargs):
-        kwargs.pop("request", None)
+        request = kwargs.pop("request", None)
         super().__init__(*args, **kwargs)
+
+        if request:
+            for field_name in ("sender_address", "recipient_address"):
+                field = self.fields.get(field_name)
+                if hasattr(field, "set_current_user"):
+                    field.set_current_user(getattr(request, "user", None))
 
         self.fields["provider_choice"].widget.attrs["data-providers-config"] = (
             json.dumps(self.PROVIDERS_BY_TYPE)
@@ -168,6 +174,7 @@ class MissiveAdmin(admin.ModelAdmin):
                     "sender_name",
                     "sender_email",
                     "sender_phone",
+                    "sender_address",
                     "sender_address_line1",
                     "sender_address_line2",
                     "sender_address_line3",
@@ -186,6 +193,7 @@ class MissiveAdmin(admin.ModelAdmin):
                     "recipient_name",
                     "recipient_email",
                     "recipient_phone",
+                    "recipient_address",
                     "recipient_address_line1",
                     "recipient_address_line2",
                     "recipient_address_line3",

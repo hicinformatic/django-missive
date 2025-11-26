@@ -5,7 +5,7 @@
   {{ block.super }}
   {% if original %}
     <li>
-      <a href="{% url 'admin:missive_address_backend_test' original.name %}" class="button">
+      <a href="{% url 'admin:missive_addresslookup_changelist' %}?backend={{ original.pk }}" class="button">
         {% trans "Test" %}
       </a>
     </li>

@@ -6,7 +6,7 @@ from ..helpers import (
     get_provider_name_from_path,
     get_providers_from_config,
 )
-from .address_backend import AddressBackendInfoAdmin
+from .address_backend import AddressBackendInfoAdmin, AddressLookupAdmin
 from .attachment import MissiveAttachmentAdmin, MissiveAttachmentInline
 from .event import MissiveEventAdmin, MissiveEventInline
 
@@ -27,6 +27,7 @@ __all__ = [
     "MissiveTemplateAdmin",
     "ProviderInfoAdmin",
     "AddressBackendInfoAdmin",
+    "AddressLookupAdmin",
     "get_provider_name_from_path",
     "get_providers_from_config",
     "get_all_provider_choices",

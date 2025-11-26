@@ -154,6 +154,8 @@ class AddressBackendInfoManager(models.Manager):
                     class_path = data.get("class", "")
                     class_name = class_path.split(".")[-1] if class_path else f"Backend {idx}"
                     backend_name = class_name.replace("AddressBackend", "").replace("Backend", "").lower() or f"backend_{idx}"
+                display_label = data.get("backend_display_name") or backend_name
+                data["backend_display_name"] = display_label
 
                 base_slug_source = backend_name or data.get("class") or str(idx)
                 slug_value = _to_slug(str(base_slug_source))
@@ -185,6 +187,7 @@ class AddressBackendInfoManager(models.Manager):
                     "class_name": class_name,
                     "status": "unknown",
                     "backend_name": backend_name,
+                    "backend_display_name": backend_name,
                     "packages": {},
                     "config": {},
                     "required_packages": [],
@@ -230,6 +233,9 @@ class AddressBackendInfoManager(models.Manager):
                     diagnostic.update({
                         "status": status,
                         "backend_name": getattr(backend_instance, "name", backend_name),
+                        "backend_display_name": getattr(
+                            backend_instance, "label", getattr(backend_instance, "name", backend_name)
+                        ),
                         "documentation_url": backend_instance.documentation_url,
                         "site_url": backend_instance.site_url,
                         "required_packages": backend_instance.required_packages,
@@ -279,7 +285,7 @@ class AddressBackendInfo(models.Model):
         ordering = ["name"]
 
     def __str__(self):
-        return self.name
+        return self.display_name
 
     # Internal helpers -------------------------------------------------
     @property
@@ -312,6 +318,13 @@ class AddressBackendInfo(models.Model):
     @property
     def site_url(self):
         return self.diagnostic.get("site_url")
+
+    @property
+    def display_name(self) -> str:
+        diag_name = self.diagnostic.get("backend_display_name")
+        if isinstance(diag_name, str) and diag_name:
+            return diag_name
+        return self.name
 
     @property
     def error(self):

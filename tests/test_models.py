@@ -4,6 +4,7 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from missive.models import Missive, MissiveStatus, MissiveType
+from missive.fields import AddressFormField
 
 User = get_user_model()
 
@@ -42,7 +43,7 @@ class TestMissive:
         )
         assert "Email" in str(missive)
         assert "Test Subject" in str(missive)
-        assert "Brouillon" in str(missive)
+        assert str(MissiveStatus.DRAFT.label) in str(missive)
 
     def test_missive_ordering(self, user):
         """Tests Missive ordering by created_at descending."""
@@ -85,3 +86,66 @@ class TestMissive:
         missive.status = MissiveStatus.SENT
         missive.save()
         assert missive.can_send() is False
+
+    def test_structured_address_populates_legacy_fields(self, user):
+        """Structured address should hydrate legacy address columns."""
+        missive = Missive.objects.create(
+            sender_name="Sender",
+            sender_email="sender@example.com",
+            missive_type=MissiveType.POSTAL,
+            recipient_email="test@example.com",
+            recipient_name="Test Recipient",
+            recipient_address={
+                "line1": "221B Baker Street",
+                "city": "London",
+                "postal_code": "NW1",
+                "country": "UK",
+            },
+            subject="Adresse",
+            body="Adresse test",
+        )
+        assert missive.recipient_address_line1 == "221B Baker Street"
+        assert missive.recipient_city == "London"
+        assert missive.recipient_postal_code == "NW1"
+        assert missive.recipient_country == "UK"
+
+    def test_legacy_fields_populate_structured_address(self, user):
+        """Legacy charfields should backfill the structured JSON field."""
+        missive = Missive.objects.create(
+            sender_name="Sender",
+            sender_email="sender@example.com",
+            missive_type=MissiveType.POSTAL,
+            recipient_email="test@example.com",
+            recipient_name="Test Recipient",
+            recipient_address_line1="10 Downing Street",
+            recipient_city="London",
+            recipient_postal_code="SW1A 2AA",
+            recipient_country="UK",
+            subject="Adresse",
+            body="Adresse test",
+        )
+        assert missive.recipient_address
+        assert missive.recipient_address.get("line1") == "10 Downing Street"
+        assert missive.recipient_address.get("city") == "London"
+        assert missive.recipient_address.get("postal_code") == "SW1A 2AA"
+
+
+class TestAddressField:
+    """Tests for the AddressFormField manual fallback logic."""
+
+    def test_manual_entry_sets_user_backend(self, user):
+        field = AddressFormField(use_backend=False)
+        field.set_current_user(user)
+        result = field.clean(
+            [
+                "221B Baker Street",
+                "",
+                "",
+                "NW1",
+                "London",
+                "",
+                "UK",
+            ]
+        )
+        assert result["backend_used"] == "user"
+        assert result["backend_reference"] == str(user.pk)

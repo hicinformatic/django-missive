@@ -1,73 +1,45 @@
-"""Missive view tests."""
+"""Missive diagnostics and webhook view tests."""
 
 import pytest
+from django.test import override_settings
 from django.urls import reverse
-
-from missive.models import Missive, MissiveType
 
 
 @pytest.mark.django_db
 class TestMissiveViews:
-    """Missive view tests."""
+    """Validate JSON diagnostics and webhook helper endpoints."""
 
-    def test_missive_list_view(self, client, user):
-        """Tests missive list view."""
-        client.force_login(user)
-
-        Missive.objects.create(
-            sender=user,
-            missive_type=MissiveType.EMAIL,
-            recipient_email="test@example.com",
-            subject="Test",
-            body="Content",
-        )
-
-        url = reverse("missive:missive-list")
-        response = client.get(url)
-
+    def test_system_status_view(self, client):
+        """System status endpoint should return missive/provider stats."""
+        response = client.get(reverse("missive:system-status"))
         assert response.status_code == 200
-        assert "missives" in response.context
+        data = response.json()
+        assert "missives" in data
+        assert "providers" in data
 
-    def test_missive_detail_view(self, client, user):
-        """Tests missive detail view."""
-        client.force_login(user)
-
-        missive = Missive.objects.create(
-            sender=user,
-            missive_type=MissiveType.EMAIL,
-            recipient_email="test@example.com",
-            subject="Test",
-            body="Content",
-        )
-
-        url = reverse("missive:missive-detail", kwargs={"pk": missive.pk})
-        response = client.get(url)
-
+    def test_address_backends_status_view(self, client):
+        """Address backend diagnostics should include configuration summary."""
+        response = client.get(reverse("missive:address-backends-status"))
         assert response.status_code == 200
-        assert response.context["missive"] == missive
+        data = response.json()
+        assert "configured" in data
+        assert "items" in data
 
-    def test_missive_create_view_requires_login(self, client):
-        """Tests create view requires authentication."""
-        url = reverse("missive:missive-create")
-        response = client.get(url)
+    def test_webhook_status_view(self, client, admin_user):
+        """Webhook status view exposes provider details for staff users."""
+        client.force_login(admin_user)
+        response = client.get(reverse("missive:webhook-status"))
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert data.get("admin") is True
+        assert "providers" in data
 
-        assert response.status_code == 302
-
-    def test_missive_create_view_authenticated(self, client, user):
-        """Tests missive creation while authenticated."""
-        client.force_login(user)
-        url = reverse("missive:missive-create")
-
-        response = client.post(
-            url,
-            {
-                "missive_type": MissiveType.EMAIL,
-                "subject": "New Test",
-                "body": "New Content",
-                "recipient_email": "test@example.com",
-                "priority": "NORMAL",
-            },
-        )
-
-        assert response.status_code == 302  # Redirect after success
-        assert Missive.objects.filter(subject="New Test").exists()
+    @override_settings(DEBUG=True)
+    def test_webhook_test_view_get_lists_providers(self, client):
+        """GET on webhook test view returns provider hints."""
+        response = client.get(reverse("missive:webhook-test"))
+        assert response.status_code == 200
+        data = response.json()
+        assert "providers_available" in data
+        assert isinstance(data["providers_available"], list)

@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 try:
-    from dotenv import load_dotenv
+    from dotenv import load_dotenv  # type: ignore[import-not-found]
 
     env_path = Path(__file__).resolve().parent.parent / ".env"
     if env_path.exists():
