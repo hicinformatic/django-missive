@@ -4,18 +4,27 @@ from __future__ import annotations
 
 import json
 from typing import Any, Dict, Optional
+from urllib.parse import quote, unquote
 
 from django.conf import settings
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.core.cache import cache
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
+from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
 try:
-    from python_missive.helpers import search_addresses as pm_search_addresses
+    from python_missive.helpers import (
+        get_address_backends_from_config as pm_get_address_backends,
+        get_address_by_reference as pm_get_address_by_reference,
+        search_addresses as pm_search_addresses,
+    )
 except ImportError:  # pragma: no cover - optional dependency
     pm_search_addresses = None
+    pm_get_address_backends = None
+    pm_get_address_by_reference = None
 
 from ..models.address_backend import AddressBackendInfo, AddressBackendInfoQuerySet
 from ..models.address_lookup import AddressLookup, AddressLookupQuerySet
@@ -485,6 +494,7 @@ class BackendFilter(admin.SimpleListFilter):
 @admin.register(AddressLookup)
 class AddressLookupAdmin(admin.ModelAdmin):
     list_display = [
+        "reference_link",
         "address_line1_display",
         "address_line2_display",
         "address_line3_display",
@@ -496,14 +506,74 @@ class AddressLookupAdmin(admin.ModelAdmin):
         "longitude_display",
         "confidence_display",
         "backend_used_display",
-        "backend_reference",
     ]
     search_fields = ["label", "backend_used", "backend_reference"]
     ordering = ["label"]
     list_per_page = 20
-    list_display_links = None
+    list_display_links = ("reference_link",)
     change_list_template = "admin/change_list.html"
     list_filter = [BackendFilter]
+    readonly_fields = [
+        "reference_slug_display",
+        "label",
+        "backend_used",
+        "backend_used_display",
+        "backend_reference",
+        "confidence_display",
+        "address_line1_display",
+        "address_line2_display",
+        "address_line3_display",
+        "city_display",
+        "postal_code_display",
+        "state_display",
+        "country_display",
+        "latitude_display",
+        "longitude_display",
+        "raw_payload_full_display",
+    ]
+    fieldsets = (
+        (
+            _("Summary"),
+            {
+                "fields": (
+                    "reference_slug_display",
+                    "label",
+                    "backend_used_display",
+                    "backend_reference",
+                    "confidence_display",
+                )
+            },
+        ),
+        (
+            _("Address components"),
+            {
+                "fields": (
+                    "address_line1_display",
+                    "address_line2_display",
+                    "address_line3_display",
+                    "city_display",
+                    "postal_code_display",
+                    "state_display",
+                    "country_display",
+                )
+            },
+        ),
+        (
+            _("Geolocation"),
+            {
+                "fields": (
+                    "latitude_display",
+                    "longitude_display",
+                )
+            },
+        ),
+        (
+            _("Raw payload"),
+            {
+                "fields": ("raw_payload_full_display",),
+            },
+        ),
+    )
 
     def has_add_permission(self, request):
         return False
@@ -512,10 +582,13 @@ class AddressLookupAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
-        return False
+        if request is None:
+            return False
+        return request.method in ("GET", "HEAD")
 
-    def get_list_display_links(self, request, list_display):
-        return None
+    _REFERENCE_SAFE_CHARS = "._~:@"
+    _SLUG_SEPARATOR = "-"
+    _CACHE_TIMEOUT = 900  # 15 minutes
 
     def get_queryset(self, request):
         query = (request.GET.get("q") or "").strip()
@@ -541,9 +614,205 @@ class AddressLookupAdmin(admin.ModelAdmin):
                     ),
                     raw_payload=raw,
                 )
+                slug_value = self._build_reference_slug(obj.backend_used, obj.backend_reference)
+                if slug_value:
+                    obj._lookup_slug = slug_value
+                    obj.pk = slug_value
+                    self._cache_payload(slug_value, raw, obj.backend_used)
                 data.append(obj)
 
         return AddressLookupQuerySet(model=AddressLookup, data=data)
+
+    # Helpers -------------------------------------------------------------
+    def _build_reference_slug(
+        self, backend_name: Optional[str], backend_reference: Optional[str]
+    ) -> Optional[str]:
+        if not backend_reference:
+            return None
+        backend_identifier = self._normalize_backend_identifier(backend_name)
+        if not backend_identifier:
+            return None
+        backend_token = quote(backend_identifier, safe=self._REFERENCE_SAFE_CHARS)
+        reference_token = quote(str(backend_reference), safe=self._REFERENCE_SAFE_CHARS)
+        return f"{backend_token}{self._SLUG_SEPARATOR}{reference_token}"
+
+    def _get_obj_slug(self, obj: AddressLookup) -> Optional[str]:
+        slug_value = getattr(obj, "_lookup_slug", None)
+        if slug_value:
+            return slug_value  # type: ignore[no-any-return]
+        slug_value = self._build_reference_slug(obj.backend_used, obj.backend_reference)
+        if slug_value:
+            obj._lookup_slug = slug_value  # type: ignore[attr-defined]
+        return slug_value
+
+    @staticmethod
+    def _normalize_backend_identifier(value: Optional[str]) -> str:
+        if not value:
+            return ""
+        cleaned = str(value).strip()
+        if not cleaned:
+            return ""
+        return cleaned
+
+    def _parse_slug(self, slug_value: str) -> tuple[Optional[str], Optional[str]]:
+        if not slug_value or self._SLUG_SEPARATOR not in slug_value:
+            return None, None
+        backend_token, reference_token = slug_value.split(self._SLUG_SEPARATOR, 1)
+        backend_name = unquote(backend_token).strip()
+        reference = unquote(reference_token).strip()
+        return backend_name or None, reference or None
+
+    def _cache_key(self, slug_value: str) -> str:
+        return f"missive:addresslookup:{slug_value}"
+
+    def _cache_payload(self, slug_value: Optional[str], payload: Dict[str, Any], backend_label: str):
+        if not slug_value or not payload:
+            return
+        cache.set(
+            self._cache_key(slug_value),
+            {
+                "payload": payload,
+                "backend_label": backend_label,
+            },
+            timeout=self._CACHE_TIMEOUT,
+        )
+
+    def _fetch_backend_payload(
+        self,
+        backend_name: Optional[str],
+        backend_reference: Optional[str],
+        *,
+        slug_value: Optional[str] = None,
+    ) -> tuple[Dict[str, Any], str]:
+        if not backend_reference:
+            return {"error": "Missing backend reference.", "backend_reference": ""}, ""
+        backend_identifier = self._normalize_backend_identifier(backend_name)
+        if not backend_identifier:
+            return (
+                {
+                    "error": "Missing backend identifier.",
+                    "backend_reference": backend_reference,
+                },
+                "",
+            )
+        cache_slug = slug_value or self._build_reference_slug(backend_identifier, backend_reference)
+        if cache_slug:
+            cached_entry = cache.get(self._cache_key(cache_slug))
+            if cached_entry:
+                payload = dict(cached_entry.get("payload") or {})
+                backend_label = cached_entry.get("backend_label") or backend_identifier
+                payload.setdefault("backend_reference", backend_reference)
+                payload.setdefault("backend_used", backend_identifier)
+                return payload, backend_label
+
+        if pm_get_address_by_reference is None:
+            return (
+                {
+                    "error": "python-missive helpers are not available.",
+                    "backend_reference": backend_reference,
+                },
+                backend_identifier,
+            )
+        configs = get_backend_configs()
+        if not configs:
+            return (
+                {
+                    "error": "No address backends configured.",
+                    "backend_reference": backend_reference,
+                },
+                backend_identifier,
+            )
+        payload = pm_get_address_by_reference(
+            configs,
+            backend=backend_identifier,
+            address_reference=backend_reference,
+        )
+        backend_label = payload.get("backend_used") or backend_identifier
+        if cache_slug:
+            self._cache_payload(cache_slug, payload, backend_label)
+        return payload, backend_label
+
+    @staticmethod
+    def _derive_label_from_payload(payload: Optional[Dict[str, Any]]) -> str:
+        if not payload:
+            return ""
+        for key in ("formatted_address", "label"):
+            value = payload.get(key)
+            if value:
+                return str(value)
+        normalized = payload.get("normalized_address") or {}
+        for key in ("formatted_address", "label"):
+            value = normalized.get(key)
+            if value:
+                return str(value)
+        return ""
+
+    @admin.display(description=_("Reference"))
+    def reference_link(self, obj: AddressLookup):
+        slug_value = self._get_obj_slug(obj)
+        reference = obj.backend_reference or "—"
+        if not slug_value:
+            return reference
+        try:
+            url = reverse("admin:missive_addresslookup_change", args=[slug_value])
+        except Exception:
+            return reference
+        return format_html('<a href="{}">{}</a>', url, reference)
+
+    @admin.display(description=_("Detail slug"))
+    def reference_slug_display(self, obj: AddressLookup):
+        return self._get_obj_slug(obj) or "—"
+
+    def _make_lookup_object(
+        self,
+        *,
+        payload: Dict[str, Any],
+        backend_label: str,
+        backend_reference: str,
+        slug_value: str,
+    ) -> AddressLookup:
+        obj = AddressLookup(
+            label=self._derive_label_from_payload(payload)
+            or backend_reference
+            or backend_label,
+            backend_used=backend_label,
+            backend_reference=backend_reference,
+            raw_payload=payload,
+        )
+        obj.pk = slug_value
+        obj._lookup_slug = slug_value  # type: ignore[attr-defined]
+        return obj
+
+    def get_object(self, request, object_id, from_field=None):
+        backend_name, backend_reference = self._parse_slug(object_id)
+        if not backend_name or not backend_reference:
+            messages.error(request, _("Unable to open detail view for this reference."))
+            return None
+        payload, backend_label = self._fetch_backend_payload(
+            backend_name, backend_reference, slug_value=object_id
+        )
+        if "error" in payload:
+            messages.warning(
+                request,
+                _("Backend response contains an error: %(error)s")
+                % {"error": payload.get("error")},
+            )
+        return self._make_lookup_object(
+            payload=payload,
+            backend_label=backend_label or backend_name or "",
+            backend_reference=backend_reference,
+            slug_value=object_id,
+        )
+
+    @admin.display(description=_("Raw payload"))
+    def raw_payload_full_display(self, obj: AddressLookup):
+        if not obj.raw_payload:
+            return "—"
+        payload = json.dumps(obj.raw_payload, indent=2, ensure_ascii=False)
+        return format_html(
+            '<pre style="white-space: pre-wrap; max-width: 640px;">{}</pre>',
+            payload,
+        )
 
     def _get_from_payload(self, obj: AddressLookup, *keys: str) -> Optional[str]:
         """Extract value from raw_payload using multiple possible keys."""
@@ -631,11 +900,8 @@ class AddressLookupAdmin(admin.ModelAdmin):
 
         # Try to get display name from backend configuration
         try:
-            from python_missive.helpers import get_address_backends_from_config
-            from django.conf import settings
-
             configs = getattr(settings, "MISSIVE_ADDRESS_BACKENDS", [])
-            backends = get_address_backends_from_config(configs)
+            backends = pm_get_address_backends(configs) if pm_get_address_backends else []
 
             # Normalize backend_name for comparison (handle various formats)
             backend_name_normalized = backend_name.lower().strip()

@@ -3,7 +3,7 @@
 import importlib
 import json
 from decimal import Decimal, InvalidOperation
-from typing import Optional
+from typing import Dict, Optional
 
 from django.conf import settings
 from django.contrib import admin
@@ -409,7 +409,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
     list_filter = [MissiveTypeFilter]
 
-    _provider_metadata_cache: Optional[dict[str, dict]] = None
+    _provider_metadata_cache: Optional[Dict[str, Dict]] = None
 
     search_fields = ["name", "missive_type"]
 
@@ -1334,15 +1334,15 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
         return format_html("{}", value)
 
-    def _get_metadata_for_provider(self, provider_name: str):
+    def _get_metadata_for_provider(self, provider_name: str) -> Dict:
         metadata_map = self._get_provider_metadata_map()
         return metadata_map.get((provider_name or "").lower(), {})
 
-    def _get_provider_metadata_map(self):
+    def _get_provider_metadata_map(self) -> Dict[str, Dict]:
         if self._provider_metadata_cache is not None:
             return self._provider_metadata_cache
 
-        metadata_map: dict[str, dict] = {}
+        metadata_map: Dict[str, Dict] = {}
 
         dedicated_metadata = getattr(settings, "MISSIVE_PROVIDER_METADATA", {})
         if isinstance(dedicated_metadata, dict):

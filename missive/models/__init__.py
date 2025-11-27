@@ -20,4 +20,5 @@ __all__ = [
     "MissiveTemplate",
     "ProviderInfo",
     "AddressBackendInfo",
+    "AddressLookup",
 ]
