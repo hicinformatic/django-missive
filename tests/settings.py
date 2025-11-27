@@ -126,20 +126,53 @@ MISSIVE_ADDRESS_BACKENDS = [
     {
         "class": "python_missive.address_backends.nominatim.NominatimAddressBackend",
         "config": {
-            "NOMINATIM_USER_AGENT": _env(
-                "NOMINATIM_USER_AGENT", "django-missive/1.0"
-            ),
-            "NOMINATIM_BASE_URL": _env(
-                "NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org"
-            ),
+            "NOMINATIM_USER_AGENT": _env("NOMINATIM_USER_AGENT", "django-missive/1.0"),
+            "NOMINATIM_BASE_URL": _env("NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org"),
         },
     },
     {
         "class": "python_missive.address_backends.photon.PhotonAddressBackend",
         "config": {
-            "PHOTON_BASE_URL": _env(
-                "PHOTON_BASE_URL", "https://photon.komoot.io"
+            "PHOTON_BASE_URL": _env("PHOTON_BASE_URL", "https://photon.komoot.io"),
+        },
+    },
+    {
+        "class": "python_missive.address_backends.locationiq.LocationIQAddressBackend",
+        "config": {
+            "LOCATIONIQ_API_KEY": _env("LOCATIONIQ_API_KEY", ""),
+            "LOCATIONIQ_BASE_URL": _env("LOCATIONIQ_BASE_URL", "https://api.locationiq.com/v1"),
+        },
+    },
+    {
+        "class": "python_missive.address_backends.opencage.OpenCageAddressBackend",
+        "config": {
+            "OPENCAGE_API_KEY": _env("OPENCAGE_API_KEY", ""),
+            "OPENCAGE_BASE_URL": _env(
+                "OPENCAGE_BASE_URL", "https://api.opencagedata.com/geocode/v1"
             ),
+        },
+    },
+    {
+        "class": "python_missive.address_backends.geocode_earth.GeocodeEarthAddressBackend",
+        "config": {
+            "GEOCODE_EARTH_API_KEY": _env("GEOCODE_EARTH_API_KEY", ""),
+            "GEOCODE_EARTH_BASE_URL": _env(
+                "GEOCODE_EARTH_BASE_URL", "https://api.geocode.earth/v1"
+            ),
+        },
+    },
+    {
+        "class": "python_missive.address_backends.geoapify.GeoapifyAddressBackend",
+        "config": {
+            "GEOAPIFY_API_KEY": _env("GEOAPIFY_API_KEY", ""),
+            "GEOAPIFY_BASE_URL": _env("GEOAPIFY_BASE_URL", "https://api.geoapify.com/v1"),
+        },
+    },
+    {
+        "class": "python_missive.address_backends.maps_co.MapsCoAddressBackend",
+        "config": {
+            "MAPS_CO_API_KEY": _env("MAPS_CO_API_KEY", ""),
+            "MAPS_CO_BASE_URL": _env("MAPS_CO_BASE_URL", "https://geocode.maps.co"),
         },
     },
     {
@@ -179,9 +212,7 @@ MISSIVE_SANDBOX = True
 #   - Production : "https://api.monapp.com"
 #   - Development: "https://1234.ngrok.io" (ngrok tunnel)
 #   - Local: "http://192.168.1.100:8000" (local network IP)
-MISSIVE_WEBHOOK_BASE_URL = os.getenv(
-    "MISSIVE_WEBHOOK_BASE_URL", "http://127.0.0.1:8000"
-)
+MISSIVE_WEBHOOK_BASE_URL = os.getenv("MISSIVE_WEBHOOK_BASE_URL", "http://127.0.0.1:8000")
 
 # =============================================================================
 # API key configuration (loaded from environment variables)
@@ -235,9 +266,7 @@ TEAMS_CLIENT_SECRET = os.getenv("TEAMS_CLIENT_SECRET")
 TEAMS_TENANT_ID = os.getenv("TEAMS_TENANT_ID")
 
 # Default Django email configuration
-EMAIL_BACKEND = os.getenv(
-    "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
-)
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
 EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
