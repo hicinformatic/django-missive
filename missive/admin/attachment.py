@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
-from ..decorators import sandbox_warning, library_presence_warning
+from ..decorators import library_presence_warning, sandbox_warning
 from ..models import MissiveAttachment
 
 

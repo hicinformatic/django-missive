@@ -13,6 +13,8 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from python_missive.helpers import (
     get_provider_paths_from_config as pm_get_provider_paths_from_config,
+)
+from python_missive.helpers import (
     get_providers_from_config as pm_get_providers_from_config,
 )
 from python_missive.providers import (
@@ -285,7 +287,9 @@ class MissiveBuilder:
                 parts = last_line.split()
                 if parts:
                     # Assume last part is city, rest is postal code
-                    data["recipient_postal_code"] = " ".join(parts[:-1]) if len(parts) > 1 else ""
+                    data["recipient_postal_code"] = (
+                        " ".join(parts[:-1]) if len(parts) > 1 else ""
+                    )
                     data["recipient_city"] = parts[-1] if parts else ""
 
         return data
@@ -579,17 +583,13 @@ def send_delayed_missives(
             else:
                 results["failed"] += 1
                 error_msg = f"Send returned False for missive {missive.id}"
-                results["errors"].append(
-                    {"missive_id": missive.id, "error": error_msg}
-                )
+                results["errors"].append({"missive_id": missive.id, "error": error_msg})
                 logger.warning(error_msg)
 
         except Exception as e:
             results["failed"] += 1
             error_msg = str(e)
-            results["errors"].append(
-                {"missive_id": missive.id, "error": error_msg}
-            )
+            results["errors"].append({"missive_id": missive.id, "error": error_msg})
             logger.error(
                 f"Error sending delayed missive {missive.id}: {error_msg}",
                 exc_info=True,

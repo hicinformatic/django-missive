@@ -277,7 +277,9 @@ def webhook_status_view(request):
         response_data.update(
             {
                 "admin": True,
-                "sandbox_mode": getattr(settings, "MISSIVE_SANDBOX", False),  # nosec B110
+                "sandbox_mode": getattr(
+                    settings, "MISSIVE_SANDBOX", False
+                ),  # nosec B110
                 "webhook_base_url": base_url,
                 "providers_count": len(all_providers),
                 "providers": webhook_urls,

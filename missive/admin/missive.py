@@ -8,9 +8,10 @@ from django.contrib import admin
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
-from ..decorators import sandbox_warning, library_presence_warning
+from ..decorators import library_presence_warning, sandbox_warning
 from ..helpers import get_all_provider_choices, get_providers_from_config
 from ..models import Missive
 from ..providers import normalize_provider_path
@@ -27,9 +28,7 @@ class MissiveAdminForm(forms.ModelForm):
         required=True,
         initial="django_email",
         label=_("Provider"),
-        help_text=_(
-            "Provider to use for sending (filtered according to missive type)"
-        ),
+        help_text=_("Provider to use for sending (filtered according to missive type)"),
     )
 
     class Meta:
@@ -150,6 +149,8 @@ class MissiveAdmin(admin.ModelAdmin):
         "delivered_at",
         "read_at",
         "proof_of_delivery_display",
+        "sender_address_display",
+        "recipient_address_display",
     ]
 
     date_hierarchy = "created_at"
@@ -175,6 +176,7 @@ class MissiveAdmin(admin.ModelAdmin):
                     "sender_email",
                     "sender_phone",
                     "sender_address",
+                    "sender_address_display",
                     "sender_address_line1",
                     "sender_address_line2",
                     "sender_address_line3",
@@ -194,6 +196,7 @@ class MissiveAdmin(admin.ModelAdmin):
                     "recipient_email",
                     "recipient_phone",
                     "recipient_address",
+                    "recipient_address_display",
                     "recipient_address_line1",
                     "recipient_address_line2",
                     "recipient_address_line3",
@@ -389,6 +392,80 @@ class MissiveAdmin(admin.ModelAdmin):
                 return label
         return "-"
 
+    @admin.display(description=_("Sender Address Details"))
+    def sender_address_display(self, obj):
+        """Display structured sender address information."""
+        if not obj.sender_address:
+            return "—"
+        return self._format_address_display(obj.sender_address)
+
+    @admin.display(description=_("Recipient Address Details"))
+    def recipient_address_display(self, obj):
+        """Display structured recipient address information."""
+        if not obj.recipient_address:
+            return "—"
+        return self._format_address_display(obj.recipient_address)
+
+    def _format_address_display(self, address_data):
+        """Format address data for display in admin."""
+        if not address_data or not isinstance(address_data, dict):
+            return "—"
+
+        lines = []
+        if address_data.get("line1"):
+            lines.append(address_data["line1"])
+        if address_data.get("line2"):
+            lines.append(address_data["line2"])
+        if address_data.get("line3"):
+            lines.append(address_data["line3"])
+
+        city_parts = []
+        if address_data.get("postal_code"):
+            city_parts.append(address_data["postal_code"])
+        if address_data.get("city"):
+            city_parts.append(address_data["city"])
+        if city_parts:
+            lines.append(" ".join(city_parts))
+
+        if address_data.get("state"):
+            lines.append(address_data["state"])
+        if address_data.get("country"):
+            lines.append(address_data["country"])
+
+        address_html = "<br>".join(lines) if lines else "—"
+
+        details_parts = []
+        if (
+            address_data.get("latitude") is not None
+            and address_data.get("longitude") is not None
+        ):
+            lat = float(address_data["latitude"])
+            lon = float(address_data["longitude"])
+            details_parts.append(f"<strong>Coordinates:</strong> {lat:.6f}, {lon:.6f}")
+        if address_data.get("confidence") is not None:
+            try:
+                conf_value = float(address_data["confidence"])
+                details_parts.append(f"<strong>Confidence:</strong> {conf_value:.1%}")
+            except (TypeError, ValueError):
+                details_parts.append(
+                    f"<strong>Confidence:</strong> {address_data['confidence']}"
+                )
+        if address_data.get("backend_used"):
+            details_parts.append(
+                f"<strong>Backend:</strong> {address_data['backend_used']}"
+            )
+        if address_data.get("backend_reference"):
+            details_parts.append(
+                f"<strong>Reference:</strong> <code>{address_data['backend_reference']}</code>"
+            )
+
+        if details_parts:
+            details_html = "<br>".join(details_parts)
+            full_html = f"{address_html}<br><br>{details_html}"
+            return mark_safe(full_html)  # nosec
+
+        return mark_safe(address_html)  # nosec
+
     @admin.display(description=_("Proof of Delivery"))
     def proof_of_delivery_display(self, obj):
         """Displays all proof of delivery links."""
@@ -514,9 +591,7 @@ class MissiveAdmin(admin.ModelAdmin):
 
             if missive.status == "CANCELLED":
                 error_count += 1
-                errors.append(
-                    f"Missive #{missive.id} cancelled, cannot be sent"
-                )
+                errors.append(f"Missive #{missive.id} cancelled, cannot be sent")
                 continue
 
             try:
@@ -556,23 +631,17 @@ class MissiveAdmin(admin.ModelAdmin):
     @admin.action(description=_("Mark as Sent"))
     def mark_as_sent(self, request, queryset):
         updated = queryset.update(status="SENT", sent_at=timezone.now())
-        self.message_user(
-            request, _(f"{updated} missive(s) marked as sent.")
-        )
+        self.message_user(request, _(f"{updated} missive(s) marked as sent."))
 
     @admin.action(description=_("Mark as Delivered"))
     def mark_as_delivered(self, request, queryset):
         updated = queryset.update(status="DELIVERED", delivered_at=timezone.now())
-        self.message_user(
-            request, _(f"{updated} missive(s) marked as delivered.")
-        )
+        self.message_user(request, _(f"{updated} missive(s) marked as delivered."))
 
     @admin.action(description=_("Mark as Failed"))
     def mark_as_failed(self, request, queryset):
         updated = queryset.update(status="FAILED")
-        self.message_user(
-            request, _(f"{updated} missive(s) marked as failed.")
-        )
+        self.message_user(request, _(f"{updated} missive(s) marked as failed."))
 
     @admin.action(description=_("🔍 Analyze Delivery Risk"))
     def check_delivery_risk_action(self, request, queryset):

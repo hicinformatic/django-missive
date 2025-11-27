@@ -164,7 +164,5 @@ class MissiveAttachment(models.Model):
 
         if not self.missive and not self.content_type:
             raise ValidationError(
-                _(
-                    "You must attach this file to either a missive or another object."
-                )
+                _("You must attach this file to either a missive or another object.")
             )

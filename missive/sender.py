@@ -26,9 +26,7 @@ class MissiveSender:
             return [provider_path]
 
         if missive.provider:
-            logger.info(
-                f"Missive {missive.id}: Explicit provider '{missive.provider}'"
-            )
+            logger.info(f"Missive {missive.id}: Explicit provider '{missive.provider}'")
             return [missive.provider]
 
         providers_by_type = get_provider_paths_from_config()
@@ -60,9 +58,7 @@ class MissiveSender:
 
             return is_healthy
         except Exception as e:
-            logger.error(
-                f"Error during health check of {provider_class.__name__}: {e}"
-            )
+            logger.error(f"Error during health check of {provider_class.__name__}: {e}")
             return False
 
     @staticmethod
@@ -71,9 +67,7 @@ class MissiveSender:
     ) -> bool:
         """Sends missive via appropriate provider with automatic fallback."""
         if not missive.can_send():
-            logger.warning(
-                f"Missive {missive.id}: Cannot be sent (can_send()=False)"
-            )
+            logger.warning(f"Missive {missive.id}: Cannot be sent (can_send()=False)")
             return False
 
         provider_paths = MissiveSender.get_provider_classes(missive)
@@ -214,8 +208,6 @@ class MissiveSender:
             except Exception as e:
                 results["failed"] += 1
                 results["errors"].append({"missive_id": missive.id, "error": str(e)})
-                logger.error(
-                    f"Error during bulk send of missive {missive.id}: {e}"
-                )
+                logger.error(f"Error during bulk send of missive {missive.id}: {e}")
 
         return results

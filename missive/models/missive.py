@@ -13,9 +13,9 @@ try:
 except ImportError:
     format_phone_international = None
 
-from .choices import MissivePriority, MissiveStatus, MissiveType
 from ..fields import AddressField
 from ..providers import normalize_provider_path
+from .choices import MissivePriority, MissiveStatus, MissiveType
 
 
 class Missive(models.Model):
@@ -41,7 +41,9 @@ class Missive(models.Model):
         blank=True,
         null=True,
         verbose_name=_("Sender Phone"),
-        help_text=_("Sender's phone number in international format (e.g., +33 6 12 34 56 78)"),
+        help_text=_(
+            "Sender's phone number in international format (e.g., +33 6 12 34 56 78)"
+        ),
     )
     sender_address_line1 = models.CharField(
         max_length=255,
@@ -113,7 +115,9 @@ class Missive(models.Model):
         blank=True,
         null=True,
         verbose_name=_("Recipient Phone"),
-        help_text=_("Recipient's phone number in international format (e.g., +33 6 12 34 56 78)"),
+        help_text=_(
+            "Recipient's phone number in international format (e.g., +33 6 12 34 56 78)"
+        ),
     )
     recipient_address_line1 = models.CharField(
         max_length=255,
@@ -452,9 +456,21 @@ class Missive(models.Model):
 
     def _apply_address_dict(self, prefix: str, data: Dict[str, Any]) -> None:
         """Populate legacy charfields from structured data."""
-        setattr(self, f"{prefix}_address_line1", data.get("line1") or data.get("address_line1") or "")
-        setattr(self, f"{prefix}_address_line2", data.get("line2") or data.get("address_line2") or "")
-        setattr(self, f"{prefix}_address_line3", data.get("line3") or data.get("address_line3") or "")
+        setattr(
+            self,
+            f"{prefix}_address_line1",
+            data.get("line1") or data.get("address_line1") or "",
+        )
+        setattr(
+            self,
+            f"{prefix}_address_line2",
+            data.get("line2") or data.get("address_line2") or "",
+        )
+        setattr(
+            self,
+            f"{prefix}_address_line3",
+            data.get("line3") or data.get("address_line3") or "",
+        )
         if "postal_code" in data:
             setattr(self, f"{prefix}_postal_code", data.get("postal_code") or "")
         if "city" in data:

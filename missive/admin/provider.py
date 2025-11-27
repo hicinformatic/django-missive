@@ -7,18 +7,22 @@ from typing import Optional
 
 from django.conf import settings
 from django.contrib import admin
-from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist, PermissionDenied
+from django.core.exceptions import (
+    MultipleObjectsReturned,
+    ObjectDoesNotExist,
+    PermissionDenied,
+)
 from django.http import JsonResponse
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
-from ..decorators import sandbox_warning, library_presence_warning
+
+from ..decorators import library_presence_warning, sandbox_warning
 from ..helpers import _normalize_providers_config, _provider_error_logger
 from ..models import MissiveType, ProviderInfo
 from ..models.provider import ProviderInfoQuerySet
 from ..providers import normalize_provider_path
-
 
 # Shared postal attachment limit fields
 _POSTAL_ATTACHMENT_LIMIT_FIELDS = [
@@ -209,9 +213,7 @@ TYPE_SUMMARY_FIELDS = {
 }
 
 TYPE_SUMMARY_FIELD_LOOKUP = {
-    spec["name"]: spec
-    for specs in TYPE_SUMMARY_FIELDS.values()
-    for spec in specs
+    spec["name"]: spec for specs in TYPE_SUMMARY_FIELDS.values() for spec in specs
 }
 
 
@@ -326,9 +328,7 @@ class MissiveTypeFilter(admin.SimpleListFilter):
                 provider_metadata = None
 
             # Get ordering configuration from settings
-            ordering_config = getattr(
-                settings, "MISSIVE_PROVIDER_ORDERING", {}
-            )
+            ordering_config = getattr(settings, "MISSIVE_PROVIDER_ORDERING", {})
             ordering = ordering_config.get(missive_type)
 
             # Get ordered providers for this type
@@ -393,6 +393,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
     class Media:
         js = ("admin/js/config_vars_toggle.js",)
+
     ordering = ["name"]
 
     list_display = [
@@ -562,13 +563,23 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                         if method_name and hasattr(provider_instance, method_name):
                             service_info = getattr(provider_instance, method_name)()
                             # Return raw response as JSON string
-                            return json.dumps(service_info, indent=2, ensure_ascii=False)
+                            return json.dumps(
+                                service_info, indent=2, ensure_ascii=False
+                            )
                         else:
-                            return json.dumps({
-                                "error": f"Method {method_name} not implemented for {provider_instance.name}"
-                            }, indent=2, ensure_ascii=False)
+                            return json.dumps(
+                                {
+                                    "error": f"Method {method_name} not implemented for {provider_instance.name}"
+                                },
+                                indent=2,
+                                ensure_ascii=False,
+                            )
                     else:
-                        return json.dumps({"error": "Provider not loaded"}, indent=2, ensure_ascii=False)
+                        return json.dumps(
+                            {"error": "Provider not loaded"},
+                            indent=2,
+                            ensure_ascii=False,
+                        )
 
                 except Exception as e:
                     return json.dumps({"error": str(e)}, indent=2, ensure_ascii=False)
@@ -659,7 +670,9 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                         f"No attachment limit config for {missive_type}.{suffix}"
                     )
 
-                def attachment_limit_method(obj, missive_type=missive_type, config=config):
+                def attachment_limit_method(
+                    obj, missive_type=missive_type, config=config
+                ):
                     try:
                         provider_class = obj._get_provider_class()
                         if not provider_class:
@@ -697,44 +710,54 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
                         # EMAIL attachments
                         if missive_type == "EMAIL":
-                            if hasattr(provider_instance, "max_email_attachment_size_mb"):
-                                limits_info[
-                                    "max_size_mb"
-                                ] = provider_instance.max_email_attachment_size_mb
-                                limits_info[
-                                    "max_size_bytes"
-                                ] = provider_instance.max_email_attachment_size_bytes
-                            if hasattr(provider_instance, "allowed_attachment_mime_types"):
-                                limits_info[
-                                    "allowed_mime_types"
-                                ] = provider_instance.allowed_attachment_mime_types
+                            if hasattr(
+                                provider_instance, "max_email_attachment_size_mb"
+                            ):
+                                limits_info["max_size_mb"] = (
+                                    provider_instance.max_email_attachment_size_mb
+                                )
+                                limits_info["max_size_bytes"] = (
+                                    provider_instance.max_email_attachment_size_bytes
+                                )
+                            if hasattr(
+                                provider_instance, "allowed_attachment_mime_types"
+                            ):
+                                limits_info["allowed_mime_types"] = (
+                                    provider_instance.allowed_attachment_mime_types
+                                )
 
                         # POSTAL attachments
                         elif missive_type in ("POSTAL", "POSTAL_REGISTERED"):
                             if hasattr(provider_instance, "max_postal_pages"):
-                                limits_info["max_pages"] = provider_instance.max_postal_pages
-                            if hasattr(provider_instance, "allowed_attachment_mime_types"):
-                                limits_info[
-                                    "allowed_mime_types"
-                                ] = provider_instance.allowed_attachment_mime_types
+                                limits_info["max_pages"] = (
+                                    provider_instance.max_postal_pages
+                                )
+                            if hasattr(
+                                provider_instance, "allowed_attachment_mime_types"
+                            ):
+                                limits_info["allowed_mime_types"] = (
+                                    provider_instance.allowed_attachment_mime_types
+                                )
                             if hasattr(provider_instance, "allowed_page_formats"):
-                                limits_info[
-                                    "allowed_page_formats"
-                                ] = provider_instance.allowed_page_formats
+                                limits_info["allowed_page_formats"] = (
+                                    provider_instance.allowed_page_formats
+                                )
 
                         # BRANDED attachments
                         elif missive_type == "BRANDED":
                             if hasattr(provider_instance, "max_attachment_size_mb"):
-                                limits_info[
-                                    "max_size_mb"
-                                ] = provider_instance.max_attachment_size_mb
-                                limits_info[
-                                    "max_size_bytes"
-                                ] = provider_instance.max_attachment_size_bytes
-                            if hasattr(provider_instance, "allowed_attachment_mime_types"):
-                                limits_info[
-                                    "allowed_mime_types"
-                                ] = provider_instance.allowed_attachment_mime_types
+                                limits_info["max_size_mb"] = (
+                                    provider_instance.max_attachment_size_mb
+                                )
+                                limits_info["max_size_bytes"] = (
+                                    provider_instance.max_attachment_size_bytes
+                                )
+                            if hasattr(
+                                provider_instance, "allowed_attachment_mime_types"
+                            ):
+                                limits_info["allowed_mime_types"] = (
+                                    provider_instance.allowed_attachment_mime_types
+                                )
 
                         if limits_info:
                             return json.dumps(limits_info, indent=2, ensure_ascii=False)
@@ -747,7 +770,9 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
                     else:
                         return json.dumps(
-                            {"error": "Provider not loaded"}, indent=2, ensure_ascii=False
+                            {"error": "Provider not loaded"},
+                            indent=2,
+                            ensure_ascii=False,
                         )
 
                 except Exception as e:
@@ -1404,6 +1429,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         provider_info = self._get_provider_info(provider_name)
         if provider_info is None:
             from django.http import Http404
+
             raise Http404(_("Provider not found"))
 
         provider_path = self._get_provider_path(provider_name)
@@ -1423,7 +1449,9 @@ class ProviderInfoAdmin(admin.ModelAdmin):
             "can_test": can_test,
             "default_type": default_type,
             "missive_types": provider_info.missive_types_list,
-            "send_url": reverse("admin:missive_provider_test_send", args=[provider_name]),
+            "send_url": reverse(
+                "admin:missive_provider_test_send", args=[provider_name]
+            ),
             "opts": ProviderInfo._meta,
         }
         return TemplateResponse(

@@ -3,8 +3,8 @@
 import pytest
 from django.contrib.auth import get_user_model
 
-from missive.models import Missive, MissiveStatus, MissiveType
 from missive.fields import AddressFormField
+from missive.models import Missive, MissiveStatus, MissiveType
 
 User = get_user_model()
 

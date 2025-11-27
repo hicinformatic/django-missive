@@ -3,125 +3,17 @@
 import importlib
 
 from django.conf import settings
-from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from django.db import models
-from django.db.models.query import QuerySet
-from django.db.models.sql import Query
 from django.utils.translation import gettext_lazy as _
 
 from ..providers import normalize_provider_path
+from .query import InMemoryQuerySet
 
 
-class ProviderInfoQuerySet(QuerySet):
+class ProviderInfoQuerySet(InMemoryQuerySet):
     """In-memory QuerySet for provider info."""
 
-    def __init__(self, model=None, data=None, query=None, using=None, hints=None):
-        if query is None and model is not None:
-            query = Query(model)
-        super().__init__(model=model, query=query, using=using, hints=hints)
-        self._result_cache = list(data or [])
-        self._prefetch_done = True
-
-    def __len__(self):
-        return len(self._result_cache)
-
-    def __getitem__(self, k):
-        if isinstance(k, slice):
-            return self.__class__(
-                self.model,
-                self._result_cache[k],
-                self.query.clone(),
-                using=self._db,
-                hints=self._hints,
-            )
-        return self._result_cache[k]
-
-    def _clone(self):
-        return self.__class__(
-            self.model,
-            list(self._result_cache),
-            self.query.clone(),
-            using=self._db,
-            hints=self._hints,
-        )
-
-    def all(self):
-        return self._clone()
-
-    def count(self):
-        return len(self._result_cache)
-
-    def filter(self, *args, **kwargs):
-        """Filters providers with Django lookup support."""
-        rslt = self._result_cache
-
-        for lookup, value in kwargs.items():
-            if "__" in lookup:
-                field_name, lookup_type = lookup.rsplit("__", 1)
-
-                if lookup_type == "icontains":
-                    rslt = [
-                        obj
-                        for obj in rslt
-                        if value.lower() in str(getattr(obj, field_name, "")).lower()
-                    ]
-                elif lookup_type == "contains":
-                    rslt = [
-                        obj
-                        for obj in rslt
-                        if value in str(getattr(obj, field_name, ""))
-                    ]
-                elif lookup_type == "exact":
-                    rslt = [obj for obj in rslt if getattr(obj, field_name) == value]
-                elif lookup_type == "in":
-                    rslt = [obj for obj in rslt if getattr(obj, field_name) in value]
-                else:
-                    pass
-            else:
-                rslt = [obj for obj in rslt if getattr(obj, lookup, None) == value]
-
-        return self.__class__(
-            self.model,
-            rslt,
-            self.query.clone(),
-            using=self._db,
-            hints=self._hints,
-        )
-
-    def order_by(self, *fields):
-        """Sorts providers."""
-        rslt = self._result_cache
-        for field in reversed(fields):
-            reverse = False
-            if field.startswith("-"):
-                reverse = True
-                field = field[1:]
-            rslt = sorted(
-                rslt, key=lambda x: getattr(x, field, None) or "", reverse=reverse
-            )
-        return self.__class__(
-            self.model,
-            rslt,
-            self.query.clone(),
-            using=self._db,
-            hints=self._hints,
-        )
-
-    def get(self, **kwargs):
-        """Get a unique provider"""
-        rslt = self._result_cache
-        for attr, value in kwargs.items():
-            rslt = [obj for obj in rslt if getattr(obj, attr) == value]
-
-        if len(rslt) == 1:
-            return rslt[0]
-        if not rslt:
-            raise ObjectDoesNotExist(
-                f"{self.model.__name__} matching query does not exist."
-            )
-        raise MultipleObjectsReturned(
-            f"Multiple {self.model.__name__} objects returned."
-        )
+    pass
 
 
 class ProviderInfoManager(models.Manager):
@@ -130,9 +22,10 @@ class ProviderInfoManager(models.Manager):
     def get_queryset(self):
         # Load providers from settings using python-missive helper
         try:
+            from django.conf import settings as dj_settings
             from python_missive.helpers import get_provider_paths_from_config
             from python_missive.providers import get_provider_name_from_path
-            from django.conf import settings as dj_settings
+
             configured = getattr(dj_settings, "MISSIVE_PROVIDERS", None) or []
             provider_paths = (
                 list(configured.keys()) if isinstance(configured, dict) else configured
@@ -163,9 +56,7 @@ class ProviderInfoManager(models.Manager):
             provider = ProviderInfo(
                 pk=provider_name,  # Use name as pk for URL generation
                 name=provider_name,
-                missive_type=",".join(
-                    missive_types
-                ),  # Store type list for display
+                missive_type=",".join(missive_types),  # Store type list for display
             )
             providers_list.append(provider)
 
@@ -333,9 +224,7 @@ class ProviderInfo(models.Model):
         for key in self.required_config_keys:
             # B105: getattr on settings is safe, settings are controlled
             value = getattr(settings, key, None)  # nosec B105
-            is_sensitive = any(
-                keyword in key.lower() for keyword in sensitive_keywords
-            )
+            is_sensitive = any(keyword in key.lower() for keyword in sensitive_keywords)
             config_vars[key] = {
                 "configured": bool(value),
                 "value": "***HIDDEN***" if is_sensitive and value else value,
@@ -371,7 +260,9 @@ class ProviderInfo(models.Model):
             return True
 
         # B105: getattr on settings is safe, settings are controlled
-        return hasattr(settings, key) and bool(getattr(settings, key, None))  # nosec B105
+        return hasattr(settings, key) and bool(
+            getattr(settings, key, None)
+        )  # nosec B105
 
     @property
     def status(self):
@@ -451,7 +342,9 @@ class ProviderInfo(models.Model):
 
             # Special cases for names using underscores or multiple words
             if self.name == "django_email":
-                provider_path = "python_missive.providers.django_email.DjangoEmailProvider"
+                provider_path = (
+                    "python_missive.providers.django_email.DjangoEmailProvider"
+                )
             elif self.name == "smspartner":
                 provider_path = "python_missive.providers.smspartner.SMSPartnerProvider"
 

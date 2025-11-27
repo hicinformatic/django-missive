@@ -88,7 +88,9 @@ def system_status_view(request):
                     else:
                         provider_data["geographic_coverage"][missive_type] = [geo_value]
                 elif isinstance(geo_value, (list, tuple)):
-                    provider_data["geographic_coverage"][missive_type] = list(geo_value) if geo_value else "*"
+                    provider_data["geographic_coverage"][missive_type] = (
+                        list(geo_value) if geo_value else "*"
+                    )
                 else:
                     provider_data["geographic_coverage"][missive_type] = str(geo_value)
 

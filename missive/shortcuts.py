@@ -81,7 +81,9 @@ def _validate_content(content: str, missive_type: str = "") -> None:
     if not content or not content.strip():
         msg: Union[Promise, str] = gettext_lazy("Content cannot be empty")
         if missive_type:
-            msg = gettext_lazy("%(type)s content cannot be empty") % {"type": missive_type}
+            msg = gettext_lazy("%(type)s content cannot be empty") % {
+                "type": missive_type
+            }
         raise MissiveValidationError(msg)
 
     max_length = getattr(settings, "MISSIVE_MAX_CONTENT_LENGTH", 1_000_000)
@@ -124,13 +126,16 @@ def send_missive(
     if missive_type in ("SMS", "VOICE_CALL"):
         if not phone:
             raise MissiveValidationError(
-                gettext_lazy("'phone' field required for %(type)s") % {"type": missive_type}
+                gettext_lazy("'phone' field required for %(type)s")
+                % {"type": missive_type}
             )
         phone = _validate_phone(phone, country_code)
 
     elif missive_type == "EMAIL":
         if not email:
-            raise MissiveValidationError(gettext_lazy("'email' field required for EMAIL"))
+            raise MissiveValidationError(
+                gettext_lazy("'email' field required for EMAIL")
+            )
         _validate_email(email)
 
         if subject is not None and not subject.strip():
@@ -152,7 +157,8 @@ def send_missive(
         missing = [f for f in required_fields if not address.get(f)]
         if missing:
             raise MissiveValidationError(
-                gettext_lazy("Missing address fields: %(fields)s") % {"fields": ", ".join(missing)}
+                gettext_lazy("Missing address fields: %(fields)s")
+                % {"fields": ", ".join(missing)}
             )
         if missive_type == "POSTAL_REGISTERED":
             kwargs.setdefault("is_registered", True)
@@ -192,7 +198,8 @@ def send_missive(
     max_subject_length = getattr(settings, "MISSIVE_MAX_SUBJECT_LENGTH", 998)
     if subject and len(subject) > max_subject_length:
         raise MissiveValidationError(
-            gettext_lazy("Subject too long (max: %(max)s chars)") % {"max": max_subject_length}
+            gettext_lazy("Subject too long (max: %(max)s chars)")
+            % {"max": max_subject_length}
         )
 
     missive_data = {

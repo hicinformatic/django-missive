@@ -8,9 +8,11 @@ from typing import Any, Dict, List, Optional, Sequence
 try:
     from python_missive.helpers import (
         _load_address_backend_class as pm_load_address_backend_class,
-        get_address_backends_from_config as pm_get_address_backends_from_config,
-        get_address_from_backends as pm_get_address_from_backends,
     )
+    from python_missive.helpers import (
+        get_address_backends_from_config as pm_get_address_backends_from_config,
+    )
+    from python_missive.helpers import search_addresses as pm_search_addresses
 except ImportError:  # pragma: no cover - python-missive is an optional dependency here
     pm_load_address_backend_class = None
 
@@ -19,11 +21,16 @@ except ImportError:  # pragma: no cover - python-missive is an optional dependen
     ) -> List[Any]:
         return []
 
-    def pm_get_address_from_backends(  # type: ignore[no-redef]
+    def pm_search_addresses(  # type: ignore[no-redef]
         backends_config: Optional[Sequence[Dict[str, Any]]] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        return {"error": "python-missive is not installed", "errors": []}
+        return {
+            "results": [],
+            "total": 0,
+            "error": "python-missive is not installed",
+            "errors": [],
+        }
 
 
 DEFAULT_ADDRESS_KWARGS: Dict[str, Optional[str]] = {
@@ -198,15 +205,39 @@ def build_address_backends_payload(
 
     resolved_address_kwargs = _resolve_address_kwargs(address_kwargs)
     resolved_extra_kwargs = (
-        _resolve_extra_kwargs(operation, extra_kwargs) if operation == "reverse_geocode" else {}
+        _resolve_extra_kwargs(operation, extra_kwargs)
+        if operation == "reverse_geocode"
+        else {}
     )
 
-    sample_result = pm_get_address_from_backends(
-        backends_config,
-        operation=operation,
-        **resolved_address_kwargs,
-        **resolved_extra_kwargs,
-    )
+    # Build query string for testing
+    address_parts = [
+        resolved_address_kwargs.get("address_line1"),
+        resolved_address_kwargs.get("postal_code"),
+        resolved_address_kwargs.get("city"),
+    ]
+    test_query = ", ".join(filter(None, address_parts)) or "test address"
+
+    if operation == "reverse_geocode" or pm_search_addresses is None:
+        # Reverse geocode not supported by search_addresses
+        sample_result = {
+            "error": "Reverse geocode test not available",
+            "backend_used": None,
+        }
+    else:
+        search_result = pm_search_addresses(
+            backends_config=backends_config,
+            query=test_query,
+            country=resolved_address_kwargs.get("country"),
+            limit=1,
+        )
+        results = search_result.get("results", [])
+        if results:
+            sample_result = results[0]
+            sample_result["backend_used"] = search_result.get("backend_used")
+        else:
+            sample_result = search_result
+
     selected_backend = sample_result.get("backend_used")
 
     working_instances_list = pm_get_address_backends_from_config(backends_config)

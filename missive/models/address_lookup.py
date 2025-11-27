@@ -1,40 +1,15 @@
 from __future__ import annotations
 
 from django.db import models
-from django.db.models.sql import Query
 from django.utils.translation import gettext_lazy as _
 
+from .query import InMemoryQuerySet
 
-class AddressLookupQuerySet(models.QuerySet):
-    def __init__(self, model=None, data=None, query=None, using=None, hints=None):
-        if query is None and model is not None:
-            query = Query(model)
-        super().__init__(model=model, query=query, using=using, hints=hints)
-        self._result_cache = list(data or [])
-        self._prefetch_done = True
 
-    def __len__(self):
-        return len(self._result_cache)
+class AddressLookupQuerySet(InMemoryQuerySet):
+    """In-memory queryset for address lookup suggestions."""
 
-    def __getitem__(self, k):
-        if isinstance(k, slice):
-            return AddressLookupQuerySet(
-                self.model,
-                self._result_cache[k],
-                self.query.clone(),
-                using=self._db,
-                hints=self._hints,
-            )
-        return self._result_cache[k]
-
-    def _clone(self):
-        return AddressLookupQuerySet(
-            self.model,
-            list(self._result_cache),
-            self.query.clone(),
-            using=self._db,
-            hints=self._hints,
-        )
+    pass
 
 
 class AddressLookupManager(models.Manager):

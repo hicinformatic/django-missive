@@ -113,7 +113,9 @@ class AddressFormField(forms.MultiValueField):
                 **data,
             )
         except Exception as exc:  # pragma: no cover - defensive
-            raise ValidationError(_("Address normalization failed: %(error)s") % {"error": exc})
+            raise ValidationError(
+                _("Address normalization failed: %(error)s") % {"error": exc}
+            )
 
         result: Dict[str, Any] = normalized.to_dict()
         if payload.get("errors"):

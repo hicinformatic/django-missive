@@ -102,7 +102,9 @@ def library_presence_warning(admin_class, *, module_name: str = "python_missive"
         return original_add_view(self, request, form_url, extra_context)
 
     @wraps(original_change_view)
-    def change_view_with_lib_check(self, request, object_id, form_url="", extra_context=None):
+    def change_view_with_lib_check(
+        self, request, object_id, form_url="", extra_context=None
+    ):
         _warn_if_missing(request)
         return original_change_view(self, request, object_id, form_url, extra_context)
 

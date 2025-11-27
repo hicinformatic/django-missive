@@ -9,7 +9,6 @@ from ..helpers import (
 from .address_backend import AddressBackendInfoAdmin, AddressLookupAdmin
 from .attachment import MissiveAttachmentAdmin, MissiveAttachmentInline
 from .event import MissiveEventAdmin, MissiveEventInline
-
 from .missive import MissiveAdmin, MissiveAdminForm
 from .provider import ProviderInfoAdmin
 from .template import MissiveTemplateAdmin

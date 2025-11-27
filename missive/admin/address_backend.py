@@ -13,9 +13,9 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
 try:
-    from python_missive.helpers import get_address_from_backends as pm_get_address_from_backends
+    from python_missive.helpers import search_addresses as pm_search_addresses
 except ImportError:  # pragma: no cover - optional dependency
-    pm_get_address_from_backends = None
+    pm_search_addresses = None
 
 from ..models.address_backend import AddressBackendInfo, AddressBackendInfoQuerySet
 from ..models.address_lookup import AddressLookup, AddressLookupQuerySet
@@ -35,49 +35,127 @@ def get_backend_config_for_path(class_path: Optional[str]) -> Optional[Dict[str,
     return None
 
 
+def _parse_address_term(term: str) -> Dict[str, Optional[str]]:
+    """Parse an address string to extract components.
+
+    Tries to extract postal_code (5 digits) and city from the term.
+    """
+    import re
+
+    term = term.strip()
+    if not term:
+        return {"address_line1": term, "postal_code": None, "city": None}
+
+    postal_code_pattern = r"\b(\d{5})\b"
+    postal_match = re.search(postal_code_pattern, term)
+
+    postal_code = None
+    city = None
+    address_line1 = term
+
+    if postal_match:
+        postal_code = postal_match.group(1)
+        postal_pos = postal_match.start()
+
+        parts = term.split(postal_code)
+        if len(parts) >= 2:
+            address_line1 = parts[0].strip()
+            city_part = parts[1].strip()
+            if city_part:
+                city = city_part
+        else:
+            address_line1 = term[:postal_pos].strip()
+
+    return {
+        "address_line1": address_line1,
+        "postal_code": postal_code,
+        "city": city,
+    }
+
+
 def build_address_suggestions(
-    config_list: list[Dict[str, Any]], term: str
+    config_list: list[Dict[str, Any]], term: str, backend: Optional[str] = None
 ) -> list[Dict[str, Any]]:
-    if not config_list or not term or pm_get_address_from_backends is None:
+    if not config_list or not term or pm_search_addresses is None:
         return []
 
     try:
-        result = pm_get_address_from_backends(
-            config_list,
-            operation="validate",
-            address_line1=term,
+        search_result = pm_search_addresses(
+            backends_config=config_list,
+            query=term,
+            min_confidence=0.0,
+            limit=20,
+            backend=backend,
         )
     except Exception as exc:  # pragma: no cover - defensive
-        return [{"label": str(exc), "raw": {"error": str(exc)}}]
+        error_detail = str(exc)
+        # Include backend name in error if specified
+        if backend:
+            error_detail = f"[Backend: {backend}] {error_detail}"
+        return [
+            {
+                "label": f"Error: {error_detail}",
+                "raw": {"error": error_detail, "errors": [str(exc)], "backend": backend},
+            }
+        ]
 
-    backend_name = result.get("backend_used") or ""
-    backend_reference = result.get("backend_reference") or ""
+    if search_result.get("error"):
+        error_msg = search_result.get("error", "Unknown error")
+        errors_list = search_result.get("errors", [])
+        if errors_list:
+            error_msg = "; ".join(str(e) for e in errors_list[:3])
+        # Include backend name in error message if specified
+        if backend:
+            error_msg = f"[Backend: {backend}] {error_msg}"
+        # Return error as a suggestion so it's visible in admin
+        return [{"label": f"Error: {error_msg}", "raw": {**search_result, "backend": backend}}]
 
-    suggestions = result.get("suggestions") or []
-    if suggestions:
-        rows = []
-        for suggestion in suggestions:
-            raw = dict(suggestion or {})
-            if backend_name and not raw.get("backend_used"):
-                raw["backend_used"] = backend_name
-            if backend_reference and not raw.get("backend_reference"):
-                raw["backend_reference"] = backend_reference
-            label = (
-                raw.get("formatted_address")
-                or raw.get("normalized_address")
-                or term
-            )
-            rows.append({"label": label, "raw": raw})
-        return rows
+    backend_name = search_result.get("backend_used") or ""
+    results = search_result.get("results", [])
 
-    normalized = result.get("normalized_address") or {}
-    label = normalized.get("formatted_address") or term
-    raw_result = dict(result)
-    if backend_name and not raw_result.get("backend_used"):
-        raw_result["backend_used"] = backend_name
-    if backend_reference and not raw_result.get("backend_reference"):
-        raw_result["backend_reference"] = backend_reference
-    return [{"label": label, "raw": raw_result}]
+    if not results:
+        return [{"label": "No result from backends", "raw": {"error": "No result"}}]
+
+    rows = []
+    for result in results:
+        raw = dict(result or {})
+        if backend_name and not raw.get("backend_used"):
+            raw["backend_used"] = backend_name
+        backend_reference = (
+            raw.get("backend_reference")
+            or raw.get("address_reference")
+            or search_result.get("backend_reference")
+            or ""
+        )
+        if backend_reference and not raw.get("backend_reference"):
+            raw["backend_reference"] = backend_reference
+        label = raw.get("formatted_address") or raw.get("normalized_address") or term
+        label = _clean_address_label(label)
+        rows.append({"label": label, "raw": raw})
+
+    return rows
+
+
+def _clean_address_label(label: str) -> str:
+    """Remove warnings and low-level messages from address labels."""
+    if not label:
+        return label
+
+    import re
+
+    label = str(label).strip()
+
+    patterns_to_remove = [
+        r"\s*\([^)]*Low importance match[^)]*\)",
+        r"\s*\([^)]*Low confidence match[^)]*\)",
+        r"\s*\([^)]*Low importance[^)]*\)",
+        r"\s*\([^)]*Low confidence[^)]*\)",
+    ]
+
+    for pattern in patterns_to_remove:
+        label = re.sub(pattern, "", label, flags=re.IGNORECASE)
+
+    return label.strip()
 
 
 @admin.register(AddressBackendInfo)
@@ -277,9 +355,7 @@ class AddressBackendInfoAdmin(admin.ModelAdmin):
         configured = sum(1 for _, present, _ in entries if present)
         total = len(entries)
         if configured == total:
-            return format_html(
-                '<span style="color: #198754;">✓ {} configured</span>', total
-            )
+            return format_html('<span style="color: #198754;">✓ {} configured</span>', total)
         return format_html(
             '<span style="color: #dc3545;">✗ {} / {} configured</span>',
             configured,
@@ -314,16 +390,12 @@ class AddressBackendInfoAdmin(admin.ModelAdmin):
             is_configured = present and actual_value is not None and str(actual_value).strip() != ""
 
             if is_configured:
-                icon = format_html(
-                    '<span style="color: #198754; font-weight: bold;">✓</span>'
-                )
-                status_text = format_html(
-                    '<span style="color: #198754;">Configured</span>'
-                )
+                icon = format_html('<span style="color: #198754; font-weight: bold;">✓</span>')
+                status_text = format_html('<span style="color: #198754;">Configured</span>')
 
                 if key in non_sensitive_keys:
                     # For non-sensitive keys, show full value directly
-                    value_html = format_html('<code>{}</code>', str(actual_value))
+                    value_html = format_html("<code>{}</code>", str(actual_value))
                 else:
                     # For sensitive keys, show masked value with eye button
                     value_html = format_html(
@@ -337,15 +409,9 @@ class AddressBackendInfoAdmin(admin.ModelAdmin):
                         str(actual_value),
                     )
             else:
-                icon = format_html(
-                    '<span style="color: #dc3545; font-weight: bold;">✗</span>'
-                )
-                status_text = format_html(
-                    '<span style="color: #dc3545;">Missing</span>'
-                )
-                value_html = format_html(
-                    '<code style="color: #6c757d;">Not defined</code>'
-                )
+                icon = format_html('<span style="color: #dc3545; font-weight: bold;">✗</span>')
+                status_text = format_html('<span style="color: #dc3545;">Missing</span>')
+                value_html = format_html('<code style="color: #6c757d;">Not defined</code>')
 
             rows.append(
                 format_html(
@@ -391,14 +457,53 @@ class AddressBackendInfoAdmin(admin.ModelAdmin):
         return obj.error or "—"
 
 
+class BackendFilter(admin.SimpleListFilter):
+    """Filter to select a backend for address search."""
+
+    title = _("Backend")
+    parameter_name = "backend"
+
+    def lookups(self, request, model_admin):
+        """Return a list of available backends."""
+        backends = AddressBackendInfo.objects.all()
+        choices = [("", _("All backends"))]
+        for backend in backends:
+            display_name = backend.display_name or backend.name
+            # Get the actual backend name from diagnostic if available, otherwise use name
+            diagnostic = getattr(backend, "_diagnostic", {})
+            backend_name = diagnostic.get("backend_name") or backend.name
+            # Use the backend name (like "nominatim", "google_maps") as the value
+            choices.append((backend_name, display_name))
+        return choices
+
+    def queryset(self, request, queryset):
+        # This filter doesn't actually filter the queryset
+        # Instead, the backend parameter is used in get_queryset to force a backend
+        return queryset
+
+
 @admin.register(AddressLookup)
 class AddressLookupAdmin(admin.ModelAdmin):
-    list_display = ["label", "backend_used", "backend_reference", "raw_payload_display"]
+    list_display = [
+        "address_line1_display",
+        "address_line2_display",
+        "address_line3_display",
+        "city_display",
+        "postal_code_display",
+        "state_display",
+        "country_display",
+        "latitude_display",
+        "longitude_display",
+        "confidence_display",
+        "backend_used_display",
+        "backend_reference",
+    ]
     search_fields = ["label", "backend_used", "backend_reference"]
     ordering = ["label"]
     list_per_page = 20
     list_display_links = None
     change_list_template = "admin/change_list.html"
+    list_filter = [BackendFilter]
 
     def has_add_permission(self, request):
         return False
@@ -414,34 +519,206 @@ class AddressLookupAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         query = (request.GET.get("q") or "").strip()
+        # Get backend name from filter parameter (e.g., "nominatim", "google_maps")
         backend_name = (request.GET.get("backend") or "").strip()
-        configs = []
 
-        if backend_name:
-            try:
-                backend = AddressBackendInfo.objects.get(pk=backend_name)
-            except AddressBackendInfo.DoesNotExist:
-                backend = None
-            if backend:
-                backend_config = get_backend_config_for_path(backend.class_path)
-                if backend_config:
-                    configs = [backend_config]
-        else:
-            configs = get_backend_configs()
+        # Use all backends config for search_addresses
+        # The backend parameter will be passed to force a specific backend
+        configs = get_backend_configs()
 
         data = []
         if configs and query:
-            for entry in build_address_suggestions(configs, query):
+            # Pass backend_name to build_address_suggestions which will use it in search_addresses
+            for entry in build_address_suggestions(
+                configs, query, backend=backend_name if backend_name else None
+            ):
                 raw = entry.get("raw") or {}
                 obj = AddressLookup(
                     label=entry.get("label") or "",
                     backend_used=raw.get("backend_used") or raw.get("backend") or "",
-                    backend_reference=raw.get("backend_reference") or "",
+                    backend_reference=(
+                        raw.get("backend_reference") or raw.get("address_reference") or ""
+                    ),
                     raw_payload=raw,
                 )
                 data.append(obj)
 
         return AddressLookupQuerySet(model=AddressLookup, data=data)
+
+    def _get_from_payload(self, obj: AddressLookup, *keys: str) -> Optional[str]:
+        """Extract value from raw_payload using multiple possible keys."""
+        if not obj.raw_payload:
+            return None
+        payload = obj.raw_payload
+        normalized = payload.get("normalized_address") or {}
+        for key in keys:
+            value = payload.get(key) or normalized.get(key)
+            if value:
+                return str(value)
+        return None
+
+    @admin.display(description=_("Address Line 1"))
+    def address_line1_display(self, obj: AddressLookup):
+        value = self._get_from_payload(obj, "address_line1", "line1")
+        return value or "—"
+
+    @admin.display(description=_("Address Line 2"))
+    def address_line2_display(self, obj: AddressLookup):
+        value = self._get_from_payload(obj, "address_line2", "line2")
+        return value or "—"
+
+    @admin.display(description=_("Address Line 3"))
+    def address_line3_display(self, obj: AddressLookup):
+        value = self._get_from_payload(obj, "address_line3", "line3")
+        return value or "—"
+
+    @admin.display(description=_("City"))
+    def city_display(self, obj: AddressLookup):
+        value = self._get_from_payload(obj, "city")
+        return value or "—"
+
+    @admin.display(description=_("Postal Code"))
+    def postal_code_display(self, obj: AddressLookup):
+        value = self._get_from_payload(obj, "postal_code", "postal_code")
+        return value or "—"
+
+    @admin.display(description=_("State"))
+    def state_display(self, obj: AddressLookup):
+        value = self._get_from_payload(obj, "state")
+        return value or "—"
+
+    @admin.display(description=_("Country"))
+    def country_display(self, obj: AddressLookup):
+        value = self._get_from_payload(obj, "country")
+        return value or "—"
+
+    @admin.display(description=_("Latitude"))
+    def latitude_display(self, obj: AddressLookup):
+        if not obj.raw_payload:
+            return "—"
+        payload = obj.raw_payload
+        normalized = payload.get("normalized_address") or {}
+        lat = payload.get("latitude") or normalized.get("latitude")
+        if lat is not None:
+            try:
+                lat_val = float(lat)
+                return f"{lat_val:.6f}"
+            except (TypeError, ValueError):
+                return "—"
+        return "—"
+
+    @admin.display(description=_("Longitude"))
+    def longitude_display(self, obj: AddressLookup):
+        if not obj.raw_payload:
+            return "—"
+        payload = obj.raw_payload
+        normalized = payload.get("normalized_address") or {}
+        lon = payload.get("longitude") or normalized.get("longitude")
+        if lon is not None:
+            try:
+                lon_val = float(lon)
+                return f"{lon_val:.6f}"
+            except (TypeError, ValueError):
+                return "—"
+        return "—"
+
+    @admin.display(description=_("Backend"))
+    def backend_used_display(self, obj: AddressLookup):
+        """Display backend name with proper formatting."""
+        backend_name = obj.backend_used or ""
+        if not backend_name:
+            return "—"
+
+        # Try to get display name from backend configuration
+        try:
+            from python_missive.helpers import get_address_backends_from_config
+            from django.conf import settings
+
+            configs = getattr(settings, "MISSIVE_ADDRESS_BACKENDS", [])
+            backends = get_address_backends_from_config(configs)
+
+            # Normalize backend_name for comparison (handle various formats)
+            backend_name_normalized = backend_name.lower().strip()
+
+            # Find matching backend by name or class name
+            for backend in backends:
+                backend_class_name = backend.__class__.__name__
+                backend_class_name_lower = backend_class_name.lower()
+                backend_name_lower = backend.name.lower() if hasattr(backend, "name") else ""
+
+                # Extract base name from class name (remove "AddressBackend")
+                class_base_name = backend_class_name_lower.replace("addressbackend", "").strip()
+
+                # Check multiple matching patterns (including case variations)
+                matches = (
+                    backend_name_normalized == backend_name_lower
+                    or backend_name_normalized == backend_class_name_lower
+                    or backend_name == backend_class_name
+                    or backend_name_normalized == class_base_name
+                    or backend_name_normalized.endswith(backend_name_lower + "addressbackend")
+                    or backend_name_normalized.endswith(backend_class_name_lower)
+                    # Handle cases like "opencageaddressbackend" -> matches "opencage"
+                    or (
+                        backend_name_normalized.startswith(backend_name_lower)
+                        and "addressbackend" in backend_name_normalized
+                    )
+                    or (
+                        backend_name_normalized.startswith(class_base_name)
+                        and "addressbackend" in backend_name_normalized
+                    )
+                    # Match if the normalized name contains the base name followed by "addressbackend"
+                    or backend_name_normalized == (class_base_name + "addressbackend")
+                )
+
+                if matches:
+                    return backend.label or backend.display_name or backend.name or backend_name
+
+            # Fallback: try to format the backend name nicely
+            # Remove "AddressBackend" or "addressbackend" suffix if present (case-insensitive)
+            formatted = backend_name
+            for suffix in ["AddressBackend", "addressbackend", "Addressbackend", "addressBackend"]:
+                if formatted.lower().endswith(suffix.lower()):
+                    formatted = formatted[: -len(suffix)]
+                    break
+
+            # Format nicely: replace underscores with spaces and title case
+            formatted = formatted.replace("_", " ").strip()
+            if formatted:
+                # Handle camelCase or lowercase words
+                if formatted.islower():
+                    formatted = formatted.title()
+                else:
+                    # If it's already mixed case, try to split camelCase
+                    import re
+
+                    formatted = re.sub(r"(?<!^)(?=[A-Z])", " ", formatted).title()
+
+                return formatted
+
+            return backend_name
+        except Exception:
+            # Fallback: try simple formatting if error occurs
+            formatted = backend_name
+            for suffix in ["AddressBackend", "addressbackend"]:
+                if formatted.lower().endswith(suffix.lower()):
+                    formatted = formatted[: -len(suffix)].replace("_", " ").title()
+                    return formatted
+            return backend_name
+
+    @admin.display(description=_("Confidence"))
+    def confidence_display(self, obj: AddressLookup):
+        if not obj.raw_payload:
+            return "—"
+        payload = obj.raw_payload
+        normalized = payload.get("normalized_address") or {}
+        confidence = payload.get("confidence") or normalized.get("confidence")
+        if confidence is not None:
+            try:
+                conf_value = float(confidence)
+                return f"{conf_value:.1%}"
+            except (TypeError, ValueError):
+                return str(confidence)
+        return "—"
 
     @admin.display(description=_("Raw payload"))
     def raw_payload_display(self, obj: AddressLookup):

@@ -6,12 +6,10 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from django.conf import settings
-from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from django.db import models
-from django.db.models.query import QuerySet
-from django.db.models.sql import Query
 from django.utils.translation import gettext_lazy as _
 
+from .query import InMemoryQuerySet
 
 _slug_cleanup = re.compile(r"[^a-z0-9]+")
 
@@ -21,103 +19,10 @@ def _to_slug(value: str) -> str:
     return slug_value or "backend"
 
 
-class AddressBackendInfoQuerySet(QuerySet):
+class AddressBackendInfoQuerySet(InMemoryQuerySet):
     """In-memory queryset for address backend diagnostics."""
 
-    def __init__(self, model=None, data=None, query=None, using=None, hints=None):
-        if query is None and model is not None:
-            query = Query(model)
-        super().__init__(model=model, query=query, using=using, hints=hints)
-        self._result_cache = list(data or [])
-        self._prefetch_done = True
-
-    def __len__(self):
-        return len(self._result_cache)
-
-    def __getitem__(self, k):
-        if isinstance(k, slice):
-            return self.__class__(
-                self.model,
-                self._result_cache[k],
-                self.query.clone(),
-                using=self._db,
-                hints=self._hints,
-            )
-        return self._result_cache[k]
-
-    def _clone(self):
-        return self.__class__(
-            self.model,
-            list(self._result_cache),
-            self.query.clone(),
-            using=self._db,
-            hints=self._hints,
-        )
-
-    def all(self):
-        return self._clone()
-
-    def filter(self, *args, **kwargs):
-        rslt = self._result_cache
-
-        def _value(obj, attr):
-            return getattr(obj, attr, "")
-
-        for lookup, value in kwargs.items():
-            if "__" in lookup:
-                field_name, lookup_type = lookup.rsplit("__", 1)
-                if lookup_type == "icontains":
-                    rslt = [
-                        obj
-                        for obj in rslt
-                        if value.lower()
-                        in str(_value(obj, field_name)).lower()
-                    ]
-                elif lookup_type == "contains":
-                    rslt = [obj for obj in rslt if value in str(_value(obj, field_name))]
-                elif lookup_type == "exact":
-                    rslt = [obj for obj in rslt if _value(obj, field_name) == value]
-                elif lookup_type == "in":
-                    rslt = [obj for obj in rslt if _value(obj, field_name) in value]
-            else:
-                rslt = [obj for obj in rslt if getattr(obj, lookup, None) == value]
-        return self.__class__(
-            self.model,
-            rslt,
-            self.query.clone(),
-            using=self._db,
-            hints=self._hints,
-        )
-
-    def order_by(self, *fields):
-        rslt = self._result_cache
-        for field in reversed(fields):
-            reverse = field.startswith("-")
-            field_name = field[1:] if reverse else field
-            rslt = sorted(
-                rslt, key=lambda obj: getattr(obj, field_name, ""), reverse=reverse
-            )
-        return self.__class__(
-            self.model,
-            rslt,
-            self.query.clone(),
-            using=self._db,
-            hints=self._hints,
-        )
-
-    def get(self, **kwargs):
-        rslt = self._result_cache
-        for attr, value in kwargs.items():
-            rslt = [obj for obj in rslt if getattr(obj, attr) == value]
-        if len(rslt) == 1:
-            return rslt[0]
-        if not rslt:
-            raise ObjectDoesNotExist(
-                f"{self.model.__name__} matching query does not exist."
-            )
-        raise MultipleObjectsReturned(
-            f"Multiple {self.model.__name__} objects returned."
-        )
+    pass
 
 
 class AddressBackendInfoManager(models.Manager):
@@ -139,6 +44,7 @@ class AddressBackendInfoManager(models.Manager):
         except Exception as e:
             # Log error but still try to build items from config
             import logging
+
             logger = logging.getLogger(__name__)
             logger.warning(f"Error describing address backends: {e}")
             diagnostics = []
@@ -152,8 +58,15 @@ class AddressBackendInfoManager(models.Manager):
                 backend_name = data.get("backend_name") or data.get("class_name")
                 if not backend_name:
                     class_path = data.get("class", "")
-                    class_name = class_path.split(".")[-1] if class_path else f"Backend {idx}"
-                    backend_name = class_name.replace("AddressBackend", "").replace("Backend", "").lower() or f"backend_{idx}"
+                    class_name = (
+                        class_path.split(".")[-1] if class_path else f"Backend {idx}"
+                    )
+                    backend_name = (
+                        class_name.replace("AddressBackend", "")
+                        .replace("Backend", "")
+                        .lower()
+                        or f"backend_{idx}"
+                    )
                 display_label = data.get("backend_display_name") or backend_name
                 data["backend_display_name"] = display_label
 
@@ -176,8 +89,15 @@ class AddressBackendInfoManager(models.Manager):
             for idx, backend_config in enumerate(backends_config, start=1):
                 class_path = backend_config.get("class", "")
                 config = backend_config.get("config", {}) or {}
-                class_name = class_path.split(".")[-1] if class_path else f"Backend {idx}"
-                backend_name = class_name.replace("AddressBackend", "").replace("Backend", "").lower() or f"backend_{idx}"
+                class_name = (
+                    class_path.split(".")[-1] if class_path else f"Backend {idx}"
+                )
+                backend_name = (
+                    class_name.replace("AddressBackend", "")
+                    .replace("Backend", "")
+                    .lower()
+                    or f"backend_{idx}"
+                )
                 base_slug_source = backend_name or class_path or str(idx)
                 slug_value = _to_slug(str(base_slug_source))
 
@@ -197,6 +117,7 @@ class AddressBackendInfoManager(models.Manager):
                 try:
                     # Import backend class dynamically
                     from importlib import import_module
+
                     module_path, class_name_attr = class_path.rsplit(".", 1)
                     module = import_module(module_path)
                     backend_class = getattr(module, class_name_attr)
@@ -230,25 +151,33 @@ class AddressBackendInfoManager(models.Manager):
                     else:
                         status = "unavailable"
 
-                    diagnostic.update({
-                        "status": status,
-                        "backend_name": getattr(backend_instance, "name", backend_name),
-                        "backend_display_name": getattr(
-                            backend_instance, "label", getattr(backend_instance, "name", backend_name)
-                        ),
-                        "documentation_url": backend_instance.documentation_url,
-                        "site_url": backend_instance.site_url,
-                        "required_packages": backend_instance.required_packages,
-                        "required_config_keys": backend_instance.config_keys,
-                        "packages": packages,
-                        "config": {
-                            key: {
-                                "present": config_status.get(key) == "present",
-                                "value_preview": _mask_value(config.get(key)),
-                            }
-                            for key in (backend_instance.config_keys or config.keys())
-                        },
-                    })
+                    diagnostic.update(
+                        {
+                            "status": status,
+                            "backend_name": getattr(
+                                backend_instance, "name", backend_name
+                            ),
+                            "backend_display_name": getattr(
+                                backend_instance,
+                                "label",
+                                getattr(backend_instance, "name", backend_name),
+                            ),
+                            "documentation_url": backend_instance.documentation_url,
+                            "site_url": backend_instance.site_url,
+                            "required_packages": backend_instance.required_packages,
+                            "required_config_keys": backend_instance.config_keys,
+                            "packages": packages,
+                            "config": {
+                                key: {
+                                    "present": config_status.get(key) == "present",
+                                    "value_preview": _mask_value(config.get(key)),
+                                }
+                                for key in (
+                                    backend_instance.config_keys or config.keys()
+                                )
+                            },
+                        }
+                    )
                 except Exception as exc:
                     diagnostic["error"] = str(exc)
                     diagnostic["status"] = "error"
