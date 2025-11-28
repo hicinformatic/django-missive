@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     WebhookView,
+    address_autocomplete_view,
     address_backends_status_view,
     system_status_view,
     webhook_status_view,
@@ -20,4 +21,5 @@ urlpatterns = [
         address_backends_status_view,
         name="address-backends-status",
     ),
+    path("address/autocomplete/", address_autocomplete_view, name="address-autocomplete"),
 ]

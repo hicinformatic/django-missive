@@ -15,6 +15,19 @@ from .template import MissiveTemplateAdmin
 
 MissiveAdmin.inlines = [MissiveAttachmentInline, MissiveEventInline]
 
+# Register admin views for address autocomplete
+from django.contrib import admin
+from .views import get_admin_urls
+
+_admin_urls = get_admin_urls()
+if _admin_urls:
+    _original_get_urls = admin.site.get_urls
+
+    def _get_urls_with_address_autocomplete():
+        return _admin_urls + _original_get_urls()
+
+    admin.site.get_urls = _get_urls_with_address_autocomplete
+
 __all__ = [
     "sandbox_warning",
     "MissiveAdmin",
