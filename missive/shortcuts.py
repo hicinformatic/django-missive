@@ -2,7 +2,7 @@
 
 import re
 import uuid
-from typing import Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, cast
 
 from django.conf import settings
 from django.utils.functional import Promise
@@ -76,6 +76,114 @@ def _validate_phone(phone: str, country_code: Optional[str] = None) -> str:
     return cleaned_phone
 
 
+def _normalize_address_payload(address: Optional[Dict]) -> Dict[str, Any]:
+    return dict(address) if isinstance(address, dict) else {}
+
+
+def _prepare_recipient_channels(
+    missive_type: str,
+    phone: Optional[str],
+    email: Optional[str],
+    subject: Optional[str],
+    address: Dict[str, Any],
+    country_code: Optional[str],
+    kwargs: Dict[str, Any],
+) -> tuple[Optional[str], Optional[str], Optional[str], Dict[str, Any]]:
+    normalized_address = address
+    if missive_type in ("SMS", "VOICE_CALL"):
+        if not phone:
+            raise MissiveValidationError(
+                gettext_lazy("'phone' field required for %(type)s")
+                % {"type": missive_type}
+            )
+        phone = _validate_phone(phone, country_code)
+    elif missive_type == "EMAIL":
+        if not email:
+            raise MissiveValidationError(
+                gettext_lazy("'email' field required for EMAIL")
+            )
+        _validate_email(email)
+        if subject is not None and not subject.strip():
+            raise MissiveValidationError(gettext_lazy("Email subject cannot be empty"))
+    elif missive_type == "BRANDED":
+        if phone:
+            phone = _validate_phone(phone, country_code)
+        if email:
+            _validate_email(email)
+    elif missive_type in ("POSTAL", "POSTAL_REGISTERED"):
+        normalized_address = _validate_postal_address(address, missive_type)
+        if missive_type == "POSTAL_REGISTERED":
+            kwargs.setdefault("is_registered", True)
+    return phone, email, subject, normalized_address
+
+
+def _validate_postal_address(address: Dict[str, Any], missive_type: str) -> Dict[str, Any]:
+    if not address:
+        raise MissiveValidationError(
+            gettext_lazy("'address' dict required for %(type)s missives")
+            % {"type": missive_type}
+        )
+    required_fields = ["street", "city", "postal_code", "country"]
+    missing = [field for field in required_fields if not address.get(field)]
+    if missing:
+        raise MissiveValidationError(
+            gettext_lazy("Missing address fields: %(fields)s")
+            % {"fields": ", ".join(missing)}
+        )
+    return dict(address)
+
+
+def _prepare_sender_defaults(
+    sender_email: Optional[str],
+    sender_phone: Optional[str],
+    sender_name: Optional[str],
+) -> tuple[str, Optional[str], str]:
+    if sender_email:
+        _validate_email(sender_email)
+    if sender_phone:
+        sender_phone = _validate_phone(sender_phone)
+
+    default_email = cast(
+        str, sender_email or getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com")
+    )
+    default_phone = cast(
+        Optional[str], sender_phone or getattr(settings, "MISSIVE_DEFAULT_PHONE", None)
+    )
+    default_name = cast(
+        str, sender_name or getattr(settings, "MISSIVE_DEFAULT_SENDER_NAME", "System")
+    )
+    return default_email, default_phone, default_name
+
+
+def _build_recipient_name(
+    first_name: Optional[str],
+    last_name: Optional[str],
+    denomination: Optional[str],
+) -> str:
+    if first_name and last_name:
+        return f"{first_name} {last_name}"
+    if first_name:
+        return first_name
+    if last_name:
+        return last_name
+    if denomination:
+        return denomination
+    unique_id = str(uuid.uuid4())
+    return f"User_{unique_id}"
+
+
+def _default_subject(
+    missive_type: str,
+    subject: Optional[str],
+    sender_name: Optional[str],
+    default_name: str,
+) -> Optional[str]:
+    if missive_type == "EMAIL" and not subject:
+        sender_display = sender_name or default_name or "System"
+        return gettext_lazy("Message from %(sender)s") % {"sender": sender_display}
+    return subject
+
+
 def _validate_content(content: str, missive_type: str = "") -> None:
     """Validate missive content."""
     if not content or not content.strip():
@@ -117,83 +225,22 @@ def send_missive(
         )
 
     _validate_content(content, missive_type)
-
-    # Get country code from address if available (for phone formatting)
-    country_code = None
-    if address and isinstance(address, dict):
-        country_code = address.get("country")
-
-    if missive_type in ("SMS", "VOICE_CALL"):
-        if not phone:
-            raise MissiveValidationError(
-                gettext_lazy("'phone' field required for %(type)s")
-                % {"type": missive_type}
-            )
-        phone = _validate_phone(phone, country_code)
-
-    elif missive_type == "EMAIL":
-        if not email:
-            raise MissiveValidationError(
-                gettext_lazy("'email' field required for EMAIL")
-            )
-        _validate_email(email)
-
-        if subject is not None and not subject.strip():
-            raise MissiveValidationError(gettext_lazy("Email subject cannot be empty"))
-
-    elif missive_type == "BRANDED":
-        if phone:
-            phone = _validate_phone(phone, country_code)
-        if email:
-            _validate_email(email)
-
-    elif missive_type in ("POSTAL", "POSTAL_REGISTERED"):
-        if not address or not isinstance(address, dict):
-            raise MissiveValidationError(
-                gettext_lazy("'address' dict required for %(type)s missives")
-                % {"type": missive_type}
-            )
-        required_fields = ["street", "city", "postal_code", "country"]
-        missing = [f for f in required_fields if not address.get(f)]
-        if missing:
-            raise MissiveValidationError(
-                gettext_lazy("Missing address fields: %(fields)s")
-                % {"fields": ", ".join(missing)}
-            )
-        if missive_type == "POSTAL_REGISTERED":
-            kwargs.setdefault("is_registered", True)
-
-    if sender_email:
-        _validate_email(sender_email)
-    if sender_phone:
-        sender_phone = _validate_phone(sender_phone)
-
-    # Extract sender data
-    default_email = sender_email or getattr(
-        settings, "DEFAULT_FROM_EMAIL", "noreply@example.com"
+    normalized_address = _normalize_address_payload(address)
+    country_code = normalized_address.get("country")
+    phone, email, subject, normalized_address = _prepare_recipient_channels(
+        missive_type,
+        phone,
+        email,
+        subject,
+        normalized_address,
+        country_code,
+        kwargs,
     )
-    default_phone = sender_phone or getattr(settings, "MISSIVE_DEFAULT_PHONE", None)
-    default_name = sender_name or getattr(
-        settings, "MISSIVE_DEFAULT_SENDER_NAME", "System"
+    default_email, default_phone, default_name = _prepare_sender_defaults(
+        sender_email, sender_phone, sender_name
     )
-
-    # Extract recipient name
-    recipient_name = ""
-    if first_name and last_name:
-        recipient_name = f"{first_name} {last_name}"
-    elif first_name:
-        recipient_name = first_name
-    elif last_name:
-        recipient_name = last_name
-    elif denomination:
-        recipient_name = denomination
-    else:
-        unique_id = str(uuid.uuid4())
-        recipient_name = f"User_{unique_id}"
-
-    if missive_type == "EMAIL" and not subject:
-        sender_display = sender_name or default_name or "System"
-        subject = gettext_lazy("Message from %(sender)s") % {"sender": sender_display}
+    recipient_name = _build_recipient_name(first_name, last_name, denomination)
+    subject = _default_subject(missive_type, subject, sender_name, default_name)
 
     max_subject_length = getattr(settings, "MISSIVE_MAX_SUBJECT_LENGTH", 998)
     if subject and len(subject) > max_subject_length:
@@ -214,12 +261,11 @@ def send_missive(
         "subject": subject or "",
     }
 
-    # Add recipient address fields if provided
-    if address:
-        missive_data["recipient_address_line1"] = address.get("street", "")
-        missive_data["recipient_city"] = address.get("city", "")
-        missive_data["recipient_postal_code"] = address.get("postal_code", "")
-        missive_data["recipient_country"] = address.get("country", "FR")
+    if normalized_address:
+        missive_data["recipient_address_line1"] = normalized_address.get("street", "")
+        missive_data["recipient_city"] = normalized_address.get("city", "")
+        missive_data["recipient_postal_code"] = normalized_address.get("postal_code", "")
+        missive_data["recipient_country"] = normalized_address.get("country", "FR")
 
     if "priority" in kwargs:
         missive_data["priority"] = kwargs.pop("priority")

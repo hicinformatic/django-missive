@@ -1,133 +1,46 @@
 """Django Missive - Django library for missive management."""
 
+from importlib import import_module
+
 __version__ = "0.1.0"
+
+_LAZY_IMPORTS = {
+    "Missive": ".models:Missive",
+    "MissiveType": ".models:MissiveType",
+    "MissiveStatus": ".models:MissiveStatus",
+    "MissivePriority": ".models:MissivePriority",
+    "MissiveAttachment": ".models:MissiveAttachment",
+    "MissiveEvent": ".models:MissiveEvent",
+    "MissiveTemplate": ".models:MissiveTemplate",
+    "RecipientType": ".models:RecipientType",
+    "MissiveSender": ".sender:MissiveSender",
+    "MissiveBuilder": ".helpers:MissiveBuilder",
+    "get_missives_stats_for_object": ".helpers:get_missives_stats_for_object",
+    "send_missive": ".shortcuts:send_missive",
+    "send_sms": ".shortcuts:send_sms",
+    "send_email": ".shortcuts:send_email",
+    "send_whatsapp": ".shortcuts:send_whatsapp",
+    "send_slack": ".shortcuts:send_slack",
+    "send_telegram": ".shortcuts:send_telegram",
+    "MissiveError": ".exceptions:MissiveError",
+    "MissiveValidationError": ".exceptions:MissiveValidationError",
+    "MissiveProviderError": ".exceptions:MissiveProviderError",
+    "MissiveConfigError": ".exceptions:MissiveConfigError",
+    "MissiveWebhookError": ".exceptions:MissiveWebhookError",
+    "MissiveNotFoundError": ".exceptions:MissiveNotFoundError",
+    "MissiveProviderNotAvailableError": ".exceptions:MissiveProviderNotAvailableError",
+}
 
 
 def __getattr__(name):
     """Lazy imports to avoid circular dependencies."""
-    if name == "Missive":
-        from .models import Missive
+    target = _LAZY_IMPORTS.get(name)
+    if not target:
+        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
-        return Missive
-    elif name == "MissiveType":
-        from .models import MissiveType
-
-        return MissiveType
-    elif name == "MissiveStatus":
-        from .models import MissiveStatus
-
-        return MissiveStatus
-    elif name == "MissivePriority":
-        from .models import MissivePriority
-
-        return MissivePriority
-    elif name == "MissiveAttachment":
-        from .models import MissiveAttachment
-
-        return MissiveAttachment
-    elif name == "MissiveEvent":
-        from .models import MissiveEvent
-
-        return MissiveEvent
-    elif name == "MissiveTemplate":
-        from .models import MissiveTemplate
-
-        return MissiveTemplate
-    elif name == "RecipientType":
-        from .models import RecipientType
-
-        return RecipientType
-    elif name == "MissiveSender":
-        from .sender import MissiveSender
-
-        return MissiveSender
-    elif name == "MissiveBuilder":
-        from .helpers import MissiveBuilder
-
-        return MissiveBuilder
-    elif name == "get_missives_stats_for_object":
-        from .helpers import get_missives_stats_for_object
-
-        return get_missives_stats_for_object
-    elif name == "send_missive":
-        from .shortcuts import send_missive
-
-        return send_missive
-    elif name == "send_sms":
-        from .shortcuts import send_sms
-
-        return send_sms
-    elif name == "send_email":
-        from .shortcuts import send_email
-
-        return send_email
-    elif name == "send_whatsapp":
-        from .shortcuts import send_whatsapp
-
-        return send_whatsapp
-    elif name == "send_slack":
-        from .shortcuts import send_slack
-
-        return send_slack
-    elif name == "send_telegram":
-        from .shortcuts import send_telegram
-
-        return send_telegram
-    elif name == "MissiveError":
-        from .exceptions import MissiveError
-
-        return MissiveError
-    elif name == "MissiveValidationError":
-        from .exceptions import MissiveValidationError
-
-        return MissiveValidationError
-    elif name == "MissiveProviderError":
-        from .exceptions import MissiveProviderError
-
-        return MissiveProviderError
-    elif name == "MissiveConfigError":
-        from .exceptions import MissiveConfigError
-
-        return MissiveConfigError
-    elif name == "MissiveWebhookError":
-        from .exceptions import MissiveWebhookError
-
-        return MissiveWebhookError
-    elif name == "MissiveNotFoundError":
-        from .exceptions import MissiveNotFoundError
-
-        return MissiveNotFoundError
-    elif name == "MissiveProviderNotAvailableError":
-        from .exceptions import MissiveProviderNotAvailableError
-
-        return MissiveProviderNotAvailableError
-    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+    module_path, attr_name = target.split(":")
+    module = import_module(module_path, __name__)
+    return getattr(module, attr_name)
 
 
-__all__ = [
-    "__version__",
-    "Missive",
-    "MissiveType",
-    "MissiveStatus",
-    "MissivePriority",
-    "MissiveAttachment",
-    "MissiveEvent",
-    "MissiveTemplate",
-    "RecipientType",
-    "MissiveSender",
-    "MissiveBuilder",
-    "get_missives_stats_for_object",
-    "send_missive",
-    "send_sms",
-    "send_email",
-    "send_whatsapp",
-    "send_slack",
-    "send_telegram",
-    "MissiveError",
-    "MissiveValidationError",
-    "MissiveProviderError",
-    "MissiveConfigError",
-    "MissiveWebhookError",
-    "MissiveNotFoundError",
-    "MissiveProviderNotAvailableError",
-]
+__all__ = ["__version__", *_LAZY_IMPORTS.keys()]

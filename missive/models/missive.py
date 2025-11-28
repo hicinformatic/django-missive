@@ -14,7 +14,7 @@ except ImportError:
     format_phone_international = None
 
 from ..fields import AddressField
-from ..providers import normalize_provider_path
+from ..provider_utils import resolve_provider_path
 from .choices import MissivePriority, MissiveStatus, MissiveType
 
 
@@ -702,36 +702,10 @@ class Missive(models.Model):
 
         try:
             # Dynamically load the provider class
-            from django.conf import settings
+            provider_path = resolve_provider_path(provider_name)
+            if not provider_path:
+                return []
 
-            providers_config = getattr(settings, "MISSIVE_PROVIDERS", {})
-
-            # Search for the provider in config
-            provider_path = None
-            for missive_type, providers_list in providers_config.items():
-                for prov in providers_list:
-                    if provider_name.lower() in prov.lower():
-                        provider_path = prov
-                        break
-                if provider_path:
-                    break
-
-            if provider_path:
-                provider_path = normalize_provider_path(provider_path)
-            else:
-                # Fallback: try to construct the path (python-missive, except local django_email)
-                if provider_name.lower() == "django_email":
-                    provider_path = (
-                        "python_missive.providers.django_email.DjangoEmailProvider"
-                    )
-                else:
-                    provider_path = (
-                        f"python_missive.providers.{provider_name.lower()}."
-                        f"{provider_name.capitalize()}Provider"
-                    )
-                provider_path = normalize_provider_path(provider_path)
-
-            # Import and instantiate the provider
             provider_class = import_string(provider_path)
             provider_instance = provider_class(missive=self)
 
@@ -758,7 +732,6 @@ class Missive(models.Model):
             if missive.cancel():
                 print("Missive cancelled successfully")
         """
-        from django.conf import settings
         from django.utils.module_loading import import_string
 
         # Check that the missive is cancellable
@@ -768,34 +741,10 @@ class Missive(models.Model):
         # If already sent to a provider with external_id, attempt to cancel via API
         if self.provider and self.external_id:
             try:
-                # Search for the provider in config
-                providers_config = getattr(settings, "MISSIVE_PROVIDERS", {})
-                provider_path = None
+                provider_path = resolve_provider_path(self.provider)
+                if not provider_path:
+                    return False
 
-                for missive_type, providers_list in providers_config.items():
-                    for prov in providers_list:
-                        if self.provider.lower() in prov.lower():
-                            provider_path = prov
-                            break
-                    if provider_path:
-                        break
-
-                if provider_path:
-                    provider_path = normalize_provider_path(provider_path)
-                else:
-                    # Fallback: try to construct the path (python-missive, except local django_email)
-                    if self.provider.lower() == "django_email":
-                        provider_path = (
-                            "python_missive.providers.django_email.DjangoEmailProvider"
-                        )
-                    else:
-                        provider_path = (
-                            f"python_missive.providers.{self.provider.lower()}."
-                            f"{self.provider.capitalize()}Provider"
-                        )
-                    provider_path = normalize_provider_path(provider_path)
-
-                # Import and instantiate the provider
                 provider_class = import_string(provider_path)
                 provider_instance = provider_class(missive=self)
 

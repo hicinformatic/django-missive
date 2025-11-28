@@ -70,6 +70,59 @@ def _mask_value(value: Any) -> Optional[str]:
     return f"{value_str[:3]}…{value_str[-2:]}"
 
 
+def build_backend_diagnostic(
+    backend_instance: Any,
+    config: Dict[str, Any],
+    *,
+    backend_name: str,
+    selected_backend: Optional[str] = None,
+    is_working: bool = False,
+) -> Dict[str, Any]:
+    """Compute diagnostic information for a backend instance."""
+    check = backend_instance.check_package_and_config()
+    packages = check.get("packages", {})
+    config_status = check.get("config", {})
+    missing_packages = [
+        pkg for pkg, status in packages.items() if status != "installed"
+    ]
+    missing_config = [
+        key
+        for key in backend_instance.config_keys
+        if config_status.get(key) != "present" or not config.get(key)
+    ]
+
+    if is_working:
+        status = "working"
+    elif missing_packages:
+        status = "missing_packages"
+    elif missing_config:
+        status = "missing_config"
+    else:
+        status = "unavailable"
+
+    backend_label = getattr(backend_instance, "name", backend_name)
+    return {
+        "status": status,
+        "backend_name": backend_label,
+        "backend_display_name": getattr(
+            backend_instance, "label", backend_label
+        ),
+        "documentation_url": backend_instance.documentation_url,
+        "site_url": backend_instance.site_url,
+        "required_packages": backend_instance.required_packages,
+        "required_config_keys": backend_instance.config_keys,
+        "packages": packages,
+        "config": {
+            key: {
+                "present": config_status.get(key) == "present",
+                "value_preview": _mask_value(config.get(key)),
+            }
+            for key in (backend_instance.config_keys or config.keys())
+        },
+        "selected": selected_backend == getattr(backend_instance, "name", None),
+    }
+
+
 def _build_backend_payload(
     backend_config: Dict[str, Any],
     working_instances: Dict[str, Any],
@@ -97,46 +150,14 @@ def _build_backend_payload(
         backend_instance = working_instances.get(class_name) or backend_class(
             config=config
         )
-        check = backend_instance.check_package_and_config()
-        packages = check.get("packages", {})
-        config_status = check.get("config", {})
-        missing_packages = [
-            pkg for pkg, status in packages.items() if status != "installed"
-        ]
-        missing_config = [
-            key
-            for key in backend_instance.config_keys
-            if config_status.get(key) != "present" or not config.get(key)
-        ]
-        is_working = class_name in working_instances
-        if is_working:
-            status = "working"
-        elif missing_packages:
-            status = "missing_packages"
-        elif missing_config:
-            status = "missing_config"
-        else:
-            status = "unavailable"
-
-        data.update(
-            {
-                "status": status,
-                "documentation_url": backend_instance.documentation_url,
-                "site_url": backend_instance.site_url,
-                "required_packages": backend_instance.required_packages,
-                "required_config_keys": backend_instance.config_keys,
-                "packages": packages,
-                "config": {
-                    key: {
-                        "present": config_status.get(key) == "present",
-                        "value_preview": _mask_value(config.get(key)),
-                    }
-                    for key in (backend_instance.config_keys or config.keys())
-                },
-                "selected": selected_backend == getattr(backend_instance, "name", None),
-                "backend_name": getattr(backend_instance, "name", class_name),
-            }
+        diagnostic = build_backend_diagnostic(
+            backend_instance,
+            config,
+            backend_name=class_name,
+            selected_backend=selected_backend,
+            is_working=class_name in working_instances,
         )
+        data.update(diagnostic)
     except Exception as exc:  # pragma: no cover - defensive fallback
         data["error"] = str(exc)
 

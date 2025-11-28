@@ -28,6 +28,11 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from ..models.address_backend import AddressBackendInfo, AddressBackendInfoQuerySet
 from ..models.address_lookup import AddressLookup, AddressLookupQuerySet
+from .utils import (
+    find_object_by_identifier,
+    get_object_with_identifier,
+    render_settings_row,
+)
 
 
 def get_backend_configs() -> list[Dict[str, Any]]:
@@ -220,10 +225,7 @@ class AddressBackendInfoAdmin(admin.ModelAdmin):
             candidates.append(str(diag.get("backend_name", "")))
             candidates.append(str(diag.get("backend_display_name", "")))
             candidates.append(str(diag.get("class", "")))
-            for value in candidates:
-                if value and term in str(value).lower():
-                    return True
-            return False
+            return any(value and term in str(value).lower() for value in candidates)
 
         filtered = [obj for obj in queryset if _matches(obj)]
         return AddressBackendInfoQuerySet(model=self.model, data=filtered), False
@@ -233,26 +235,7 @@ class AddressBackendInfoAdmin(admin.ModelAdmin):
 
     def get_object(self, request, object_id, from_field=None):
         """Récupère l'objet address backend par son name (qui est maintenant le pk)."""
-        if object_id is None:
-            return None
-
-        try:
-            # Le pk est maintenant le name, donc on peut chercher directement
-            queryset = self.get_queryset(request)
-            try:
-                # Essayer de trouver par pk (qui est le name)
-                return queryset.get(pk=object_id)
-            except (ObjectDoesNotExist, MultipleObjectsReturned):
-                # Fallback: chercher par name (insensible à la casse) ou slug
-                for backend in queryset:
-                    if backend.name.lower() == object_id.lower():
-                        return backend
-                    if backend.slug == object_id.lower():
-                        return backend
-                return None
-        except Exception:
-            # Fallback vers le comportement par défaut
-            return super().get_object(request, object_id, from_field)
+        return get_object_with_identifier(self, request, object_id, from_field)
 
     # Helpers ----------------------------------------------------------
     def _all_backend_configs(self):
@@ -266,16 +249,9 @@ class AddressBackendInfoAdmin(admin.ModelAdmin):
         try:
             queryset = self.get_queryset(None)
             try:
-                # Essayer de trouver par pk (qui est le name)
                 return queryset.get(pk=backend_name)
             except (ObjectDoesNotExist, MultipleObjectsReturned):
-                # Fallback: chercher par name (insensible à la casse) ou slug
-                for backend in queryset:
-                    if backend.name.lower() == backend_name.lower():
-                        return backend
-                    if backend.slug == backend_name.lower():
-                        return backend
-                return None
+                return find_object_by_identifier(queryset, backend_name)
         except Exception:
             return None
 
@@ -422,20 +398,7 @@ class AddressBackendInfoAdmin(admin.ModelAdmin):
                 status_text = format_html('<span style="color: #dc3545;">Missing</span>')
                 value_html = format_html('<code style="color: #6c757d;">Not defined</code>')
 
-            rows.append(
-                format_html(
-                    "<tr>"
-                    '<td style="padding: 8px; border-bottom: 1px solid #ddd;">{}</td>'
-                    '<td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>{}</code></td>'
-                    '<td style="padding: 8px; border-bottom: 1px solid #ddd;">{}</td>'
-                    '<td style="padding: 8px; border-bottom: 1px solid #ddd;">{}</td>'
-                    "</tr>",
-                    icon,
-                    key,
-                    status_text,
-                    value_html,
-                )
-            )
+            rows.append(render_settings_row(icon, key, status_text, value_html))
 
         table_html = format_html(
             """
@@ -915,28 +878,21 @@ class AddressLookupAdmin(admin.ModelAdmin):
                 # Extract base name from class name (remove "AddressBackend")
                 class_base_name = backend_class_name_lower.replace("addressbackend", "").strip()
 
-                # Check multiple matching patterns (including case variations)
-                matches = (
-                    backend_name_normalized == backend_name_lower
-                    or backend_name_normalized == backend_class_name_lower
-                    or backend_name == backend_class_name
-                    or backend_name_normalized == class_base_name
-                    or backend_name_normalized.endswith(backend_name_lower + "addressbackend")
-                    or backend_name_normalized.endswith(backend_class_name_lower)
-                    # Handle cases like "opencageaddressbackend" -> matches "opencage"
-                    or (
-                        backend_name_normalized.startswith(backend_name_lower)
-                        and "addressbackend" in backend_name_normalized
-                    )
-                    or (
-                        backend_name_normalized.startswith(class_base_name)
-                        and "addressbackend" in backend_name_normalized
-                    )
-                    # Match if the normalized name contains the base name followed by "addressbackend"
-                    or backend_name_normalized == (class_base_name + "addressbackend")
-                )
+                comparisons = [
+                    backend_name_normalized == backend_name_lower,
+                    backend_name_normalized == backend_class_name_lower,
+                    backend_name == backend_class_name,
+                    backend_name_normalized == class_base_name,
+                    backend_name_normalized.endswith(backend_name_lower + "addressbackend"),
+                    backend_name_normalized.endswith(backend_class_name_lower),
+                    backend_name_normalized == (class_base_name + "addressbackend"),
+                    backend_name_normalized.startswith(backend_name_lower)
+                    and "addressbackend" in backend_name_normalized,
+                    backend_name_normalized.startswith(class_base_name)
+                    and "addressbackend" in backend_name_normalized,
+                ]
 
-                if matches:
+                if any(comparisons):
                     return backend.label or backend.display_name or backend.name or backend_name
 
             # Fallback: try to format the backend name nicely

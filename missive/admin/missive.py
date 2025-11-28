@@ -3,7 +3,6 @@
 import json
 
 from django import forms
-from django.conf import settings
 from django.contrib import admin
 from django.urls import reverse
 from django.utils import timezone
@@ -11,10 +10,14 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
+from ..constants import MISSIVE_STATUS_COLORS, MISSIVE_TYPE_COLORS
 from ..decorators import library_presence_warning, sandbox_warning
-from ..helpers import get_all_provider_choices, get_providers_from_config
+from ..helpers import (
+    get_all_provider_choices,
+    get_providers_from_config,
+)
 from ..models import Missive
-from ..providers import normalize_provider_path
+from ..provider_utils import resolve_provider_path
 
 
 class MissiveAdminForm(forms.ModelForm):
@@ -278,25 +281,7 @@ class MissiveAdmin(admin.ModelAdmin):
     @admin.display(description=_("Type"))
     def missive_type_badge(self, obj):
         """Colored badge describing the missive type."""
-        colors = {
-            # Postal
-            "POSTAL": "#6c757d",
-            "POSTAL_REGISTERED": "#495057",
-            "LRE": "#495057",
-            # Email
-            "EMAIL": "#0d6efd",
-            # SMS and evolutions
-            "SMS": "#198754",
-            "RCS": "#20c997",
-            # Voice
-            "VOICE_CALL": "#6f42c1",
-            # Notifications
-            "NOTIFICATION": "#fd7e14",
-            "PUSH_NOTIFICATION": "#dc3545",
-            # Branded messaging apps (generic type)
-            "BRANDED": "#9b59b6",
-        }
-        color = colors.get(obj.missive_type, "#6c757d")
+        color = MISSIVE_TYPE_COLORS.get(obj.missive_type, "#6c757d")
         return format_html(
             '<span style="background-color: {}; color: white; padding: 3px 10px; '
             'border-radius: 3px; font-size: 11px; font-weight: bold; white-space: nowrap;">{}</span>',
@@ -307,17 +292,7 @@ class MissiveAdmin(admin.ModelAdmin):
     @admin.display(description=_("Status"))
     def status_badge(self, obj):
         """Colored badge describing the current status."""
-        colors = {
-            "DRAFT": "#6c757d",
-            "PENDING": "#ffc107",
-            "PROCESSING": "#0dcaf0",
-            "SENT": "#0d6efd",
-            "DELIVERED": "#198754",
-            "READ": "#20c997",
-            "FAILED": "#dc3545",
-            "CANCELLED": "#6c757d",
-        }
-        color = colors.get(obj.status, "#6c757d")
+        color = MISSIVE_STATUS_COLORS.get(obj.status, "#6c757d")
         return format_html(
             '<span style="background-color: {}; color: white; padding: 3px 10px; '
             'border-radius: 3px; font-size: 11px; font-weight: bold; white-space: nowrap;">{}</span>',
@@ -408,63 +383,65 @@ class MissiveAdmin(admin.ModelAdmin):
 
     def _format_address_display(self, address_data):
         """Format address data for display in admin."""
-        if not address_data or not isinstance(address_data, dict):
+        if not isinstance(address_data, dict) or not address_data:
             return "—"
 
-        lines = []
-        if address_data.get("line1"):
-            lines.append(address_data["line1"])
-        if address_data.get("line2"):
-            lines.append(address_data["line2"])
-        if address_data.get("line3"):
-            lines.append(address_data["line3"])
+        address_lines = self._compose_address_lines(address_data)
+        details_parts = self._compose_address_details(address_data)
+        address_html = "<br>".join(address_lines) if address_lines else "—"
 
-        city_parts = []
-        if address_data.get("postal_code"):
-            city_parts.append(address_data["postal_code"])
-        if address_data.get("city"):
-            city_parts.append(address_data["city"])
+        if details_parts:
+            address_html = f"{address_html}<br><br>{'<br>'.join(details_parts)}"
+        return mark_safe(address_html)  # nosec
+
+    @staticmethod
+    def _compose_address_lines(address_data):
+        lines = [
+            address_data[key]
+            for key in ("line1", "line2", "line3")
+            if address_data.get(key)
+        ]
+
+        city_parts = [
+            value
+            for value in (address_data.get("postal_code"), address_data.get("city"))
+            if value
+        ]
         if city_parts:
             lines.append(" ".join(city_parts))
 
-        if address_data.get("state"):
-            lines.append(address_data["state"])
-        if address_data.get("country"):
-            lines.append(address_data["country"])
+        for key in ("state", "country"):
+            if address_data.get(key):
+                lines.append(address_data[key])
+        return lines
 
-        address_html = "<br>".join(lines) if lines else "—"
+    @staticmethod
+    def _compose_address_details(address_data):
+        details = []
+        latitude = address_data.get("latitude")
+        longitude = address_data.get("longitude")
+        if latitude is not None and longitude is not None:
+            details.append(
+                f"<strong>Coordinates:</strong> {float(latitude):.6f}, {float(longitude):.6f}"
+            )
 
-        details_parts = []
-        if (
-            address_data.get("latitude") is not None
-            and address_data.get("longitude") is not None
-        ):
-            lat = float(address_data["latitude"])
-            lon = float(address_data["longitude"])
-            details_parts.append(f"<strong>Coordinates:</strong> {lat:.6f}, {lon:.6f}")
-        if address_data.get("confidence") is not None:
+        confidence = address_data.get("confidence")
+        if confidence is not None:
             try:
-                conf_value = float(address_data["confidence"])
-                details_parts.append(f"<strong>Confidence:</strong> {conf_value:.1%}")
+                details.append(f"<strong>Confidence:</strong> {float(confidence):.1%}")
             except (TypeError, ValueError):
-                details_parts.append(
-                    f"<strong>Confidence:</strong> {address_data['confidence']}"
-                )
-        if address_data.get("backend_used"):
-            details_parts.append(
-                f"<strong>Backend:</strong> {address_data['backend_used']}"
-            )
-        if address_data.get("backend_reference"):
-            details_parts.append(
-                f"<strong>Reference:</strong> <code>{address_data['backend_reference']}</code>"
-            )
+                details.append(f"<strong>Confidence:</strong> {confidence}")
 
-        if details_parts:
-            details_html = "<br>".join(details_parts)
-            full_html = f"{address_html}<br><br>{details_html}"
-            return mark_safe(full_html)  # nosec
+        backend_used = address_data.get("backend_used")
+        if backend_used:
+            details.append(f"<strong>Backend:</strong> {backend_used}")
 
-        return mark_safe(address_html)  # nosec
+        backend_reference = address_data.get("backend_reference")
+        if backend_reference:
+            details.append(
+                f"<strong>Reference:</strong> <code>{backend_reference}</code>"
+            )
+        return details
 
     @admin.display(description=_("Proof of Delivery"))
     def proof_of_delivery_display(self, obj):
@@ -535,39 +512,12 @@ class MissiveAdmin(admin.ModelAdmin):
         try:
             from django.utils.module_loading import import_string
 
-            provider_name = obj.provider
-            if not provider_name:
+            provider_path = resolve_provider_path(obj.provider)
+            if not provider_path:
                 return None
-
-            providers_config = getattr(settings, "MISSIVE_PROVIDERS", {})
-            provider_path = None
-
-            for missive_type, providers_list in providers_config.items():
-                for prov in providers_list:
-                    if provider_name.lower() in prov.lower():
-                        provider_path = prov
-                        break
-                if provider_path:
-                    break
-
-            if provider_path:
-                provider_path = normalize_provider_path(provider_path)
-            else:
-                # Fallback to python-missive providers (except local django_email)
-                if provider_name.lower() == "django_email":
-                    provider_path = (
-                        "python_missive.providers.django_email.DjangoEmailProvider"
-                    )
-                else:
-                    provider_path = (
-                        f"python_missive.providers.{provider_name.lower()}."
-                        f"{provider_name.capitalize()}Provider"
-                    )
-                provider_path = normalize_provider_path(provider_path)
 
             provider_class = import_string(provider_path)
             return provider_class(missive=obj)
-
         except Exception:
             return None
 

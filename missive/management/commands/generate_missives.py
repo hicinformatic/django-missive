@@ -217,15 +217,13 @@ class Command(BaseCommand):
             )
 
         created_count = 0
-        for missive_data in missives:
+        for created_count, missive_data in enumerate(missives, 1):
             missive = Missive.objects.create(**missive_data)
             missive.create_send_event(
                 provider="custom",
                 status=missive.status,
                 description=f"Missive {missive.missive_type} created",
             )
-
-            created_count += 1
 
             icons = {
                 "EMAIL": "✉️",

@@ -18,11 +18,16 @@ from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 
+from ..constants import MISSIVE_TYPE_COLORS
 from ..decorators import library_presence_warning, sandbox_warning
 from ..helpers import _normalize_providers_config, _provider_error_logger
 from ..models import MissiveType, ProviderInfo
 from ..models.provider import ProviderInfoQuerySet
 from ..providers import normalize_provider_path
+from .utils import (
+    get_object_with_identifier,
+    render_settings_row,
+)
 
 # Shared postal attachment limit fields
 _POSTAL_ATTACHMENT_LIMIT_FIELDS = [
@@ -349,13 +354,14 @@ class MissiveTypeFilter(admin.SimpleListFilter):
 
             # Add providers in the order returned by get_providers_for_type
             for provider_name in ordered_provider_names:
-                # Match by case-insensitive comparison
                 provider = provider_dict.get(provider_name.lower())
-                if provider and missive_type in provider.missive_types_list:
-                    if provider not in filtered:
-                        filtered.append(provider)
+                if (
+                    provider
+                    and missive_type in provider.missive_types_list
+                    and provider not in filtered
+                ):
+                    filtered.append(provider)
 
-            # Add any remaining providers that support this type but weren't in the ordered list
             for provider in queryset:
                 if (
                     missive_type in provider.missive_types_list
@@ -548,45 +554,10 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         return readonly
 
     def __getattr__(self, name):
-        """Génère dynamiquement les méthodes service_info_{type}_display."""
+        """Génère dynamiquement les champs calculés pour l'admin."""
         if name.startswith("service_info_") and name.endswith("_display"):
             missive_type = name[14:-8].upper()
-
-            def service_info_method(obj):
-                try:
-                    provider_class = obj._get_provider_class()
-                    if provider_class:
-                        provider_instance = provider_class()
-
-                        method_name = f"get_{missive_type.lower()}_service_info"
-
-                        if method_name and hasattr(provider_instance, method_name):
-                            service_info = getattr(provider_instance, method_name)()
-                            # Return raw response as JSON string
-                            return json.dumps(
-                                service_info, indent=2, ensure_ascii=False
-                            )
-                        else:
-                            return json.dumps(
-                                {
-                                    "error": f"Method {method_name} not implemented for {provider_instance.name}"
-                                },
-                                indent=2,
-                                ensure_ascii=False,
-                            )
-                    else:
-                        return json.dumps(
-                            {"error": "Provider not loaded"},
-                            indent=2,
-                            ensure_ascii=False,
-                        )
-
-                except Exception as e:
-                    return json.dumps({"error": str(e)}, indent=2, ensure_ascii=False)
-
-            return admin.display(description=_("Service Information"))(
-                service_info_method
-            )
+            return self._build_service_info_display(missive_type)
 
         summary_spec = TYPE_SUMMARY_FIELD_LOOKUP.get(name)
         if summary_spec:
@@ -599,192 +570,199 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
         if name.startswith("geo_") and name.endswith("_display"):
             missive_type = name[4:-8].upper()
-
-            def geo_method(obj):
-                try:
-                    provider_class = obj._get_provider_class()
-                    if provider_class:
-                        provider_instance = provider_class()
-
-                        normalized = missive_type.strip().lower()
-                        geo_attr = f"{normalized}_geographic_coverage"
-
-                        # Search through MRO and __dict__ to find the attribute
-                        for cls in provider_class.__mro__:
-                            if hasattr(cls, "__dict__") and geo_attr in cls.__dict__:
-                                geo_value = cls.__dict__[geo_attr]
-                                try:
-                                    return ", ".join(str(v) for v in geo_value)
-                                except (TypeError, ValueError):
-                                    return str(geo_value)
-                        # If not found in class, try instance
-                        if hasattr(provider_instance, geo_attr):
-                            geo_value = getattr(provider_instance, geo_attr)
-                            try:
-                                return ", ".join(str(v) for v in geo_value)
-                            except (TypeError, ValueError):
-                                return str(geo_value)
-                        return "Not configured"
-
-                    else:
-                        return "Provider not loaded"
-
-                except Exception as e:
-                    return f"Error: {str(e)}"
-
-            return admin.display(description=_("Geographic Coverage"))(geo_method)
+            return self._build_geo_display(missive_type)
 
         if name.startswith("attachment_limits_") and name.endswith("_display"):
-            core_name = name[18:-8]
-            missive_type = None
-            suffix = ""
-
-            for candidate in ATTACHMENT_LIMIT_FIELDS.keys():
-                candidate_lower = candidate.lower()
-                if core_name == candidate_lower:
-                    missive_type = candidate
-                    break
-                prefix = f"{candidate_lower}_"
-                if core_name.startswith(prefix):
-                    missive_type = candidate
-                    suffix = core_name[len(prefix) :]
-                    break
-
-            if missive_type is None:
-                missive_type = core_name.upper()
-            else:
-                missive_type = missive_type.upper()
-
-            if suffix:
-                config = next(
-                    (
-                        cfg
-                        for cfg in ATTACHMENT_LIMIT_FIELDS.get(missive_type, [])
-                        if cfg["suffix"] == suffix
-                    ),
-                    None,
-                )
-
-                if not config:
-                    raise AttributeError(
-                        f"No attachment limit config for {missive_type}.{suffix}"
-                    )
-
-                def attachment_limit_method(
-                    obj, missive_type=missive_type, config=config
-                ):
-                    try:
-                        provider_class = obj._get_provider_class()
-                        if not provider_class:
-                            return _("Provider not loaded")
-
-                        provider_instance = provider_class()
-                        value = None
-                        attr_name = config.get("attr")
-                        if attr_name:
-                            value = getattr(provider_instance, attr_name, None)
-                        value_getter = config.get("value_getter")
-                        if value_getter:
-                            value = value_getter(provider_instance)
-
-                        return _format_attachment_limit_value(
-                            value,
-                            unit=config.get("unit"),
-                            empty_label=config.get("empty_label"),
-                        )
-
-                    except Exception as exc:
-                        return _("Error: %s") % exc
-
-                return admin.display(description=config["label"])(
-                    attachment_limit_method
-                )
-
-            def attachment_limits_method(obj, missive_type=missive_type):
-                try:
-                    provider_class = obj._get_provider_class()
-                    if provider_class:
-                        provider_instance = provider_class()
-
-                        limits_info = {}
-
-                        # EMAIL attachments
-                        if missive_type == "EMAIL":
-                            if hasattr(
-                                provider_instance, "max_email_attachment_size_mb"
-                            ):
-                                limits_info["max_size_mb"] = (
-                                    provider_instance.max_email_attachment_size_mb
-                                )
-                                limits_info["max_size_bytes"] = (
-                                    provider_instance.max_email_attachment_size_bytes
-                                )
-                            if hasattr(
-                                provider_instance, "allowed_attachment_mime_types"
-                            ):
-                                limits_info["allowed_mime_types"] = (
-                                    provider_instance.allowed_attachment_mime_types
-                                )
-
-                        # POSTAL attachments
-                        elif missive_type in ("POSTAL", "POSTAL_REGISTERED"):
-                            if hasattr(provider_instance, "max_postal_pages"):
-                                limits_info["max_pages"] = (
-                                    provider_instance.max_postal_pages
-                                )
-                            if hasattr(
-                                provider_instance, "allowed_attachment_mime_types"
-                            ):
-                                limits_info["allowed_mime_types"] = (
-                                    provider_instance.allowed_attachment_mime_types
-                                )
-                            if hasattr(provider_instance, "allowed_page_formats"):
-                                limits_info["allowed_page_formats"] = (
-                                    provider_instance.allowed_page_formats
-                                )
-
-                        # BRANDED attachments
-                        elif missive_type == "BRANDED":
-                            if hasattr(provider_instance, "max_attachment_size_mb"):
-                                limits_info["max_size_mb"] = (
-                                    provider_instance.max_attachment_size_mb
-                                )
-                                limits_info["max_size_bytes"] = (
-                                    provider_instance.max_attachment_size_bytes
-                                )
-                            if hasattr(
-                                provider_instance, "allowed_attachment_mime_types"
-                            ):
-                                limits_info["allowed_mime_types"] = (
-                                    provider_instance.allowed_attachment_mime_types
-                                )
-
-                        if limits_info:
-                            return json.dumps(limits_info, indent=2, ensure_ascii=False)
-                        else:
-                            return json.dumps(
-                                {"message": "No attachment limits configured"},
-                                indent=2,
-                                ensure_ascii=False,
-                            )
-
-                    else:
-                        return json.dumps(
-                            {"error": "Provider not loaded"},
-                            indent=2,
-                            ensure_ascii=False,
-                        )
-
-                except Exception as e:
-                    return json.dumps({"error": str(e)}, indent=2, ensure_ascii=False)
-
-            return admin.display(description=_("Attachment Limits"))(
-                attachment_limits_method
-            )
+            return self._build_attachment_limit_display(name[18:-8])
 
         raise AttributeError(
             f"'{type(self).__name__}' object has no attribute '{name}'"
         )
+
+    def _build_service_info_display(self, missive_type):
+        def service_info_method(obj, missive_type=missive_type):
+            try:
+                provider_class = obj._get_provider_class()
+                if not provider_class:
+                    return json.dumps(
+                        {"error": "Provider not loaded"}, indent=2, ensure_ascii=False
+                    )
+
+                provider_instance = provider_class()
+                method_name = f"get_{missive_type.lower()}_service_info"
+                if hasattr(provider_instance, method_name):
+                    service_info = getattr(provider_instance, method_name)()
+                    return json.dumps(service_info, indent=2, ensure_ascii=False)
+
+                message = {
+                    "error": (
+                        f"Method {method_name} not implemented for {provider_instance.name}"
+                    )
+                }
+                return json.dumps(message, indent=2, ensure_ascii=False)
+            except Exception as exc:  # pragma: no cover - defensive
+                return json.dumps({"error": str(exc)}, indent=2, ensure_ascii=False)
+
+        return admin.display(description=_("Service Information"))(service_info_method)
+
+    def _build_geo_display(self, missive_type):
+        def geo_method(obj, missive_type=missive_type):
+            try:
+                provider_class = obj._get_provider_class()
+                if not provider_class:
+                    return "Provider not loaded"
+
+                provider_instance = provider_class()
+                normalized = missive_type.strip().lower()
+                geo_value = self._resolve_geo_value(
+                    provider_class, provider_instance, normalized
+                )
+                if geo_value is None:
+                    return "Not configured"
+                if isinstance(geo_value, (list, tuple, set)):
+                    return ", ".join(str(v) for v in geo_value)
+                return str(geo_value)
+            except Exception as exc:  # pragma: no cover - defensive
+                return f"Error: {exc}"
+
+        return admin.display(description=_("Geographic Coverage"))(geo_method)
+
+    def _resolve_geo_value(self, provider_class, provider_instance, normalized_name):
+        attr_candidates = [
+            f"{normalized_name}_geographic_coverage",
+            f"{normalized_name}_geo",
+        ]
+        for attr in attr_candidates:
+            for cls in provider_class.__mro__:
+                if hasattr(cls, "__dict__") and attr in cls.__dict__:
+                    geo_value = cls.__dict__[attr]
+                    if not callable(geo_value):
+                        return geo_value
+            if hasattr(provider_instance, attr):
+                geo_value = getattr(provider_instance, attr)
+                if not callable(geo_value):
+                    return geo_value
+        return None
+
+    def _build_attachment_limit_display(self, core_name):
+        missive_type, suffix = self._resolve_attachment_tokens(core_name)
+        if suffix:
+            config = self._find_attachment_config(missive_type, suffix)
+            if not config:
+                raise AttributeError(
+                    f"No attachment limit config for {missive_type}.{suffix}"
+                )
+
+            def attachment_limit_method(obj, missive_type=missive_type, config=config):
+                try:
+                    provider_class = obj._get_provider_class()
+                    if not provider_class:
+                        return _("Provider not loaded")
+                    provider_instance = provider_class()
+                    value = None
+                    attr_name = config.get("attr")
+                    if attr_name:
+                        value = getattr(provider_instance, attr_name, None)
+                    value_getter = config.get("value_getter")
+                    if value_getter:
+                        value = value_getter(provider_instance)
+                    return _format_attachment_limit_value(
+                        value,
+                        unit=config.get("unit"),
+                        empty_label=config.get("empty_label"),
+                    )
+                except Exception as exc:  # pragma: no cover - defensive
+                    return _("Error: %s") % exc
+
+            return admin.display(description=config["label"])(attachment_limit_method)
+
+        def attachment_limits_method(obj, missive_type=missive_type):
+            try:
+                provider_class = obj._get_provider_class()
+                if not provider_class:
+                    return json.dumps(
+                        {"error": "Provider not loaded"}, indent=2, ensure_ascii=False
+                    )
+                provider_instance = provider_class()
+                limits_info = self._collect_attachment_limits(
+                    provider_instance, missive_type
+                )
+                if limits_info:
+                    return json.dumps(limits_info, indent=2, ensure_ascii=False)
+                return json.dumps(
+                    {"message": "No attachment limits configured"},
+                    indent=2,
+                    ensure_ascii=False,
+                )
+            except Exception as exc:  # pragma: no cover - defensive
+                return json.dumps({"error": str(exc)}, indent=2, ensure_ascii=False)
+
+        return admin.display(description=_("Attachment Limits"))(attachment_limits_method)
+
+    def _resolve_attachment_tokens(self, core_name):
+        missive_type = None
+        suffix = ""
+        candidate_keys = sorted(ATTACHMENT_LIMIT_FIELDS.keys(), key=len, reverse=True)
+        for candidate in candidate_keys:
+            candidate_lower = candidate.lower()
+            if core_name == candidate_lower:
+                missive_type = candidate
+                break
+            prefix = f"{candidate_lower}_"
+            if core_name.startswith(prefix):
+                missive_type = candidate
+                suffix = core_name[len(prefix) :]
+                break
+        if missive_type is None:
+            missive_type = core_name.upper()
+        else:
+            missive_type = missive_type.upper()
+        return missive_type, suffix
+
+    def _find_attachment_config(self, missive_type, suffix):
+        return next(
+            (
+                cfg
+                for cfg in ATTACHMENT_LIMIT_FIELDS.get(missive_type, [])
+                if cfg["suffix"] == suffix
+            ),
+            None,
+        )
+
+    def _collect_attachment_limits(self, provider_instance, missive_type):
+        limits_info = {}
+        if missive_type == "EMAIL":
+            if hasattr(provider_instance, "max_email_attachment_size_mb"):
+                limits_info["max_size_mb"] = provider_instance.max_email_attachment_size_mb
+                limits_info["max_size_bytes"] = (
+                    getattr(provider_instance, "max_email_attachment_size_bytes", None)
+                )
+            if hasattr(provider_instance, "allowed_attachment_mime_types"):
+                limits_info["allowed_mime_types"] = (
+                    provider_instance.allowed_attachment_mime_types
+                )
+        elif missive_type in ("POSTAL", "POSTAL_REGISTERED"):
+            if hasattr(provider_instance, "max_postal_pages"):
+                limits_info["max_pages"] = provider_instance.max_postal_pages
+            if hasattr(provider_instance, "allowed_attachment_mime_types"):
+                limits_info["allowed_mime_types"] = (
+                    provider_instance.allowed_attachment_mime_types
+                )
+            if hasattr(provider_instance, "allowed_page_formats"):
+                limits_info["allowed_page_formats"] = (
+                    provider_instance.allowed_page_formats
+                )
+        elif missive_type == "BRANDED":
+            if hasattr(provider_instance, "max_attachment_size_mb"):
+                limits_info["max_size_mb"] = provider_instance.max_attachment_size_mb
+                limits_info["max_size_bytes"] = (
+                    getattr(provider_instance, "max_attachment_size_bytes", None)
+                )
+            if hasattr(provider_instance, "allowed_attachment_mime_types"):
+                limits_info["allowed_mime_types"] = (
+                    provider_instance.allowed_attachment_mime_types
+                )
+        return limits_info
 
     def has_add_permission(self, request):
         return False
@@ -797,30 +775,21 @@ class ProviderInfoAdmin(admin.ModelAdmin):
 
     def get_object(self, request, object_id, from_field=None):
         """Récupère l'objet provider par son name (qui est maintenant le pk)."""
-        if object_id is None:
-            return None
 
-        try:
-            # Le pk est maintenant le name, donc on peut chercher directement
-            queryset = self.get_queryset(request)
-            try:
-                # Essayer de trouver par pk (qui est le name)
-                return queryset.get(pk=object_id)
-            except (ObjectDoesNotExist, MultipleObjectsReturned):
-                # Fallback: chercher par name (insensible à la casse)
-                for provider in queryset:
-                    if provider.name.lower() == object_id.lower():
-                        return provider
-                    # Vérifier aussi par display_name si disponible
-                    provider_class = provider._get_provider_class()
-                    if provider_class:
-                        display_name = getattr(provider_class, "display_name", None)
-                        if display_name and display_name.lower() == object_id.lower():
-                            return provider
-                return None
-        except Exception:
-            # Fallback vers le comportement par défaut
-            return super().get_object(request, object_id, from_field)
+        def _match_display_name(entry, identifier_lower):
+            provider_class = entry._get_provider_class()
+            if not provider_class:
+                return False
+            display_name = getattr(provider_class, "display_name", None)
+            return isinstance(display_name, str) and display_name.lower() == identifier_lower
+
+        return get_object_with_identifier(
+            self,
+            request,
+            object_id,
+            from_field,
+            extra_matcher=_match_display_name,
+        )
 
     def get_search_results(self, request, queryset, search_term):
         """Implémente la recherche manuelle pour le QuerySet personnalisé."""
@@ -872,22 +841,9 @@ class ProviderInfoAdmin(admin.ModelAdmin):
     @admin.display(description=_("Types supportés"))
     def missive_type_display(self, obj):
         """Badges colorés pour tous les types supportés."""
-        colors = {
-            "POSTAL": "#6c757d",
-            "POSTAL_REGISTERED": "#495057",
-            "LRE": "#495057",
-            "EMAIL": "#0d6efd",
-            "SMS": "#198754",
-            "RCS": "#20c997",
-            "VOICE_CALL": "#6f42c1",
-            "NOTIFICATION": "#fd7e14",
-            "PUSH_NOTIFICATION": "#dc3545",
-            "BRANDED": "#9b59b6",
-        }
-
         badges = []
         for missive_type in obj.missive_types_list:
-            color = colors.get(missive_type, "#6c757d")
+            color = MISSIVE_TYPE_COLORS.get(missive_type, "#6c757d")
 
             try:
                 label = MissiveType(missive_type).label
@@ -1026,11 +982,17 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 try:
                     importlib.import_module(package)
                     package_statuses.append(
-                        f'<span style="color: #198754;">✓</span> <code>{package}</code>'
+                        format_html(
+                            '<span style="color: #198754;">✓</span> <code>{}</code>',
+                            package,
+                        )
                     )
                 except ImportError:
                     package_statuses.append(
-                        f'<span style="color: #dc3545;">✗ <code style="color: #dc3545;">{package}</code></span>'
+                        format_html(
+                            '<span style="color: #dc3545;">✗ <code style="color: #dc3545;">{}</code></span>',
+                            package,
+                        )
                     )
 
             packages_html = format_html_join(
@@ -1243,14 +1205,7 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                     status_text = '<span style="color: #dc3545;">Missing</span>'
                     value_html = "<code>Not defined</code>"
 
-            rows.append(
-                "<tr>"
-                '<td style="padding: 8px; border-bottom: 1px solid #ddd;">{}</td>'
-                '<td style="padding: 8px; border-bottom: 1px solid #ddd;"><code>{}</code></td>'
-                '<td style="padding: 8px; border-bottom: 1px solid #ddd;">{}</td>'
-                '<td style="padding: 8px; border-bottom: 1px solid #ddd;">{}</td>'
-                "</tr>".format(icon, var_name, status_text, value_html)
-            )
+            rows.append(render_settings_row(icon, var_name, status_text, value_html))
 
         table_html = """
         <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
@@ -1487,21 +1442,19 @@ class ProviderInfoAdmin(admin.ModelAdmin):
                 return JsonResponse({"error": "Content is required"}, status=400)
 
             # Valider selon le type
-            if missive_type == "EMAIL":
-                if not recipient_email:
-                    return JsonResponse(
-                        {"error": "Recipient email is required for EMAIL"}, status=400
-                    )
-                if not subject:
-                    return JsonResponse(
-                        {"error": "Subject is required for EMAIL"}, status=400
-                    )
-            elif missive_type in ("SMS", "VOICE_CALL"):
-                if not recipient_phone:
-                    return JsonResponse(
-                        {"error": f"Recipient phone is required for {missive_type}"},
-                        status=400,
-                    )
+            if missive_type == "EMAIL" and not recipient_email:
+                return JsonResponse(
+                    {"error": "Recipient email is required for EMAIL"}, status=400
+                )
+            if missive_type == "EMAIL" and not subject:
+                return JsonResponse(
+                    {"error": "Subject is required for EMAIL"}, status=400
+                )
+            if missive_type in ("SMS", "VOICE_CALL") and not recipient_phone:
+                return JsonResponse(
+                    {"error": f"Recipient phone is required for {missive_type}"},
+                    status=400,
+                )
 
             # Envoyer avec le provider spécifié
             # On utilise send_missive mais on force le provider après création

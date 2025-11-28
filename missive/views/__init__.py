@@ -1,5 +1,7 @@
 """Django Missive views."""
 
+from typing import Any, Dict
+
 from django.conf import settings
 from django.db import models
 from django.http import JsonResponse
@@ -12,13 +14,20 @@ from .webhooks import WebhookView, webhook_status_view, webhook_test_view
 
 
 def system_status_view(request):
-    """
-    JSON view exposing high-level missive and provider status.
+    """JSON view exposing high-level missive and provider status."""
+    missives_qs, missive_stats = _collect_missive_stats()
+    providers_payload = _build_provider_status()
 
-    - Missives: counts by status and type.
-    - Providers: installation/configuration status per provider.
-    """
-    # Missive stats
+    payload = {
+        "sandbox_mode": getattr(settings, "MISSIVE_SANDBOX", False),
+        "missives": missive_stats,
+        "providers": {"count": len(providers_payload), "items": providers_payload},
+    }
+
+    return JsonResponse(payload, json_dumps_params={"indent": 2})
+
+
+def _collect_missive_stats():
     missives_qs = Missive.objects.all()
     status_counts = (
         missives_qs.values_list("status")
@@ -34,82 +43,70 @@ def system_status_view(request):
     )
     by_type = {mt: count for (mt, count) in type_counts}
 
-    # Provider stats via ProviderInfo virtual model
-    providers_payload = []
-    for provider in ProviderInfo.objects.all().order_by("name"):
-        provider_data = {
-            "name": provider.name,
-            "missive_types": provider.missive_types_list,
-            "status": provider.status,
-            "status_display": provider.status_display,
-            "is_installed": provider.is_installed,
-            "is_configured": provider.is_configured,
-            "required_packages": provider.required_packages,
-            "required_config_keys": provider.required_config_keys,
-            "geographic_coverage": {},
-        }
-
-        # Get geographic coverage for each supported missive type
-        provider_class = provider._get_provider_class()
-        if provider_class:
-            for missive_type in provider.missive_types_list:
-                normalized = missive_type.strip().lower()
-                geo_attr = f"{normalized}_geographic_coverage"
-                legacy_attr = f"{normalized}_geo"
-                geo_value = None
-
-                for cls in provider_class.__mro__:
-                    if geo_attr in cls.__dict__:
-                        attr_value = cls.__dict__[geo_attr]
-                        if not callable(attr_value):
-                            geo_value = attr_value
-                            break
-                    elif hasattr(cls, geo_attr):
-                        attr_value = getattr(cls, geo_attr)
-                        if not callable(attr_value):
-                            geo_value = attr_value
-                            break
-                    elif legacy_attr in cls.__dict__:
-                        attr_value = cls.__dict__[legacy_attr]
-                        if not callable(attr_value):
-                            geo_value = attr_value
-                            break
-                    elif hasattr(cls, legacy_attr):
-                        attr_value = getattr(cls, legacy_attr)
-                        if not callable(attr_value):
-                            geo_value = attr_value
-                            break
-
-                if geo_value is None:
-                    provider_data["geographic_coverage"][missive_type] = "*"
-                elif isinstance(geo_value, str):
-                    if geo_value == "*":
-                        provider_data["geographic_coverage"][missive_type] = "*"
-                    else:
-                        provider_data["geographic_coverage"][missive_type] = [geo_value]
-                elif isinstance(geo_value, (list, tuple)):
-                    provider_data["geographic_coverage"][missive_type] = (
-                        list(geo_value) if geo_value else "*"
-                    )
-                else:
-                    provider_data["geographic_coverage"][missive_type] = str(geo_value)
-
-        providers_payload.append(provider_data)
-
-    payload = {
-        "sandbox_mode": getattr(settings, "MISSIVE_SANDBOX", False),
-        "missives": {
-            "total": missives_qs.count(),
-            "by_status": by_status,
-            "by_type": by_type,
-        },
-        "providers": {
-            "count": len(providers_payload),
-            "items": providers_payload,
-        },
+    return missives_qs, {
+        "total": missives_qs.count(),
+        "by_status": by_status,
+        "by_type": by_type,
     }
 
-    return JsonResponse(payload, json_dumps_params={"indent": 2})
+
+def _build_provider_status():
+    items = []
+    for provider in ProviderInfo.objects.all().order_by("name"):
+        items.append(_serialize_provider(provider))
+    return items
+
+
+def _serialize_provider(provider: ProviderInfo) -> Dict[str, Any]:
+    provider_data: Dict[str, Any] = {
+        "name": provider.name,
+        "missive_types": provider.missive_types_list,
+        "status": provider.status,
+        "status_display": provider.status_display,
+        "is_installed": provider.is_installed,
+        "is_configured": provider.is_configured,
+        "required_packages": provider.required_packages,
+        "required_config_keys": provider.required_config_keys,
+        "geographic_coverage": {},
+    }
+
+    provider_class = provider._get_provider_class()
+    if provider_class:
+        for missive_type in provider.missive_types_list:
+            coverage = _resolve_provider_geo(provider_class, missive_type)
+            provider_data["geographic_coverage"][missive_type] = _format_geo_value(
+                coverage
+            )
+    else:
+        for missive_type in provider.missive_types_list:
+            provider_data["geographic_coverage"][missive_type] = "*"
+    return provider_data
+
+
+def _resolve_provider_geo(provider_class, missive_type: str):
+    normalized = missive_type.strip().lower()
+    candidates = [f"{normalized}_geographic_coverage", f"{normalized}_geo"]
+    for attr in candidates:
+        for cls in provider_class.__mro__:
+            if hasattr(cls, "__dict__") and attr in cls.__dict__:
+                value = cls.__dict__[attr]
+                if not callable(value):
+                    return value
+            if hasattr(cls, attr):
+                value = getattr(cls, attr)
+                if not callable(value):
+                    return value
+    return None
+
+
+def _format_geo_value(value):
+    if value is None:
+        return "*"
+    if isinstance(value, str):
+        return "*" if value == "*" else [value]
+    if isinstance(value, (list, tuple)):
+        return list(value) if value else "*"
+    return str(value)
 
 
 @require_GET

@@ -400,9 +400,11 @@ def get_provider_paths_from_config():
 
     return providers_by_type
 
-
 # Re-export python-missive helper for backward compatibility
-get_provider_name_from_path = pm_get_provider_name_from_path
+
+
+def get_provider_name_from_path(*args, **kwargs):
+    return pm_get_provider_name_from_path(*args, **kwargs)
 
 
 def discover_providers():
@@ -410,10 +412,7 @@ def discover_providers():
     Discover legacy providers inside `missive/providers/` and return a
     mapping `{short_name: display_name}` for admin dropdowns.
     """
-    providers_dict = {}
-
-    # Add special "custom" provider
-    providers_dict["custom"] = _("Custom Provider")
+    providers_dict = {"custom": _("Custom Provider")}
 
     # Look for legacy local providers
     providers_dir = Path(__file__).parent / "providers"

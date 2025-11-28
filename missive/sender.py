@@ -92,23 +92,25 @@ class MissiveSender:
                 )
 
                 # Health check (optional)
-                if not skip_health_check:
-                    if not MissiveSender.is_provider_healthy(provider_class):
-                        logger.warning(
-                            f"Missive {missive.id}: {provider_name} is not healthy, skip"
-                        )
-                        attempts.append(
-                            {
-                                "provider": provider_name,
-                                "status": "skipped",
-                                "reason": "health_check_failed",
-                            }
-                        )
+                if (
+                    not skip_health_check
+                    and not MissiveSender.is_provider_healthy(provider_class)
+                ):
+                    logger.warning(
+                        f"Missive {missive.id}: {provider_name} is not healthy, skip"
+                    )
+                    attempts.append(
+                        {
+                            "provider": provider_name,
+                            "status": "skipped",
+                            "reason": "health_check_failed",
+                        }
+                    )
 
-                        if not enable_fallback:
-                            raise RuntimeError(f"{provider_name} is not available")
+                    if not enable_fallback:
+                        raise RuntimeError(f"{provider_name} is not available")
 
-                        continue  # Try the next one
+                    continue  # Try the next one
 
                 # Instantiate and send
                 provider = provider_class(missive)

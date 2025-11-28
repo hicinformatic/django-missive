@@ -9,6 +9,7 @@ from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from ..address_backends import build_backend_diagnostic
 from .query import InMemoryQuerySet
 
 _slug_cleanup = re.compile(r"[^a-z0-9]+")
@@ -122,61 +123,12 @@ class AddressBackendInfoManager(models.Manager):
                     module = import_module(module_path)
                     backend_class = getattr(module, class_name_attr)
                     backend_instance = backend_class(config=config)
-                    check = backend_instance.check_package_and_config()
-                    packages = check.get("packages", {})
-                    config_status = check.get("config", {})
-
-                    # Helper to mask sensitive values
-                    def _mask_value(value: Any) -> Optional[str]:
-                        if not value:
-                            return None
-                        value_str = str(value)
-                        if len(value_str) > 20:
-                            return value_str[:8] + "..." + value_str[-4:]
-                        return value_str[:4] + "***"
-
-                    missing_packages = [
-                        pkg for pkg, status in packages.items() if status != "installed"
-                    ]
-                    missing_config = [
-                        key
-                        for key in backend_instance.config_keys
-                        if config_status.get(key) != "present" or not config.get(key)
-                    ]
-
-                    if missing_packages:
-                        status = "missing_packages"
-                    elif missing_config:
-                        status = "missing_config"
-                    else:
-                        status = "unavailable"
-
                     diagnostic.update(
-                        {
-                            "status": status,
-                            "backend_name": getattr(
-                                backend_instance, "name", backend_name
-                            ),
-                            "backend_display_name": getattr(
-                                backend_instance,
-                                "label",
-                                getattr(backend_instance, "name", backend_name),
-                            ),
-                            "documentation_url": backend_instance.documentation_url,
-                            "site_url": backend_instance.site_url,
-                            "required_packages": backend_instance.required_packages,
-                            "required_config_keys": backend_instance.config_keys,
-                            "packages": packages,
-                            "config": {
-                                key: {
-                                    "present": config_status.get(key) == "present",
-                                    "value_preview": _mask_value(config.get(key)),
-                                }
-                                for key in (
-                                    backend_instance.config_keys or config.keys()
-                                )
-                            },
-                        }
+                        build_backend_diagnostic(
+                            backend_instance,
+                            config=config,
+                            backend_name=backend_name,
+                        )
                     )
                 except Exception as exc:
                     diagnostic["error"] = str(exc)
