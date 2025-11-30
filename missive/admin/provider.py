@@ -16,6 +16,7 @@ from django.http import JsonResponse
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
 from ..constants import MISSIVE_TYPE_COLORS
@@ -1178,36 +1179,59 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         config_status = obj.config_status
 
         rows = []
+        # Check if key protection is enabled (default: True for security)
+        protect_keys = getattr(settings, "MISSIVE_PROTECT_KEY", True)
+        # Sensitive keywords that should be protected
+        sensitive_keywords = ["password", "secret", "key", "token", "credential"]
+        
         for var_name in config_vars:
             status = config_status.get(var_name, {})
             is_configured = status.get("configured", False)
 
             if is_configured:
-                icon = '<span style="color: #198754; font-weight: bold;">✓</span>'
-                status_text = '<span style="color: #198754;">Configured</span>'
-                actual_value = str(status.get("value", ""))
-                value_html = (
+                icon = format_html('<span style="color: #198754; font-weight: bold;">✓</span>')
+                status_text = format_html('<span style="color: #198754;">Configured</span>')
+                
+                # Check if this is a sensitive key
+                is_sensitive = any(keyword in var_name.lower() for keyword in sensitive_keywords)
+                
+                # Get the actual value from settings
+                # B105: getattr on settings is safe, settings are controlled
+                actual_value = getattr(settings, var_name, None)  # nosec B105
+                
+                # If protection is enabled and key is sensitive, use HIDDEN
+                if protect_keys and is_sensitive and actual_value:
+                    display_value = "***HIDDEN***"
+                else:
+                    display_value = str(actual_value) if actual_value is not None else ""
+                
+                value_html = format_html(
                     '<span class="config-eye" data-var="{}" style="cursor: pointer; color: #6c757d; margin-right: 8px;" '
                     'title="Click to show/hide">👁️</span>'
                     '<span class="config-value-masked" data-var="{}" style="color: #6c757d;">••••••••</span>'
-                    '<span class="config-value-revealed" data-var="{}" style="display: none;"><code>{}</code></span>'
-                ).format(var_name, var_name, var_name, actual_value)
+                    '<span class="config-value-revealed" data-var="{}" style="display: none;"><code>{}</code></span>',
+                    var_name,
+                    var_name,
+                    var_name,
+                    display_value,
+                )
             else:
                 if var_name == "SMSPARTNER_WEBHOOK_IPS":
-                    icon = '<span style="color: #0d6efd; font-weight: bold;">ℹ️</span>'
-                    status_text = '<span style="color: #0d6efd;">Default</span>'
-                    value_html = (
+                    icon = format_html('<span style="color: #0d6efd; font-weight: bold;">ℹ️</span>')
+                    status_text = format_html('<span style="color: #0d6efd;">Default</span>')
+                    value_html = format_html(
                         '<code style="color: #0d6efd;">185.66.232.0/24</code> '
                         '<small style="color: #6c757d;">(official SMSPartner range)</small>'
                     )
                 else:
-                    icon = '<span style="color: #dc3545; font-weight: bold;">✗</span>'
-                    status_text = '<span style="color: #dc3545;">Missing</span>'
-                    value_html = "<code>Not defined</code>"
+                    icon = format_html('<span style="color: #dc3545; font-weight: bold;">✗</span>')
+                    status_text = format_html('<span style="color: #dc3545;">Missing</span>')
+                    value_html = format_html('<code>Not defined</code>')
 
             rows.append(render_settings_row(icon, var_name, status_text, value_html))
 
-        table_html = """
+        table_html = format_html(
+            """
         <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
             <thead>
                 <tr style="background-color: #f8f9fa;">
@@ -1224,11 +1248,11 @@ class ProviderInfoAdmin(admin.ModelAdmin):
         <p style="margin-top: 15px; padding: 10px; background-color: #cfe2ff; border-left: 4px solid #0d6efd; color: #084298;">
             <strong>💡 To configure:</strong> Edit the <code>.env</code> file at the project root and restart the server.
         </p>
-        """.format(
-            "".join(rows)
+        """,
+            mark_safe("".join(str(row) for row in rows)),  # nosec
         )
 
-        return format_html(table_html)
+        return table_html
 
     def _render_type_summary_field(self, obj, spec):
         """Resolve a provider config attribute for summary display."""

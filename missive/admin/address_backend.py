@@ -180,7 +180,6 @@ class AddressBackendInfoAdmin(admin.ModelAdmin):
     list_display = [
         "display_name_column",
         "status_display",
-        "selected_display",
         "documentation_link",
         "site_link",
     ]
@@ -191,7 +190,6 @@ class AddressBackendInfoAdmin(admin.ModelAdmin):
         "name",
         "class_path",
         "status_display",
-        "selected_display",
         "documentation_link",
         "site_link",
         "packages_display",

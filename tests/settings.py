@@ -161,20 +161,6 @@ MISSIVE_ADDRESS_BACKENDS = [
             ),
         },
     },
-]
-
-# =============================================================================
-# Address autocomplete view configuration
-# =============================================================================
-
-MISSIVE_ADDRESS_VIEW_ENABLE = _env("MISSIVE_ADDRESS_VIEW_ENABLE", "True").lower() in (
-    "true",
-    "1",
-    "yes",
-)
-MISSIVE_ADDRESS_VIEW_AUTH_ENABLE = _env(
-    "MISSIVE_ADDRESS_VIEW_AUTH_ENABLE", "False"
-).lower() in ("true", "1", "yes")
     {
         "class": "python_missive.address_backends.geoapify.GeoapifyAddressBackend",
         "config": {
@@ -209,6 +195,19 @@ MISSIVE_ADDRESS_VIEW_AUTH_ENABLE = _env(
         },
     },
 ]
+
+# =============================================================================
+# Address autocomplete view configuration
+# =============================================================================
+
+MISSIVE_ADDRESS_VIEW_ENABLE = _env("MISSIVE_ADDRESS_VIEW_ENABLE", "True").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+MISSIVE_ADDRESS_VIEW_AUTH_ENABLE = _env(
+    "MISSIVE_ADDRESS_VIEW_AUTH_ENABLE", "False"
+).lower() in ("true", "1", "yes")
 
 # Note: multi-type providers (Twilio, Brevo, SMSPartner) are automatically
 # added to all supported categories. No need to repeat them!
