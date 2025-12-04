@@ -1,0 +1,632 @@
+"""Admin configuration for the Missive model."""
+
+import json
+
+from django import forms
+from django.contrib import admin
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
+from django.utils.translation import gettext_lazy as _
+
+from ..constants import MISSIVE_STATUS_COLORS, MISSIVE_TYPE_COLORS
+from ..decorators import library_presence_warning, sandbox_warning
+from ..helpers import (
+    get_all_provider_choices,
+    get_providers_from_config,
+)
+from ..models import Missive
+from ..provider_utils import resolve_provider_path
+
+
+class MissiveAdminForm(forms.ModelForm):
+    """Custom admin form used to filter provider choices."""
+
+    PROVIDERS_BY_TYPE = get_providers_from_config()
+    PROVIDER_CHOICES = get_all_provider_choices()
+
+    provider_choice = forms.ChoiceField(
+        choices=PROVIDER_CHOICES,
+        required=True,
+        initial="django_email",
+        label=_("Provider"),
+        help_text=_("Provider to use for sending (filtered according to missive type)"),
+    )
+
+    class Meta:
+        model = Missive
+        fields = "__all__"
+
+    class Media:
+        js = ("admin/js/missive_provider_filter.js",)
+
+    def __init__(self, *args, **kwargs):
+        request = kwargs.pop("request", None)
+        super().__init__(*args, **kwargs)
+
+        if request:
+            for field_name in ("sender_address", "recipient_address"):
+                field = self.fields.get(field_name)
+                if hasattr(field, "set_current_user"):
+                    field.set_current_user(getattr(request, "user", None))
+
+        self.fields["provider_choice"].widget.attrs["data-providers-config"] = (
+            json.dumps(self.PROVIDERS_BY_TYPE)
+        )
+
+        if self.instance.pk:
+            current_provider = self.instance.provider or "django_email"
+            provider_values = [choice[0] for choice in self.PROVIDER_CHOICES]
+            if current_provider not in provider_values:
+                self.fields["provider_choice"].choices = self.PROVIDER_CHOICES + [
+                    (current_provider, f"{current_provider} (custom)")
+                ]
+            self.fields["provider_choice"].initial = current_provider
+            self.fields["provider_choice"].help_text = _(
+                "Provider used for sending. Change it if necessary before sending."
+            )
+            # Sender fields are now direct fields, no need to disable
+        else:
+            # No default sender logic needed anymore
+            pass
+
+            if self.instance.missive_type:
+                compatible_providers = self.PROVIDERS_BY_TYPE.get(
+                    self.instance.missive_type, []
+                )
+                self.fields["provider_choice"].choices = [
+                    choice
+                    for choice in self.PROVIDER_CHOICES
+                    if choice[0] in compatible_providers
+                ]
+                if "django_email" not in compatible_providers and compatible_providers:
+                    self.fields["provider_choice"].initial = compatible_providers[0]
+
+    def save(self, commit=True):
+        is_new = self.instance.pk is None
+        instance = super().save(commit=commit)
+
+        if commit and is_new:
+            provider = self.cleaned_data.get("provider_choice") or "django_email"
+            instance.create_send_event(
+                provider=provider,
+                status=instance.status,
+                description=f"Missive created with provider {provider}",
+            )
+
+        return instance
+
+
+@sandbox_warning
+@library_presence_warning  # warns if 'pymissive' is not installed
+@admin.register(Missive)
+class MissiveAdmin(admin.ModelAdmin):
+    """Interface d'administration pour les Missives."""
+
+    form = MissiveAdminForm
+    raw_id_fields = ["recipient_user"]
+
+    list_display = [
+        "recipient_display_short",
+        "subject",
+        "missive_type_badge",
+        "sender_display_short",
+        "related_object_display",
+        "status_badge",
+        "priority_badge",
+        "is_registered",
+        "created_at",
+        "sent_at",
+    ]
+
+    list_display_links = ["recipient_display_short"]
+
+    list_filter = [
+        "missive_type",
+        "status",
+        "priority",
+        "is_registered",
+        "requires_signature",
+        "created_at",
+        "sent_at",
+    ]
+
+    search_fields = [
+        "subject",
+        "body",
+        "sender_name",
+        "sender_email",
+        "recipient_name",
+        "recipient_email",
+        "recipient_phone",
+        "external_id",
+        "content_type__model",
+        "content_type__app_label",
+    ]
+
+    readonly_fields = [
+        "created_at",
+        "updated_at",
+        "sent_at",
+        "delivered_at",
+        "read_at",
+        "proof_of_delivery_display",
+        "sender_address_display",
+        "recipient_address_display",
+    ]
+
+    date_hierarchy = "created_at"
+
+    fieldsets = (
+        (
+            _("General Information"),
+            {
+                "fields": (
+                    "subject",
+                    "body",
+                    "body_text",
+                    "context",
+                    "recipient_user",
+                )
+            },
+        ),
+        (
+            _("Sender (Expéditeur)"),
+            {
+                "fields": (
+                    "sender_name",
+                    "sender_email",
+                    "sender_phone",
+                    "sender_address",
+                    "sender_address_display",
+                    "sender_address_line1",
+                    "sender_address_line2",
+                    "sender_address_line3",
+                    "sender_postal_code",
+                    "sender_city",
+                    "sender_state",
+                    "sender_country",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            _("Recipient (Destinataire)"),
+            {
+                "fields": (
+                    "recipient_name",
+                    "recipient_email",
+                    "recipient_phone",
+                    "recipient_address",
+                    "recipient_address_display",
+                    "recipient_address_line1",
+                    "recipient_address_line2",
+                    "recipient_address_line3",
+                    "recipient_postal_code",
+                    "recipient_city",
+                    "recipient_state",
+                    "recipient_country",
+                ),
+            },
+        ),
+        (
+            _("Type and Configuration"),
+            {
+                "fields": (
+                    "missive_type",
+                    "provider_choice",
+                    "provider_options",
+                    "priority",
+                    "is_registered",
+                    "requires_signature",
+                ),
+                "description": _(
+                    "The available provider is automatically filtered according to the selected missive type. "
+                    "Provider options allow you to customize the sending (scheduled_time, track_clicks, etc.)"
+                ),
+            },
+        ),
+        (
+            _("Status and Tracking"),
+            {
+                "fields": (
+                    "status",
+                    "scheduled_at",
+                    "content_type",
+                    "object_id",
+                    "external_id",
+                    "error_message",
+                ),
+                "description": _(
+                    "Optional source object to link this missive to an Order, Participant, etc."
+                ),
+            },
+        ),
+        (
+            _("Dates"),
+            {
+                "fields": (
+                    "created_at",
+                    "updated_at",
+                    "sent_at",
+                    "delivered_at",
+                    "read_at",
+                    "proof_of_delivery_display",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            _("Metadata"),
+            {
+                "fields": (
+                    "attachments_count",
+                    "cost",
+                    "metadata",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    actions = [
+        "send_now_action",
+        "mark_as_sent",
+        "mark_as_delivered",
+        "mark_as_failed",
+        "check_delivery_risk_action",
+    ]
+
+    @admin.display(description=_("Type"))
+    def missive_type_badge(self, obj):
+        """Colored badge describing the missive type."""
+        color = MISSIVE_TYPE_COLORS.get(obj.missive_type, "#6c757d")
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 10px; '
+            'border-radius: 3px; font-size: 11px; font-weight: bold; white-space: nowrap;">{}</span>',
+            color,
+            obj.get_missive_type_display(),
+        )
+
+    @admin.display(description=_("Status"))
+    def status_badge(self, obj):
+        """Colored badge describing the current status."""
+        color = MISSIVE_STATUS_COLORS.get(obj.status, "#6c757d")
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 10px; '
+            'border-radius: 3px; font-size: 11px; font-weight: bold; white-space: nowrap;">{}</span>',
+            color,
+            obj.get_status_display(),
+        )
+
+    @admin.display(description=_("Priority"))
+    def priority_badge(self, obj):
+        """Colored badge describing the current priority."""
+        colors = {
+            "LOW": "#6c757d",
+            "NORMAL": "#0d6efd",
+            "HIGH": "#ffc107",
+            "URGENT": "#dc3545",
+        }
+        color = colors.get(obj.priority, "#6c757d")
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 2px 8px; '
+            'border-radius: 3px; font-size: 10px; white-space: nowrap;">{}</span>',
+            color,
+            obj.get_priority_display(),
+        )
+
+    @admin.display(description=_("Recipient"))
+    def recipient_display_short(self, obj):
+        """Short recipient display."""
+        if obj.recipient_name:
+            return obj.recipient_name
+        elif obj.recipient_email:
+            return obj.recipient_email
+        elif obj.recipient_phone:
+            return obj.recipient_phone
+        elif obj.recipient_user:
+            return str(obj.recipient_user)
+        return _("Unknown recipient")
+
+    @admin.display(description=_("Sender"))
+    def sender_display_short(self, obj):
+        """Short sender display."""
+        if obj.sender_name:
+            display = obj.sender_name
+        elif obj.sender_email:
+            display = obj.sender_email
+        elif obj.sender_phone:
+            display = obj.sender_phone
+        else:
+            return _("Unknown sender")
+
+        if len(display) > 30:
+            return display[:27] + "..."
+        return display
+
+    @admin.display(description=_("Related Object"))
+    def related_object_display(self, obj):
+        """Displays related object."""
+        if obj.content_object:
+            try:
+                content_type = obj.content_type
+                url = reverse(
+                    f"admin:{content_type.app_label}_{content_type.model}_change",
+                    args=[obj.object_id],
+                )
+                label = str(obj.content_object)
+                if len(label) > 30:
+                    label = label[:27] + "..."
+                return format_html('<a href="{}">{}</a>', url, label)
+            except Exception:
+                label = str(obj.content_object)
+                if len(label) > 30:
+                    label = label[:27] + "..."
+                return label
+        return "-"
+
+    @admin.display(description=_("Sender Address Details"))
+    def sender_address_display(self, obj):
+        """Display structured sender address information."""
+        if not obj.sender_address:
+            return "—"
+        return self._format_address_display(obj.sender_address)
+
+    @admin.display(description=_("Recipient Address Details"))
+    def recipient_address_display(self, obj):
+        """Display structured recipient address information."""
+        if not obj.recipient_address:
+            return "—"
+        return self._format_address_display(obj.recipient_address)
+
+    def _format_address_display(self, address_data):
+        """Format address data for display in admin."""
+        if not isinstance(address_data, dict) or not address_data:
+            return "—"
+
+        address_lines = self._compose_address_lines(address_data)
+        details_parts = self._compose_address_details(address_data)
+        address_html = "<br>".join(address_lines) if address_lines else "—"
+
+        if details_parts:
+            address_html = f"{address_html}<br><br>{'<br>'.join(details_parts)}"
+        return mark_safe(address_html)  # nosec
+
+    @staticmethod
+    def _compose_address_lines(address_data):
+        lines = [
+            address_data[key]
+            for key in ("line1", "line2", "line3")
+            if address_data.get(key)
+        ]
+
+        city_parts = [
+            value
+            for value in (address_data.get("postal_code"), address_data.get("city"))
+            if value
+        ]
+        if city_parts:
+            lines.append(" ".join(city_parts))
+
+        for key in ("state", "country"):
+            if address_data.get(key):
+                lines.append(address_data[key])
+        return lines
+
+    @staticmethod
+    def _compose_address_details(address_data):
+        details = []
+        latitude = address_data.get("latitude")
+        longitude = address_data.get("longitude")
+        if latitude is not None and longitude is not None:
+            details.append(
+                f"<strong>Coordinates:</strong> {float(latitude):.6f}, {float(longitude):.6f}"
+            )
+
+        confidence = address_data.get("confidence")
+        if confidence is not None:
+            try:
+                details.append(f"<strong>Confidence:</strong> {float(confidence):.1%}")
+            except (TypeError, ValueError):
+                details.append(f"<strong>Confidence:</strong> {confidence}")
+
+        backend_used = address_data.get("backend_used")
+        if backend_used:
+            details.append(f"<strong>Backend:</strong> {backend_used}")
+
+        backend_reference = address_data.get("backend_reference")
+        if backend_reference:
+            details.append(
+                f"<strong>Reference:</strong> <code>{backend_reference}</code>"
+            )
+        return details
+
+    @admin.display(description=_("Proof of Delivery"))
+    def proof_of_delivery_display(self, obj):
+        """Displays all proof of delivery links."""
+        if not obj.pk:
+            return "-"
+
+        try:
+            proofs = obj.get_proofs_of_delivery()
+
+            if not proofs:
+                provider_instance = self._get_provider_instance(obj)
+                if provider_instance:
+                    available_proofs = provider_instance.list_available_proofs()
+                    service_type = provider_instance._detect_service_type()
+
+                    if available_proofs.get(service_type):
+                        return format_html(
+                            '<span style="color: #ffc107; white-space: nowrap;">⏳ Pending</span>'
+                        )
+
+                return format_html(
+                    '<span style="color: #ccc; white-space: nowrap;">Not available</span>'
+                )
+
+            proof_badges = []
+            for proof in proofs:
+                proof_label = proof.get("label", proof.get("type", "Proof"))
+                proof_format = proof.get("format", "pdf").upper()
+                url = proof.get("url")
+                available = proof.get("available", False)
+
+                if available and url:
+                    proof_badges.append(
+                        '<a href="{}" target="_blank" style="display: inline-block; margin: 2px;">'
+                        '<span style="background-color: #198754; color: white; padding: 3px 8px; '
+                        'border-radius: 3px; font-size: 10px; font-weight: bold; white-space: nowrap;">'
+                        "📄 {} ({})</span></a>".format(url, proof_label, proof_format)
+                    )
+                elif available:
+                    proof_badges.append(
+                        '<span style="background-color: #198754; color: white; padding: 3px 8px; '
+                        "border-radius: 3px; font-size: 10px; font-weight: bold; white-space: nowrap; "
+                        'display: inline-block; margin: 2px;">✓ {}</span>'.format(
+                            proof_label
+                        )
+                    )
+                else:
+                    message = proof.get("metadata", {}).get("message", "Pending")
+                    proof_badges.append(
+                        '<span style="background-color: #ffc107; color: black; padding: 3px 8px; '
+                        "border-radius: 3px; font-size: 10px; font-weight: bold; white-space: nowrap; "
+                        'display: inline-block; margin: 2px;" title="{}">⏳ {}</span>'.format(
+                            message, proof_label
+                        )
+                    )
+
+            return format_html("".join(proof_badges))
+
+        except Exception as e:
+            return format_html(
+                '<span style="color: #dc3545; white-space: nowrap;" title="{}">❌ Error</span>',
+                str(e),
+            )
+
+    def _get_provider_instance(self, obj):
+        """Gets provider instance for this missive."""
+        try:
+            from django.utils.module_loading import import_string
+
+            provider_path = resolve_provider_path(obj.provider)
+            if not provider_path:
+                return None
+
+            provider_class = import_string(provider_path)
+            return provider_class(missive=obj)
+        except Exception:
+            return None
+
+    @admin.action(description=_("🚀 Send Now"))
+    def send_now_action(self, request, queryset):
+        """Admin action to send the selected missives immediately."""
+        from ..sender import MissiveSender
+
+        sender = MissiveSender()
+        success_count = 0
+        error_count = 0
+        errors = []
+
+        for missive in queryset:
+            if missive.status in ["SENT", "DELIVERED", "READ"]:
+                error_count += 1
+                errors.append(
+                    f"Missive #{missive.id} already sent (status: {missive.get_status_display()})"
+                )
+                continue
+
+            if missive.status == "CANCELLED":
+                error_count += 1
+                errors.append(f"Missive #{missive.id} cancelled, cannot be sent")
+                continue
+
+            try:
+                if sender.send(missive):
+                    success_count += 1
+                    self.message_user(
+                        request,
+                        _(f"✅ Missive #{missive.id} sent successfully!"),
+                        level="success",
+                    )
+                else:
+                    error_count += 1
+                    error_msg = missive.error_message or "Unknown error"
+                    errors.append(f"Missive #{missive.id}: {error_msg}")
+            except Exception as e:
+                error_count += 1
+                errors.append(f"Missive #{missive.id}: {str(e)}")
+
+        if success_count > 0:
+            self.message_user(
+                request,
+                _(f"🎉 {success_count} missive(s) sent successfully!"),
+                level="success",
+            )
+
+        if error_count > 0:
+            self.message_user(
+                request,
+                _(
+                    f"⚠️ {error_count} error(s): "
+                    + " | ".join(errors[:5])
+                    + ("..." if len(errors) > 5 else "")
+                ),
+                level="warning",
+            )
+
+    @admin.action(description=_("Mark as Sent"))
+    def mark_as_sent(self, request, queryset):
+        updated = queryset.update(status="SENT", sent_at=timezone.now())
+        self.message_user(request, _(f"{updated} missive(s) marked as sent."))
+
+    @admin.action(description=_("Mark as Delivered"))
+    def mark_as_delivered(self, request, queryset):
+        updated = queryset.update(status="DELIVERED", delivered_at=timezone.now())
+        self.message_user(request, _(f"{updated} missive(s) marked as delivered."))
+
+    @admin.action(description=_("Mark as Failed"))
+    def mark_as_failed(self, request, queryset):
+        updated = queryset.update(status="FAILED")
+        self.message_user(request, _(f"{updated} missive(s) marked as failed."))
+
+    @admin.action(description=_("🔍 Analyze Delivery Risk"))
+    def check_delivery_risk_action(self, request, queryset):
+        """Admin action to analyze delivery risk for selected missives."""
+        from ..sender import MissiveSender
+
+        low_risk = 0
+        medium_risk = 0
+        high_risk = 0
+        critical_risk = 0
+
+        for missive in queryset:
+            sender = MissiveSender()
+            risk_level = sender.check_delivery_risk(missive)
+
+            if risk_level == "LOW":
+                low_risk += 1
+            elif risk_level == "MEDIUM":
+                medium_risk += 1
+            elif risk_level == "HIGH":
+                high_risk += 1
+            elif risk_level == "CRITICAL":
+                critical_risk += 1
+
+        self.message_user(
+            request,
+            format_html(
+                "🔍 <strong>Risk analysis complete</strong><br>"
+                "✅ {} missive(s) with <strong>low</strong> risk<br>"
+                "⚠️ {} missive(s) with <strong>medium</strong> risk<br>"
+                "⚠️ {} missive(s) with <strong>high</strong> risk<br>"
+                "🔴 {} missive(s) with <strong>critical</strong> risk",
+                low_risk,
+                medium_risk,
+                high_risk,
+                critical_risk,
+            ),
+        )

@@ -142,7 +142,7 @@ Repository = "https://github.com/yourusername/django-missive"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["missive*"]
+include = ["djmissive*"]
 exclude = ["tests*", "docs*"]
 
 [tool.black]
@@ -164,7 +164,7 @@ disallow_untyped_defs = false
 plugins = ["mypy_django_plugin.main"]
 
 [[tool.mypy.overrides]]
-module = "python_missive.*"
+module = "pymissive.*"
 ignore_missing_imports = true
 
 [tool.django-stubs]

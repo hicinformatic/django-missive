@@ -29,6 +29,10 @@ if platform.system() == 'Windows' and not os.environ.get('ANSICON'):
 
 PROJECT_ROOT = Path(__file__).parent
 PYTHON_MISSIVE_DIR = PROJECT_ROOT.parent / 'python-missive'
+PYTHON_GEOADDRESS_DIR = PROJECT_ROOT.parent / 'python-geoaddress'
+DJANGO_GEOADDRESS_DIR = PROJECT_ROOT.parent / 'django-geoaddress'
+DJANGO_VIRTUALQUERYSET_DIR = PROJECT_ROOT.parent / 'django-virtualqueryset'
+DJANGO_VIRTUALQUERYSET_DIR = PROJECT_ROOT.parent / 'django-virtualqueryset'
 
 
 def _resolve_venv_dir() -> Path:
@@ -124,6 +128,9 @@ def task_help():
     print("  install           Install package in production mode")
     print("  install-dev       Install package in development mode")
     print("  update-python-missive  Install or refresh local python-missive package")
+    print("  update-geoaddress      Install or refresh local python-geoaddress")
+    print("  update-django-geoaddress Install or refresh local django-geoaddress")
+    print("  update-virtualqueryset Install or refresh local django-virtualqueryset")
     print("")
     
     print(f"{GREEN}Django Dev Server:{NC}")
@@ -270,6 +277,102 @@ def task_update_python_missive():
         return True
 
     print_error("Failed to install/update python-missive.")
+    return False
+
+
+def task_update_geoaddress():
+    """Install or update python-geoaddress inside the venv.
+    
+    Usage:
+      python dev.py update-geoaddress [path]
+    
+    - If a path is provided, it is used (editable install).
+    - Otherwise defaults to the sibling directory ../python-geoaddress.
+    """
+    if not venv_exists():
+        print_error("Virtual environment not found. Run 'python dev.py venv' first.")
+        return False
+
+    args = sys.argv[2:]
+    target_dir = Path(args[0]) if args else PYTHON_GEOADDRESS_DIR
+
+    if not target_dir.exists():
+        print_error(
+            f"python-geoaddress directory not found at {target_dir}. "
+            "Provide path: python dev.py update-geoaddress /path/to/python-geoaddress"
+        )
+        return False
+
+    print_info("Installing python-geoaddress into the virtual environment...")
+    if run_command([str(PIP), "install", "-e", str(target_dir)]):
+        print_success("python-geoaddress installed/updated successfully.")
+        return True
+
+    print_error("Failed to install/update python-geoaddress.")
+    return False
+
+
+def task_update_django_geoaddress():
+    """Install or update django-geoaddress inside the venv.
+    
+    Usage:
+      python dev.py update-django-geoaddress [path]
+    
+    - If a path is provided, it is used (editable install).
+    - Otherwise defaults to the sibling directory ../django-geoaddress.
+    """
+    if not venv_exists():
+        print_error("Virtual environment not found. Run 'python dev.py venv' first.")
+        return False
+
+    args = sys.argv[2:]
+    target_dir = Path(args[0]) if args else DJANGO_GEOADDRESS_DIR
+
+    if not target_dir.exists():
+        print_error(
+            f"django-geoaddress directory not found at {target_dir}. "
+            "Provide path: python dev.py update-django-geoaddress /path/to/django-geoaddress"
+        )
+        return False
+
+    print_info("Installing django-geoaddress into the virtual environment...")
+    if run_command([str(PIP), "install", "-e", str(target_dir)]):
+        print_success("django-geoaddress installed/updated successfully.")
+        return True
+
+    print_error("Failed to install/update django-geoaddress.")
+    return False
+
+
+def task_update_virtualqueryset():
+    """Install or update django-virtualqueryset inside the venv.
+    
+    Usage:
+      python dev.py update-virtualqueryset [path]
+    
+    - If a path is provided, it is used (editable install).
+    - Otherwise defaults to the sibling directory ../django-virtualqueryset.
+    """
+    if not venv_exists():
+        print_error("Virtual environment not found. Run 'python dev.py venv' first.")
+        return False
+
+    args = sys.argv[2:]
+    target_dir = Path(args[0]) if args else DJANGO_VIRTUALQUERYSET_DIR
+
+    if not target_dir.exists():
+        print_error(
+            f"django-virtualqueryset directory not found at {target_dir}. "
+            "Provide path: python dev.py update-virtualqueryset /path/to/django-virtualqueryset"
+        )
+        return False
+
+    print_info("Installing django-virtualqueryset into the virtual environment...")
+    if run_command([str(PIP), "install", "-e", str(target_dir)]):
+        print_success("django-virtualqueryset installed/updated successfully.")
+        return True
+
+    print_error("Failed to install/update django-virtualqueryset.")
     return False
 
 
@@ -1033,6 +1136,10 @@ COMMANDS = {
     'install': task_install,
     'install-dev': task_install_dev,
     'update-python-missive': task_update_python_missive,
+    'update-missive': task_update_python_missive,  # Alias
+    'update-geoaddress': task_update_geoaddress,
+    'update-django-geoaddress': task_update_django_geoaddress,
+    'update-virtualqueryset': task_update_virtualqueryset,
     # Django commands
     'migrate': task_migrate,
     'makemigrations': task_makemigrations,

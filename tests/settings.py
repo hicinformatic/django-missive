@@ -32,7 +32,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "missive",
+    "djmissive",
 ]
 
 MIDDLEWARE = [
@@ -90,31 +90,31 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 MISSIVE_PROVIDERS = [
     # Email providers
-    "python_missive.providers.django_email.DjangoEmailProvider",
-    "python_missive.providers.smtp.SMTPProvider",
-    "python_missive.providers.sendgrid.SendGridProvider",
-    "python_missive.providers.mailgun.MailgunProvider",
-    "python_missive.providers.ses.SESProvider",
-    "python_missive.providers.brevo.BrevoProvider",
+    "pymissive.providers.django_email.DjangoEmailProvider",
+    "pymissive.providers.smtp.SMTPProvider",
+    "pymissive.providers.sendgrid.SendGridProvider",
+    "pymissive.providers.mailgun.MailgunProvider",
+    "pymissive.providers.ses.SESProvider",
+    "pymissive.providers.brevo.BrevoProvider",
     # SMS / Voice providers
-    "python_missive.providers.twilio.TwilioProvider",
-    "python_missive.providers.vonage.VonageProvider",
-    "python_missive.providers.smspartner.SMSPartnerProvider",
+    "pymissive.providers.twilio.TwilioProvider",
+    "pymissive.providers.vonage.VonageProvider",
+    "pymissive.providers.smspartner.SMSPartnerProvider",
     # Branded messaging providers
-    "python_missive.providers.slack.SlackProvider",
-    "python_missive.providers.teams.TeamsProvider",
-    "python_missive.providers.telegram.TelegramProvider",
-    "python_missive.providers.signal.SignalProvider",
-    "python_missive.providers.messenger.MessengerProvider",
+    "pymissive.providers.slack.SlackProvider",
+    "pymissive.providers.teams.TeamsProvider",
+    "pymissive.providers.telegram.TelegramProvider",
+    "pymissive.providers.signal.SignalProvider",
+    "pymissive.providers.messenger.MessengerProvider",
     # Postal / LRE providers
-    "python_missive.providers.laposte.LaPosteProvider",
-    "python_missive.providers.maileva.MailevaProvider",
-    "python_missive.providers.ar24.AR24Provider",
-    "python_missive.providers.certeurope.CerteuropeProvider",
+    "pymissive.providers.laposte.LaPosteProvider",
+    "pymissive.providers.maileva.MailevaProvider",
+    "pymissive.providers.ar24.AR24Provider",
+    "pymissive.providers.certeurope.CerteuropeProvider",
     # Notifications / Push
-    "python_missive.providers.fcm.FCMProvider",
-    "python_missive.providers.apn.APNProvider",
-    "python_missive.providers.notification.InAppNotificationProvider",
+    "pymissive.providers.fcm.FCMProvider",
+    "pymissive.providers.apn.APNProvider",
+    "pymissive.providers.notification.InAppNotificationProvider",
 ]
 
 # =============================================================================
@@ -124,27 +124,27 @@ MISSIVE_PROVIDERS = [
 
 MISSIVE_ADDRESS_BACKENDS = [
     {
-        "class": "python_missive.address_backends.nominatim.NominatimAddressBackend",
+        "class": "pymissive.address_backends.nominatim.NominatimAddressBackend",
         "config": {
             "NOMINATIM_USER_AGENT": _env("NOMINATIM_USER_AGENT", "django-missive/1.0"),
             "NOMINATIM_BASE_URL": _env("NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org"),
         },
     },
     {
-        "class": "python_missive.address_backends.photon.PhotonAddressBackend",
+        "class": "pymissive.address_backends.photon.PhotonAddressBackend",
         "config": {
             "PHOTON_BASE_URL": _env("PHOTON_BASE_URL", "https://photon.komoot.io"),
         },
     },
     {
-        "class": "python_missive.address_backends.locationiq.LocationIQAddressBackend",
+        "class": "pymissive.address_backends.locationiq.LocationIQAddressBackend",
         "config": {
             "LOCATIONIQ_API_KEY": _env("LOCATIONIQ_API_KEY", ""),
             "LOCATIONIQ_BASE_URL": _env("LOCATIONIQ_BASE_URL", "https://api.locationiq.com/v1"),
         },
     },
     {
-        "class": "python_missive.address_backends.opencage.OpenCageAddressBackend",
+        "class": "pymissive.address_backends.opencage.OpenCageAddressBackend",
         "config": {
             "OPENCAGE_API_KEY": _env("OPENCAGE_API_KEY", ""),
             "OPENCAGE_BASE_URL": _env(
@@ -153,7 +153,7 @@ MISSIVE_ADDRESS_BACKENDS = [
         },
     },
     {
-        "class": "python_missive.address_backends.geocode_earth.GeocodeEarthAddressBackend",
+        "class": "pymissive.address_backends.geocode_earth.GeocodeEarthAddressBackend",
         "config": {
             "GEOCODE_EARTH_API_KEY": _env("GEOCODE_EARTH_API_KEY", ""),
             "GEOCODE_EARTH_BASE_URL": _env(
@@ -162,33 +162,33 @@ MISSIVE_ADDRESS_BACKENDS = [
         },
     },
     {
-        "class": "python_missive.address_backends.geoapify.GeoapifyAddressBackend",
+        "class": "pymissive.address_backends.geoapify.GeoapifyAddressBackend",
         "config": {
             "GEOAPIFY_API_KEY": _env("GEOAPIFY_API_KEY", ""),
             "GEOAPIFY_BASE_URL": _env("GEOAPIFY_BASE_URL", "https://api.geoapify.com/v1"),
         },
     },
     {
-        "class": "python_missive.address_backends.maps_co.MapsCoAddressBackend",
+        "class": "pymissive.address_backends.maps_co.MapsCoAddressBackend",
         "config": {
             "MAPS_CO_API_KEY": _env("MAPS_CO_API_KEY", ""),
             "MAPS_CO_BASE_URL": _env("MAPS_CO_BASE_URL", "https://geocode.maps.co"),
         },
     },
     {
-        "class": "python_missive.address_backends.google_maps.GoogleMapsAddressBackend",
+        "class": "pymissive.address_backends.google_maps.GoogleMapsAddressBackend",
         "config": {
             "GOOGLE_MAPS_API_KEY": _env("GOOGLE_MAPS_API_KEY", ""),
         },
     },
     {
-        "class": "python_missive.address_backends.mapbox.MapboxAddressBackend",
+        "class": "pymissive.address_backends.mapbox.MapboxAddressBackend",
         "config": {
             "MAPBOX_ACCESS_TOKEN": _env("MAPBOX_ACCESS_TOKEN", ""),
         },
     },
     {
-        "class": "python_missive.address_backends.here.HereAddressBackend",
+        "class": "pymissive.address_backends.here.HereAddressBackend",
         "config": {
             "HERE_APP_ID": _env("HERE_APP_ID", ""),
             "HERE_APP_CODE": _env("HERE_APP_CODE", ""),

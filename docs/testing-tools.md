@@ -106,7 +106,7 @@ Simpler mocking API than `unittest.mock`:
 ```python
 def test_something(mocker):
     # mocker is automatically available
-    mock_send = mocker.patch('missive.helpers.send_missive')
+    mock_send = mocker.patch('djmissive.helpers.send_missive')
     mock_send.return_value = True
     
     result = my_function()

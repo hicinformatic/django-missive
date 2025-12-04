@@ -7,7 +7,7 @@ from django.views.generic import RedirectView
 urlpatterns = [
     path("", RedirectView.as_view(url="/admin/", permanent=False)),
     path("admin/", admin.site.urls),
-    path("missive/", include("missive.urls")),
+    path("missive/", include("djmissive.urls")),
 ]
 
 admin.site.site_header = "Django Missive - Administration"

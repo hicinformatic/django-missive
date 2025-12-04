@@ -67,7 +67,7 @@ pip install django-missive[all]          # Tous les providers
 ```python
 INSTALLED_APPS = [
     ...
-    'missive',
+    'djmissive',
 ]
 ```
 
@@ -84,7 +84,7 @@ from django.urls import path, include
 
 urlpatterns = [
     ...
-    path('missive/', include('missive.urls')),  # Interface + Webhooks
+    path('missive/', include('djmissive.urls')),  # Interface + Webhooks
 ]
 ```
 
@@ -98,37 +98,37 @@ This will create the following URLs:
 # Providers automatically categorized by supported_types
 MISSIVE_PROVIDERS = [
     # Email
-    "python_missive.providers.django_email.DjangoEmailProvider",
-    "python_missive.providers.smtp.SMTPProvider",
-    "python_missive.providers.sendgrid.SendGridProvider",
-    "python_missive.providers.mailgun.MailgunProvider",
-    "python_missive.providers.ses.SESProvider",
-    "python_missive.providers.brevo.BrevoProvider",
+    "pymissive.providers.django_email.DjangoEmailProvider",
+    "pymissive.providers.smtp.SMTPProvider",
+    "pymissive.providers.sendgrid.SendGridProvider",
+    "pymissive.providers.mailgun.MailgunProvider",
+    "pymissive.providers.ses.SESProvider",
+    "pymissive.providers.brevo.BrevoProvider",
     # SMS / Voice
-    "python_missive.providers.twilio.TwilioProvider",
-    "python_missive.providers.vonage.VonageProvider",
-    "python_missive.providers.smspartner.SMSPartnerProvider",
+    "pymissive.providers.twilio.TwilioProvider",
+    "pymissive.providers.vonage.VonageProvider",
+    "pymissive.providers.smspartner.SMSPartnerProvider",
     # Branded / messaging
-    "python_missive.providers.slack.SlackProvider",
-    "python_missive.providers.teams.TeamsProvider",
-    "python_missive.providers.telegram.TelegramProvider",
-    "python_missive.providers.signal.SignalProvider",
-    "python_missive.providers.messenger.MessengerProvider",
+    "pymissive.providers.slack.SlackProvider",
+    "pymissive.providers.teams.TeamsProvider",
+    "pymissive.providers.telegram.TelegramProvider",
+    "pymissive.providers.signal.SignalProvider",
+    "pymissive.providers.messenger.MessengerProvider",
     # Postal / LRE
-    "python_missive.providers.laposte.LaPosteProvider",
-    "python_missive.providers.maileva.MailevaProvider",
-    "python_missive.providers.ar24.AR24Provider",
-    "python_missive.providers.certeurope.CerteuropeProvider",
+    "pymissive.providers.laposte.LaPosteProvider",
+    "pymissive.providers.maileva.MailevaProvider",
+    "pymissive.providers.ar24.AR24Provider",
+    "pymissive.providers.certeurope.CerteuropeProvider",
     # Notifications / push
-    "python_missive.providers.fcm.FCMProvider",
-    "python_missive.providers.apn.APNProvider",
-    "python_missive.providers.notification.InAppNotificationProvider",
+    "pymissive.providers.fcm.FCMProvider",
+    "pymissive.providers.apn.APNProvider",
+    "pymissive.providers.notification.InAppNotificationProvider",
 ]
 
 # Address verification backends (first working backend is used)
 MISSIVE_ADDRESS_BACKENDS = [
     {
-        "class": "python_missive.address_backends.nominatim.NominatimAddressBackend",
+        "class": "pymissive.address_backends.nominatim.NominatimAddressBackend",
         "config": {
             "NOMINATIM_USER_AGENT": os.getenv("NOMINATIM_USER_AGENT", "django-missive/1.0"),
             "NOMINATIM_BASE_URL": os.getenv(
@@ -137,25 +137,25 @@ MISSIVE_ADDRESS_BACKENDS = [
         },
     },
     {
-        "class": "python_missive.address_backends.photon.PhotonAddressBackend",
+        "class": "pymissive.address_backends.photon.PhotonAddressBackend",
         "config": {
             "PHOTON_BASE_URL": os.getenv("PHOTON_BASE_URL", "https://photon.komoot.io"),
         },
     },
     {
-        "class": "python_missive.address_backends.google_maps.GoogleMapsAddressBackend",
+        "class": "pymissive.address_backends.google_maps.GoogleMapsAddressBackend",
         "config": {
             "GOOGLE_MAPS_API_KEY": os.getenv("GOOGLE_MAPS_API_KEY", ""),
         },
     },
     {
-        "class": "python_missive.address_backends.mapbox.MapboxAddressBackend",
+        "class": "pymissive.address_backends.mapbox.MapboxAddressBackend",
         "config": {
             "MAPBOX_ACCESS_TOKEN": os.getenv("MAPBOX_ACCESS_TOKEN", ""),
         },
     },
     {
-        "class": "python_missive.address_backends.here.HereAddressBackend",
+        "class": "pymissive.address_backends.here.HereAddressBackend",
         "config": {
             "HERE_APP_ID": os.getenv("HERE_APP_ID", ""),
             "HERE_APP_CODE": os.getenv("HERE_APP_CODE", ""),
@@ -211,7 +211,7 @@ sms = Missive.objects.create(sender=user, recipient=recipient, ...)
 ### Monitoring des providers
 
 ```python
-from python_missive.providers import SendGridProvider, TwilioProvider
+from pymissive.providers import SendGridProvider, TwilioProvider
 
 # Vérifier le statut et les crédits
 provider = SendGridProvider()
@@ -236,7 +236,7 @@ if credits['needs_refill']:
 ### Valider avant envoi
 
 ```python
-from python_missive.providers import SendGridProvider
+from pymissive.providers import SendGridProvider
 
 provider = SendGridProvider(missive)
 
