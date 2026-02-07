@@ -17,6 +17,24 @@ class MissiveStatus(models.TextChoices):
     CANCELLED = "CANCELLED", _("Cancelled")
 
 
+# Mapping des styles pour chaque statut
+_MISSIVE_STATUS_STYLE_MAP = {
+    "DRAFT": "secondary",
+    "PENDING": "info",
+    "PROCESSING": "info",
+    "SENT": "success",
+    "DELIVERED": "success",
+    "READ": "success",
+    "FAILED": "danger",
+    "CANCELLED": "warning",
+}
+
+
+def get_status_style(status: str) -> str:
+    """Retourne le style associé à un statut."""
+    return _MISSIVE_STATUS_STYLE_MAP.get(status, "info")
+
+
 class MissivePriority(models.TextChoices):
     """Priority levels."""
 
@@ -24,6 +42,20 @@ class MissivePriority(models.TextChoices):
     NORMAL = "NORMAL", _("Normal")
     HIGH = "HIGH", _("High")
     URGENT = "URGENT", _("Urgent")
+
+
+# Mapping des styles pour chaque priorité
+_MISSIVE_PRIORITY_STYLE_MAP = {
+    "LOW": "info",
+    "NORMAL": "secondary",
+    "HIGH": "warning",
+    "URGENT": "danger",
+}
+
+
+def get_priority_style(priority: str) -> str:
+    """Retourne le style associé à une priorité."""
+    return _MISSIVE_PRIORITY_STYLE_MAP.get(priority, "info")
 
 
 choices_missive_modes = {

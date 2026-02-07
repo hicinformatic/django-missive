@@ -12,7 +12,7 @@ class MissiveRelatedObject(models.Model):
     missive = models.ForeignKey(
         "djpymissive.Missive",
         on_delete=models.CASCADE,
-        related_name="related_objects",
+        related_name="to_missiverelatedobject",
         verbose_name=_("Missive"),
         help_text=_("Missive to which this object is related"),
     )

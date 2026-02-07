@@ -74,3 +74,9 @@ INSTALLED_APPS += [
     "phonenumber_field",
     "djpymissive",
 ]
+
+# Address autocomplete view configuration
+GEOADDRESS_PROVIDERVIEW = True
+GEOADDRESS_PROVIDERVIEW_AUTH = True
+GEOADDRESS_ADDRESSVIEW = True
+GEOADDRESS_ADDRESSVIEW_AUTH = True

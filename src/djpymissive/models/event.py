@@ -12,7 +12,7 @@ class MissiveEvent(models.Model):
     missive = models.ForeignKey(
         "djpymissive.Missive",
         on_delete=models.CASCADE,
-        related_name="events",
+        related_name="to_missiveevent",
         verbose_name=_("Missive"),
         help_text=_("Missive associated with this event"),
     )
