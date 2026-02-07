@@ -1,59 +1,23 @@
 # Development dependencies
-# Install with: pip install -r requirements-dev.txt
+# Install qualitybase in editable mode for local development
+-e ../python-qualitybase
+-e ../python-providerkit
+-e ../django-providerkit
+-e ../django-boosted
+-e ../django-virtualqueryset
+-e ../python-geoaddress
+-e ../django-geoaddress
+-e ../python-missive
+-e .
 
-# Core dependencies
--r requirements.txt
 
-# Testing framework
+# Include production dependencies
+Django>=3.2
+django-stubs>=5.0.0
+python-dotenv>=1.0
 pytest>=7.0
 pytest-django>=4.5
-pytest-cov>=4.0
-coverage>=7.3
-
-# Testing utilities
-pytest-xdist>=3.0  # Parallel test execution
-pytest-mock>=3.10  # Better mocking support
-pytest-timeout>=2.1  # Detect slow/hanging tests
-pytest-sugar>=0.9  # Improved test output
-pytest-html>=3.1  # HTML test reports
-pytest-randomly>=3.12  # Random test execution order
-pytest-repeat>=0.9  # Repeat tests to find flaky tests
-
-# Test data generation
-factory-boy>=3.3  # Django model factories
-faker>=19.0  # Generate realistic fake data
-hypothesis>=6.68  # Property-based testing
-
-# Code quality
-ruff>=0.5
-black>=23.0
-flake8>=6.0
-flake8-simplify>=0.21
-flake8-docstrings>=1.7
-isort>=5.12
-mypy>=1.0
-django-stubs>=5.0.0
-django-stubs-ext>=5.0.0
-
-# Security
-bandit>=1.7
-safety>=3.0
-pip-audit>=2.6
-semgrep>=1.94
-
-# Code Quality & Cleanup
-vulture>=2.10
-autoflake>=2.2
-pylint>=3.0
-radon>=6.0
-
-# Django extensions pour dev
 django-extensions>=3.2
-django-debug-toolbar>=4.2
-
-# Environment variables
-python-dotenv>=1.0
-
-# Documentation
-sphinx>=7.2
-sphinx-rtd-theme>=2.0
+djangorestframework>=3.14
+django-phonenumber-field[phonenumbers]>=7.0
+babel>=2.0

@@ -1,1 +1,1 @@
-"""Tests package for django-missive."""
+"""Tests for django-companyatlas."""

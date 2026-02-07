@@ -6,3 +6,7 @@ Django>=3.2
 
 # Messaging backend (python-missive)
 python-missive>=0.1.0
+
+# Phone number field
+django-phonenumber-field[phonenumbers]>=7.0
+babel>=2.0
