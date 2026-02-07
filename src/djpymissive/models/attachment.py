@@ -84,7 +84,7 @@ class MissiveAttachment(models.Model):
         if self.file:
             return self.file
         return self.get_file_method()
-    
+
     def clean(self):
         """Validates attachment."""
         if not self.file and not self.can_access_file():

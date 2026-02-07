@@ -1,6 +1,5 @@
 """Main Missive model for multi-channel sending."""
 
-from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -158,4 +157,6 @@ class Missive(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.missive_type} - {self.recipient_name or self.recipient_email or 'Unknown'} ({self.status})"
+        """String representation of missive."""
+        recipient = self.recipient_name or self.recipient_email or 'Unknown'
+        return f"{self.missive_type} - {recipient} ({self.status})"

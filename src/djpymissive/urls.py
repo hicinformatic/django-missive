@@ -1,7 +1,8 @@
-from django.urls import path
+from typing import List
+from django.urls import URLPattern
 
 app_name = "djpymissive"
 
-urlpatterns = [
+urlpatterns: List[URLPattern] = [
     # Add your URL patterns here
 ]

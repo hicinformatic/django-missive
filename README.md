@@ -62,19 +62,19 @@ pip install django-missive[all]          # Tous les providers
 
 ## Quick Start
 
-1. Add `missive` to your `INSTALLED_APPS` in `settings.py`:
+1. Add `djpymissive` to your `INSTALLED_APPS` in `settings.py`:
 
 ```python
 INSTALLED_APPS = [
     ...
-    'djmissive',
+    'djpymissive',
 ]
 ```
 
 2. Run migrations:
 
 ```bash
-python manage.py migrate missive
+python manage.py migrate djpymissive
 ```
 
 3. Include the URLconf in your project `urls.py`:
@@ -84,84 +84,43 @@ from django.urls import path, include
 
 urlpatterns = [
     ...
-    path('missive/', include('djmissive.urls')),  # Interface + Webhooks
+    path('missive/', include('djpymissive.urls')),  # Webhooks
 ]
 ```
 
 This will create the following URLs:
-- `/missive/` - Interface CRUD des missives
 - `/missive/webhook/{provider}/` - Webhook unifié pour tous les providers
 
-4. Configure providers and address backends in `settings.py`:
+4. Configure providers in `settings.py`:
 
 ```python
-# Providers automatically categorized by supported_types
-MISSIVE_PROVIDERS = [
-    # Email
-    "pymissive.providers.django_email.DjangoEmailProvider",
-    "pymissive.providers.smtp.SMTPProvider",
-    "pymissive.providers.sendgrid.SendGridProvider",
-    "pymissive.providers.mailgun.MailgunProvider",
-    "pymissive.providers.ses.SESProvider",
-    "pymissive.providers.brevo.BrevoProvider",
-    # SMS / Voice
-    "pymissive.providers.twilio.TwilioProvider",
-    "pymissive.providers.vonage.VonageProvider",
-    "pymissive.providers.smspartner.SMSPartnerProvider",
-    # Branded / messaging
-    "pymissive.providers.slack.SlackProvider",
-    "pymissive.providers.teams.TeamsProvider",
-    "pymissive.providers.telegram.TelegramProvider",
-    "pymissive.providers.signal.SignalProvider",
-    "pymissive.providers.messenger.MessengerProvider",
-    # Postal / LRE
-    "pymissive.providers.laposte.LaPosteProvider",
-    "pymissive.providers.maileva.MailevaProvider",
-    "pymissive.providers.ar24.AR24Provider",
-    "pymissive.providers.certeurope.CerteuropeProvider",
-    # Notifications / push
-    "pymissive.providers.fcm.FCMProvider",
-    "pymissive.providers.apn.APNProvider",
-    "pymissive.providers.notification.InAppNotificationProvider",
-]
+# Configuration Django Missive
+MISSIVE_PROVIDERS = {
+    # Providers par type de missive (utilise python-missive)
+    'EMAIL': {
+        'backend': 'pymissive.providers.sendgrid.SendGridProvider',
+        'config': {
+            'SENDGRID_API_KEY': os.getenv('SENDGRID_API_KEY'),
+        }
+    },
+    'SMS': {
+        'backend': 'pymissive.providers.twilio.TwilioProvider',
+        'config': {
+            'TWILIO_ACCOUNT_SID': os.getenv('TWILIO_ACCOUNT_SID'),
+            'TWILIO_AUTH_TOKEN': os.getenv('TWILIO_AUTH_TOKEN'),
+            'TWILIO_PHONE_NUMBER': '+33123456789',
+        }
+    },
+    'POSTAL': {
+        'backend': 'pymissive.providers.laposte.LaPosteProvider',
+        'config': {
+            'LAPOSTE_API_KEY': os.getenv('LAPOSTE_API_KEY'),
+        }
+    },
+}
 
-# Address verification backends (first working backend is used)
-MISSIVE_ADDRESS_BACKENDS = [
-    {
-        "class": "pymissive.address_backends.nominatim.NominatimAddressBackend",
-        "config": {
-            "NOMINATIM_USER_AGENT": os.getenv("NOMINATIM_USER_AGENT", "django-missive/1.0"),
-            "NOMINATIM_BASE_URL": os.getenv(
-                "NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org"
-            ),
-        },
-    },
-    {
-        "class": "pymissive.address_backends.photon.PhotonAddressBackend",
-        "config": {
-            "PHOTON_BASE_URL": os.getenv("PHOTON_BASE_URL", "https://photon.komoot.io"),
-        },
-    },
-    {
-        "class": "pymissive.address_backends.google_maps.GoogleMapsAddressBackend",
-        "config": {
-            "GOOGLE_MAPS_API_KEY": os.getenv("GOOGLE_MAPS_API_KEY", ""),
-        },
-    },
-    {
-        "class": "pymissive.address_backends.mapbox.MapboxAddressBackend",
-        "config": {
-            "MAPBOX_ACCESS_TOKEN": os.getenv("MAPBOX_ACCESS_TOKEN", ""),
-        },
-    },
-    {
-        "class": "pymissive.address_backends.here.HereAddressBackend",
-        "config": {
-            "HERE_APP_ID": os.getenv("HERE_APP_ID", ""),
-            "HERE_APP_CODE": os.getenv("HERE_APP_CODE", ""),
-        },
-    },
-]
+# Email par défaut
+DEFAULT_FROM_EMAIL = 'noreply@example.com'
 ```
 
 ## 🚀 Usage rapide
@@ -169,184 +128,151 @@ MISSIVE_ADDRESS_BACKENDS = [
 ### Envoyer un email
 
 ```python
-from missive import MissiveBuilder, MissiveSender
+from djpymissive.models import Missive, MissiveType, MissiveStatus
 
-# Créer
-missive = MissiveBuilder.create_email(
-    source_object=order,
+# Créer une missive email
+missive = Missive.objects.create(
     sender=request.user,
+    missive_type=MissiveType.EMAIL,
     recipient_email="client@example.com",
     subject="Commande confirmée",
     body="<p>Votre commande #123 est confirmée</p>",
-    body_text="Votre commande #123 est confirmée",  # Version texte
+    body_text="Votre commande #123 est confirmée",
+    status=MissiveStatus.PENDING,
 )
 
-# Envoyer
-MissiveSender.send(missive)
+# L'envoi peut être géré via des tâches asynchrones ou manuellement
 ```
 
-### Utiliser le modèle Recipient
+### Utiliser le modèle pour créer des missives
 
 ```python
-from missive.models import Recipient, Missive
+from djpymissive.models import Missive, MissiveType, MissiveStatus
 
 # Créer un destinataire avec toutes ses coordonnées
-recipient = Recipient.objects.create(
-    first_name="Jean",
-    last_name="Dupont",
-    company_name="ACME Corp",
-    email="jean@acme.com",
-    mobile="+33600000000",
-    address_line1="123 Rue de la Paix",
-    postal_code="75001",
-    city="Paris",
-    country="FR"
+missive = Missive.objects.create(
+    sender=request.user,
+    missive_type=MissiveType.EMAIL,
+    recipient_first_name="Jean",
+    recipient_last_name="Dupont",
+    recipient_email="jean@acme.com",
+    recipient_phone="+33600000000",
+    recipient_address_line1="123 Rue de la Paix",
+    recipient_postal_code="75001",
+    recipient_city="Paris",
+    recipient_country="FR",
+    subject="Bienvenue",
+    body="<p>Bonjour Jean, bienvenue!</p>",
+    status=MissiveStatus.PENDING,
 )
 
-# Réutiliser pour plusieurs missives
-email = Missive.objects.create(sender=user, recipient=recipient, ...)
-sms = Missive.objects.create(sender=user, recipient=recipient, ...)
+# Créer un SMS avec les mêmes coordonnées
+sms = Missive.objects.create(
+    sender=request.user,
+    missive_type=MissiveType.SMS,
+    recipient_phone="+33600000000",
+    body="Votre code de vérification: 123456",
+    status=MissiveStatus.PENDING,
+)
 ```
 
-### Monitoring des providers
+### Monitoring des providers (via python-missive)
 
 ```python
-from pymissive.providers import SendGridProvider, TwilioProvider
+from pymissive.providers.sendgrid import SendGridProvider
 
-# Vérifier le statut et les crédits
-provider = SendGridProvider()
-status = provider.get_service_status()
-print(f"Status: {status['status']}")
-print(f"Services: {status['services']}")  # ['email', 'email_transactional', ...]
-print(f"Credits: {status['credits']}")
+# Configurer et vérifier le provider
+provider = SendGridProvider(config={
+    'SENDGRID_API_KEY': 'your-api-key'
+})
 
-# Health check complet
-health = provider.health_check()
-if not health['is_healthy']:
-    print(f"⚠️ {health['summary']}")
-    for issue in health['issues']:
-        print(f"  - {issue}")
+# Vérifier la configuration
+is_configured = provider.is_configured()
+print(f"Provider configuré: {is_configured}")
 
-# Vérifier les crédits spécifiquement
-credits = provider.check_credits()
-if credits['needs_refill']:
-    print(f"⚠️ Recharge nécessaire: {credits['remaining']} {credits['currency']}")
+# Envoyer un email de test
+result = provider.send_email(
+    from_email='sender@example.com',
+    to_email='recipient@example.com',
+    subject='Test',
+    body='<p>Test message</p>'
+)
 ```
 
-### Valider avant envoi
+### Valider et envoyer
 
 ```python
-from pymissive.providers import SendGridProvider
+from djpymissive.models import Missive, MissiveStatus
 
-provider = SendGridProvider(missive)
+# Récupérer une missive
+missive = Missive.objects.get(id=123)
 
-# Analyser le risque d'échec
-risk = provider.calculate_delivery_risk()
-
-if risk['risk_score'] > 70:
-    print(f"⚠️ Risque élevé : {risk['recommendations']}")
-else:
-    MissiveSender.send(missive)
-```
-
-## ⚙️ Configuration
-
-Dans votre `settings.py`:
-
-```python
-# Django Missive Configuration
-MISSIVE_CONFIG = {
-    # Providers par type de missive
-    'PROVIDERS': {
-        'EMAIL': 'sendgrid',
-        'SMS': 'twilio',
-        'WHATSAPP': 'twilio',
-        'POSTAL': 'laposte',
-        'POSTAL_REGISTERED': 'laposte',
-        'NOTIFICATION': 'inapp',
-    },
-    
-    # SendGrid
-    'SENDGRID_API_KEY': os.getenv('SENDGRID_API_KEY'),
-    
-    # Twilio
-    'TWILIO_ACCOUNT_SID': os.getenv('TWILIO_ACCOUNT_SID'),
-    'TWILIO_AUTH_TOKEN': os.getenv('TWILIO_AUTH_TOKEN'),
-    'TWILIO_PHONE_NUMBER': '+33123456789',
-    
-    # La Poste
-    'LAPOSTE_API_KEY': os.getenv('LAPOSTE_API_KEY'),
-    
-    # Général
-    'DEFAULT_FROM_EMAIL': 'noreply@example.com',
-}
-```
-
-## Usage
-
-```python
-# Example usage code here
+# Vérifier qu'elle est prête à être envoyée
+if missive.status == MissiveStatus.PENDING:
+    # Marquer comme envoyée (l'envoi réel se fait via le provider configuré)
+    missive.status = MissiveStatus.SENT
+    missive.save()
 ```
 
 ## Development
 
 ### Quick Start
 
-This project includes `dev.py` - a cross-platform development tool that works on **all operating systems**.
+This project includes `service.py` - a cross-platform development tool that works on **all operating systems**.
 
 ```bash
 # Setup development environment
-python dev.py install-dev
+python service.py dev install-dev
 
 # Run tests
-python dev.py test
+python service.py dev test
 
 # Format code
-python dev.py format
+python service.py dev format
 
 # Build package
-python dev.py build
+python service.py dev build
 ```
 
 **Linux/macOS users** can make it executable:
 ```bash
-chmod +x dev.py
-./dev.py install-dev
-./dev.py test
+chmod +x service.py
+./service.py dev install-dev
+./service.py dev test
 ```
 
 ### Available Commands
 
 **Development:**
-- `python dev.py venv` - Create virtual environment
-- `python dev.py install` - Install in production mode
-- `python dev.py install-dev` - Install in development mode
+- `python service.py dev venv` - Create virtual environment
+- `python service.py dev install` - Install in production mode
+- `python service.py dev install-dev` - Install in development mode
 
 **Testing:**
-- `python dev.py test` - Run tests with pytest
-- `python dev.py test-verbose` - Run tests with verbose output
-- `python dev.py coverage` - Run tests with coverage report
+- `python service.py dev test` - Run tests with pytest
+- `python service.py dev test-verbose` - Run tests with verbose output
+- `python service.py dev coverage` - Run tests with coverage report
 
 **Code Quality:**
-- `python dev.py lint` - Run linters (flake8, mypy)
-- `python dev.py format` - Format code (black, isort)
-- `python dev.py check` - Run all checks (lint + format check)
+- `python service.py quality lint` - Run linters (flake8, mypy)
+- `python service.py quality format` - Format code (black, isort)
+- `python service.py quality check` - Run all checks (lint + format check)
 
 **Building:**
-- `python dev.py build` - Build wheel and source distribution
-- `python dev.py clean` - Remove all build artifacts
-- `python dev.py clean-test` - Remove test artifacts (htmlcov, .coverage, etc.)
+- `python service.py dev build` - Build wheel and source distribution
+- `python service.py dev clean` - Remove all build artifacts
+- `python service.py dev clean-test` - Remove test artifacts (htmlcov, .coverage, etc.)
 
 **Publishing:**
-- `python dev.py upload-test` - Upload to TestPyPI
-- `python dev.py upload` - Upload to PyPI
-- `python dev.py release` - Full release workflow
+- `python service.py dev upload-test` - Upload to TestPyPI
+- `python service.py dev upload` - Upload to PyPI
+- `python service.py dev release` - Full release workflow
 
 **Utilities:**
-- `python dev.py show-version` - Show current version
-- `python dev.py venv-clean` - Recreate virtual environment
+- `python service.py dev show-version` - Show current version
+- `python service.py dev venv-clean` - Recreate virtual environment
 
-Run `python dev.py help` to see all available commands.
+Run `python service.py dev help` to see all available commands.
 
 ### Django Development Server
 
@@ -354,15 +280,15 @@ Test the library with a Django development server:
 
 ```bash
 # Run migrations and create superuser (admin/admin)
-python dev.py migrate
+python service.py dev migrate
 
 # Start development server
-python dev.py runserver
+python service.py dev runserver
 ```
 
 Access the admin interface at http://127.0.0.1:8000/admin/ (login: admin/admin)
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development guide.
+See [docs/development.md](docs/development.md) for detailed development guide (if available).
 
 ## Contributing
 

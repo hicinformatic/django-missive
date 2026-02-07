@@ -39,4 +39,5 @@ class MissiveProviderModel(VirtualModel):
         ordering = ['-priority', 'name']
 
     def __str__(self) -> str:
-        return self.display_name or self.name
+        display = getattr(self, 'display_name', None)
+        return str(display or self.name)

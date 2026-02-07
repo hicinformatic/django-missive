@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "django-missive"
 version = "0.1.0"
-description = "A Django library for missive management"
+description = "Django library for multi-channel missive management (email, SMS, push, postal, etc.)"
 readme = "README.md"
 authors = [
     { name = "Your Name", email = "your.email@example.com" }
@@ -181,6 +181,11 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "virtualqueryset.*"
 ignore_missing_imports = true
+
+# Ignore TextChoices.choices false positive
+[[tool.mypy.overrides]]
+module = "djpymissive.models.missive"
+disable_error_code = ["attr-defined"]
 
 [tool.django-stubs]
 django_settings_module = "tests.settings"

@@ -10,4 +10,4 @@ class DjpymissiveConfig(AppConfig):
 
     def ready(self):
         """Imports signal handlers when app is ready."""
-        pass
+        # Import signals or other initialization here if needed
