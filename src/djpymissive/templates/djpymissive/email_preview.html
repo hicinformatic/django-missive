@@ -1,0 +1,39 @@
+{% extends "djpymissive/base_preview.html" %}
+{% load static i18n %}
+
+{% block preview_stylesheet %}
+<link rel="stylesheet" href="{% static 'djpymissive/css/email_preview.css' %}">
+{% endblock %}
+
+{% block preview_content %}
+<div class="email-preview">
+    <div class="email-header">
+        <p><strong>{% trans 'From' %}:</strong> 
+            {% if missive.sender_name %}{{ missive.sender_name }} {% endif %}
+            &lt;{{ missive.sender_email }}&gt;
+        </p>
+        <p><strong>{% trans 'To' %}:</strong> 
+            {% if missive.recipient_name %}{{ missive.recipient_name }} {% endif %}
+            &lt;{{ missive.recipient_email }}&gt;
+        </p>
+        {% if missive.subject %}
+        <p><strong>{% trans 'Subject' %}:</strong> {{ missive.subject }}</p>
+        {% endif %}
+    </div>
+    <div class="email-body">
+        {% if missive.body %}
+            <div class="email-html">
+                {{ missive.body|safe }}
+            </div>
+        {% endif %}
+        {% if missive.body_text %}
+            <div class="email-text">
+                <pre>{{ missive.body_text }}</pre>
+            </div>
+        {% endif %}
+        {% if not missive.body and not missive.body_text %}
+            <p class="empty">{% trans 'No content' %}</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

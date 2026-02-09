@@ -8,6 +8,7 @@ class MissiveStatus(models.TextChoices):
     """Missive status."""
 
     DRAFT = "DRAFT", _("Draft")
+    PREPARE = "PREPARE", _("Prepare")
     PENDING = "PENDING", _("Pending")
     PROCESSING = "PROCESSING", _("Processing")
     SENT = "SENT", _("Sent")
@@ -20,6 +21,7 @@ class MissiveStatus(models.TextChoices):
 # Mapping des styles pour chaque statut
 _MISSIVE_STATUS_STYLE_MAP = {
     "DRAFT": "secondary",
+    "PREPARE": "info",
     "PENDING": "info",
     "PROCESSING": "info",
     "SENT": "success",

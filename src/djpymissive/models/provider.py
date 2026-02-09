@@ -34,8 +34,8 @@ class MissiveProviderModel(VirtualModel):
     class Meta:
         managed = False
         app_label = 'djpymissive'
-        verbose_name = _("Missive Provider")
-        verbose_name_plural = _("Missive Providers")
+        verbose_name = _("Provider")
+        verbose_name_plural = _("Providers")
         ordering = ['-priority', 'name']
 
     def __str__(self) -> str:

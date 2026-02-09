@@ -40,6 +40,12 @@ class MissiveAttachment(models.Model):
         verbose_name=_("File Method Access"),
         help_text=_("Method to access the file"),
     )
+    files_object_arguments = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name=_("File Object Arguments"),
+        help_text=_("Arguments to pass to the file method (as dict for **kwargs)"),
+    )
     file = models.FileField(
         upload_to="missive/attachments/%Y/%m/%d/",
         blank=True,
@@ -57,6 +63,11 @@ class MissiveAttachment(models.Model):
         default=0,
         verbose_name=_("Order"),
         help_text=_("Display order"),
+    )
+    multiple_files = models.BooleanField(
+        default=False,
+        verbose_name=_("Multiple Files"),
+        help_text=_("Indicates if this is a related function that returns multiple files"),
     )
 
     file_object = GenericForeignKey("file_content_type", "file_object_id")
@@ -76,7 +87,9 @@ class MissiveAttachment(models.Model):
         if hasattr(self.file_object, self.file_method_access):
             method = getattr(self.file_object, self.file_method_access)
             if callable(method):
-                return method
+                if self.files_object_arguments:
+                    return method(**self.files_object_arguments)
+                return method()
         return None
 
     def get_file(self):

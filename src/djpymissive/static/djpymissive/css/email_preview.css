@@ -1,0 +1,45 @@
+.email-preview {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 20px;
+    margin: 20px 0;
+    background: #f9f9f9;
+}
+
+.email-header {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #ddd;
+}
+
+.email-header p {
+    margin: 5px 0;
+}
+
+.email-body {
+    margin-top: 20px;
+}
+
+.email-html {
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.email-text pre {
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.empty {
+    color: #999;
+    font-style: italic;
+    text-align: center;
+    padding: 40px;
+}

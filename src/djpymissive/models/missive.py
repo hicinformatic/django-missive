@@ -119,6 +119,11 @@ class Missive(models.Model):
         verbose_name=_("Body"),
         help_text=_("Message body/content"),
     )
+    body_text = models.TextField(
+        blank=True,
+        verbose_name=_("Body Text"),
+        help_text=_("Plain text version of the message"),
+    )
 
     external_id = models.CharField(
         max_length=255,
@@ -155,6 +160,27 @@ class Missive(models.Model):
         verbose_name=_("Delivered At"),
         help_text=_("When the missive was delivered"),
     )
+    is_billed = models.BooleanField(
+        default=False,
+        verbose_name=_("Billed"),
+        help_text=_("Indicates if the missive has been billed"),
+    )
+    billing_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name=_("Billing Amount"),
+        help_text=_("Amount billed for the missive"),
+    )
+    estimate_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name=_("Estimate Amount"),
+        help_text=_("Estimated amount for the missive"),
+    )
 
     objects = MissiveManager()
 
@@ -162,11 +188,6 @@ class Missive(models.Model):
         verbose_name = _("Missive")
         verbose_name_plural = _("Missives")
         ordering = ["-created_at"]
-        indexes = [
-            models.Index(fields=["missive_type", "status"]),
-            models.Index(fields=["status", "created_at"]),
-            models.Index(fields=["provider", "external_id"]),
-        ]
 
     def __str__(self):
         recipient = self.recipient_name or self.recipient_email or 'Unknown'
@@ -174,6 +195,34 @@ class Missive(models.Model):
 
     def clean(self):
         super().clean()
+        
+        if self.pk:
+            try:
+                original = Missive.objects.get(pk=self.pk)
+                has_events = self.to_missiveevent.exists()
+                
+                if has_events:
+                    errors = {}
+                    excluded_fields = {'id', 'created_at', 'updated_at'}
+                    for field in self._meta.get_fields():
+                        if field.is_relation and not field.one_to_one:
+                            continue
+                        field_name = field.name
+                        if field_name in excluded_fields:
+                            continue
+                        if hasattr(self, field_name) and hasattr(original, field_name):
+                            try:
+                                current_value = getattr(self, field_name)
+                                original_value = getattr(original, field_name)
+                                if current_value != original_value:
+                                    errors[field_name] = _('This field cannot be modified once events have been created.')
+                            except (AttributeError, ValueError):
+                                continue
+                    
+                    if errors:
+                        raise ValidationError(errors)
+            except Missive.DoesNotExist:
+                pass
         
         if not self.sender_name:
             raise ValidationError({
@@ -245,3 +294,93 @@ class Missive(models.Model):
     @property
     def recipient(self):
         return self.get_target("recipient")
+
+    def get_serialized_data(self):
+        """Serialize missive data to a dictionary for provider calls."""
+        return {
+            field.name: getattr(self, field.name) 
+            for field in self._meta.get_fields() 
+            if not field.is_relation and not field.many_to_many
+            and not field.name.startswith("_")
+        }
+
+
+    def call_provider_service(self, service: str, status: str | None = None, **kwargs):
+        """Call a provider service."""
+        serialized = self.get_serialized_data()
+        service_name = f"{service}_{self.missive_type}".lower()
+        try:
+            description = f"Service {service_name} called"
+            response = self.provider._provider.call_service(service_name, **serialized)
+        except Exception as e:
+            status = MissiveStatus.FAILED
+            description = str(e)
+            response = {"error": str(e)}
+        event = self.to_missiveevent.create(
+            missive=self,
+            event_type=service_name,
+            status=status,
+            trace=response,
+            description=description,
+        )
+        if event.status:
+            self.status = event.status
+        return response
+
+    def prepare_missive(self):
+        """Prepare the missive for sending."""
+        self.call_provider_service("prepare", status=MissiveStatus.PREPARE)
+
+    def send_missive(self):
+        """Send the missive."""
+        response = self.call_provider_service("send", status=MissiveStatus.SENT)
+        print("response", response)
+        self.external_id = self.provider._provider.get_external_id_email(response)
+        print("external_id", self.external_id)
+        self.status = MissiveStatus.SENT if self.external_id else MissiveStatus.FAILED
+        self.save()
+
+    def cancel_missive(self):
+        """Cancel the missive."""
+        self.call_provider_service("cancel", status=MissiveStatus.CANCELLED)
+
+    def status_missive(self):
+        """Get the status of the missive."""
+        self.call_provider_service("status")
+
+    def billing_amount_missive(self):
+        """Get the billing amount of the missive."""
+        self.call_provider_service("billing_amount")
+
+    def estimate_amount_missive(self):
+        """Get the estimate amount of the missive."""
+        self.call_provider_service("estimate_amount")
+
+    def attachments_missive(self):
+        """Get the attachments of the missive."""
+        self.call_provider_service("attachments")
+
+    def save(self, *args, **kwargs):
+        """Save the missive, preventing any modification if events exist."""
+        if self.pk:
+            try:
+                original = Missive.objects.get(pk=self.pk)
+                has_events = self.to_missiveevent.exists()
+                
+                if has_events:
+                    excluded_fields = {'status', 'external_id', 'id', 'created_at', 'updated_at'}
+                    for field in self._meta.get_fields():
+                        if field.is_relation and not field.one_to_one:
+                            continue
+                        field_name = field.name
+                        if field_name in excluded_fields:
+                            continue
+                        if hasattr(original, field_name):
+                            try:
+                                setattr(self, field_name, getattr(original, field_name))
+                            except (AttributeError, ValueError):
+                                continue
+            except Missive.DoesNotExist:
+                pass
+        
+        super().save(*args, **kwargs)

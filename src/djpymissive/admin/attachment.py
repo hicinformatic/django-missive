@@ -21,6 +21,8 @@ class MissiveAttachmentInline(admin.TabularInline):
         "file_content_type",
         "file_object_id",
         "file_method_access",
+        "files_object_arguments",
+        "multiple_files",
         "order",
     ]
 
@@ -85,5 +87,5 @@ class MissiveAttachmentAdmin(AdminBoostModel):
         """Configure fieldsets for change view."""
         self.add_to_fieldset(
             _("File Object"),
-            ["file_content_type", "file_object_id", "file_method_access", "file_object"],
+            ["file_content_type", "file_object_id", "file_method_access", "files_object_arguments", "file_object", "multiple_files"],
         )

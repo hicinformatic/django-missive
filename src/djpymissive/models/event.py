@@ -59,8 +59,8 @@ class MissiveEvent(models.Model):
     )
 
     class Meta:
-        verbose_name = _("Missive Event")
-        verbose_name_plural = _("Missive Events")
+        verbose_name = _("Event")
+        verbose_name_plural = _("Events")
         ordering = ["-occurred_at"]
 
     def __str__(self):

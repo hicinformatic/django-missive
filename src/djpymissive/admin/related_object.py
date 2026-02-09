@@ -15,8 +15,9 @@ class MissiveRelatedObjectInline(admin.TabularInline):
     fields = [
         "content_type",
         "object_id",
+        "object_str",
     ]
-    readonly_fields = []
+    readonly_fields = ["object_str"]
     raw_id_fields = ["content_type"]
 
 
@@ -29,7 +30,7 @@ class MissiveRelatedObjectAdmin(AdminBoostModel):
         "missive",
         "content_type",
         "object_id",
-        "content_object",
+        "content_object_display",
         "created_at",
     ]
     list_filter = [
@@ -42,15 +43,25 @@ class MissiveRelatedObjectAdmin(AdminBoostModel):
         "missive__recipient_email",
     ]
     readonly_fields = [
+        "object_str",
         "created_at",
     ]
     raw_id_fields = ["missive", "content_type"]
+
+    @admin.display(description=_("Related Object"))
+    def content_object_display(self, obj):
+        """Display the related object or its saved string representation."""
+        if obj.content_object:
+            return str(obj.content_object)
+        elif obj.object_str:
+            return f"{obj.object_str} (deleted)"
+        return f"{obj.content_type} #{obj.object_id}"
 
     def change_fieldsets(self):
         """Configure fieldsets for change view."""
         self.add_to_fieldset(
             None,
-            ["missive", "content_type", "object_id", "content_object"],
+            ["missive", "content_type", "object_id", "content_object", "object_str"],
         )
         self.add_to_fieldset(
             _("Timestamps"),

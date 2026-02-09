@@ -1,7 +1,9 @@
 """Admin for Missive model."""
 
 from django.contrib import admin
+from django.urls import reverse
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_boosted import AdminBoostModel
 
@@ -13,6 +15,9 @@ from ..models.choices import get_priority_style, get_status_style
 from .attachment import MissiveAttachmentInline
 from .event import MissiveEventInline
 from .related_object import MissiveRelatedObjectInline
+from urllib.parse import unquote
+from django.contrib import messages
+from django.shortcuts import redirect
 
 
 @admin.register(Missive)
@@ -23,6 +28,7 @@ class MissiveAdmin(AdminBoostModel):
         "recipient_display",
         "sender_display",
         "subject",
+        "provider",
         "status_display",
         "event_display",
     ]
@@ -30,6 +36,7 @@ class MissiveAdmin(AdminBoostModel):
         "missive_type",
         "status",
         "priority",
+        "is_billed",
         "provider",
         "created_at",
     ]
@@ -51,12 +58,38 @@ class MissiveAdmin(AdminBoostModel):
         "sent_at",
         "delivered_at",
         "external_id",
+        "buttons_show_and_preview",
     ]
+
+    def get_readonly_fields(self, request, obj=None):
+        """Make all fields readonly if missive has events."""
+        readonly = list(super().get_readonly_fields(request, obj))
+        
+        if obj and obj.pk:
+            has_events = obj.to_missiveevent.exists()
+            if has_events:
+                all_fields = [
+                    f.name for f in self.model._meta.get_fields() 
+                    if (not f.is_relation or f.one_to_one) 
+                    and f.name not in ['id']
+                ]
+                readonly = list(set(readonly + all_fields))
+        
+        return readonly
     inlines = [
         MissiveAttachmentInline,
         MissiveEventInline,
         MissiveRelatedObjectInline,
     ]
+    changeform_actions = {
+        "prepare_missive": _("Prepare"),
+        "send_missive": _("Send"),
+        "cancel_missive": _("Cancel"),
+        "status_missive": _("Status"),
+        "billing_amount_missive": _("Billing Amount"),
+        "estimate_amount_missive": _("Estimate Amount"),
+        "duplicate_missive": _("Duplicate"),
+    }
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         if isinstance(db_field, PhoneNumberField):
@@ -83,6 +116,30 @@ class MissiveAdmin(AdminBoostModel):
         return self.format_with_help_text(status_html, obj.get_missive_type_display())
     status_display.short_description = _("Status")
 
+    def button_show(self, obj):
+        return format_html(
+            '<a class="button" href="{}" target="_blank">{}</a>',
+            reverse("djpymissive:missive_preview", args=[obj.pk]),
+            _("Show"),
+        )
+
+    def button_preview(self, obj):
+        preview_url = reverse("djpymissive:missive_preview_form")
+        return format_html(
+            '<button type="submit" form="missive_form" formaction="{}" formmethod="post" formtarget="_blank" class="button" name="_preview" style="margin-left: 10px;">{}</button>',
+            preview_url,
+            _("Preview"),
+        )
+    
+    def buttons_show_and_preview(self, obj):
+        buttons_html = []
+        if obj.pk:
+            buttons_html.append(self.button_show(obj))
+        elif not obj.pk or not obj.to_missiveevent.exists():
+            buttons_html.append(self.button_preview(obj))
+        return mark_safe(" ".join(str(btn) for btn in buttons_html))
+    buttons_show_and_preview.short_description = _("Show and Preview")
+
     def event_display(self, obj):
         event_related_html = format_html(
             '{} {}',
@@ -99,6 +156,10 @@ class MissiveAdmin(AdminBoostModel):
             ["provider", "missive_type", "acknowledgement", "status", "priority"],
         )
         self.add_to_fieldset(
+            _("Billing"),
+            ["is_billed", "billing_amount", "estimate_amount"],
+        )
+        self.add_to_fieldset(
             _("Sender"),
             ["sender_name", "sender_email", "sender_phone", "sender_address"],
         )
@@ -108,7 +169,7 @@ class MissiveAdmin(AdminBoostModel):
         )
         self.add_to_fieldset(
             _("Content"),
-            ["subject", "body"],
+            ["subject", "body", "body_text", "buttons_show_and_preview"],
         )
         self.add_to_fieldset(
             _("Tracking"),
@@ -118,3 +179,48 @@ class MissiveAdmin(AdminBoostModel):
             _("Timestamps"),
             ["created_at", "updated_at", "sent_at", "delivered_at"],
         )
+        self.add_to_fieldset(
+            _("Billing"),
+            ["is_billed"],
+        )
+
+    def handle_prepare_missive(self, request, object_id):
+        object_id = unquote(object_id)
+        obj = self.get_object(request, object_id)
+        obj.prepare_missive()
+        messages.success(request, _("Missive prepared successfully."))
+
+    def handle_send_missive(self, request, object_id):
+        object_id = unquote(object_id)
+        obj = self.get_object(request, object_id)
+        obj.send_missive()
+        messages.success(request, _("Missive sent successfully."))
+
+    def handle_cancel_missive(self, request, object_id):
+        object_id = unquote(object_id)
+        obj = self.get_object(request, object_id)
+        obj.cancel_missive()
+        messages.success(request, _("Missive cancelled successfully."))
+
+    def handle_status_missive(self, request, object_id):
+        object_id = unquote(object_id)
+        obj = self.get_object(request, object_id)
+        obj.status_missive()
+        messages.success(request, _("Missive status updated successfully."))
+
+    def has_duplicate_missive_permission(self, request, obj=None):
+        return (obj and obj.pk)
+
+    def handle_duplicate_missive(self, request, object_id):
+        """Duplicate a missive by creating a copy."""
+        object_id = unquote(object_id)
+        obj = self.get_object(request, object_id)
+        
+        obj.pk = None
+        obj.id = None
+        obj.save()
+        
+        messages.success(request, _("Missive duplicated successfully."))
+        return redirect(reverse("admin:djpymissive_missive_change", args=[obj.pk]))
+        
+        

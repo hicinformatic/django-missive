@@ -12,9 +12,10 @@ if str(src_path) not in sys.path:
 
 SECRET_KEY = os.getenv("SECRET_KEY", "test-secret-key-for-django-missive")
 DEBUG = True
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["*", ".ngrok.io", ".ngrok-free.app"]
 
 INSTALLED_APPS = [
+    "django_boosted",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -68,7 +69,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 ROOT_URLCONF = "tests.urls"
 INSTALLED_APPS += [
-    "django_boosted",
     "virtualqueryset",
     "djgeoaddress",
     "phonenumber_field",
