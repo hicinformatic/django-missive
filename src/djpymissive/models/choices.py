@@ -2,39 +2,40 @@
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from pymissive.config import MISSIVE_TYPES, MISSIVE_ACKNOWLEDGEMENT_LEVELS
 
-class MissiveStatus(models.TextChoices):
-    """Missive status."""
+from pymissive.config import (
+    MISSIVE_ACKNOWLEDGEMENT_LEVELS,
+    MISSIVE_TYPES,
+    MISSIVE_EVENT_SUCCESS,
+    MISSIVE_EVENT_INFO,
+    MISSIVE_EVENT_FAILED,
+)
 
-    DRAFT = "DRAFT", _("Draft")
-    PREPARE = "PREPARE", _("Prepare")
-    PENDING = "PENDING", _("Pending")
-    PROCESSING = "PROCESSING", _("Processing")
-    SENT = "SENT", _("Sent")
-    DELIVERED = "DELIVERED", _("Delivered")
-    READ = "READ", _("Read")
-    FAILED = "FAILED", _("Failed")
-    CANCELLED = "CANCELLED", _("Cancelled")
-
-
-# Mapping des styles pour chaque statut
-_MISSIVE_STATUS_STYLE_MAP = {
-    "DRAFT": "secondary",
-    "PREPARE": "info",
-    "PENDING": "info",
-    "PROCESSING": "info",
-    "SENT": "success",
-    "DELIVERED": "success",
-    "READ": "success",
-    "FAILED": "danger",
-    "CANCELLED": "warning",
+_MISSIVE_EVENT_STYLE_MAP = {
+    **{k: "success" for k in MISSIVE_EVENT_SUCCESS.keys()},
+    **{k: "info" for k in MISSIVE_EVENT_INFO.keys()},
+    **{k: "danger" for k in MISSIVE_EVENT_FAILED.keys()},
 }
 
 
-def get_status_style(status: str) -> str:
-    """Retourne le style associé à un statut."""
-    return _MISSIVE_STATUS_STYLE_MAP.get(status, "info")
+class MissiveStatus(models.TextChoices):
+    """High-level missive workflow status."""
+
+    DRAFT = "draft", _("Draft")
+    PROCESSING = "processing", _("Processing")
+    SUCCESS = "success", _("Success")
+    FAILED = "failed", _("Failed")
+    ERROR = "error", _("Error")
+
+
+MissiveEventType = models.TextChoices(
+    "MissiveEventType",
+    {
+        **{k.upper(): (f"{k}", _(v)) for k, v in MISSIVE_EVENT_SUCCESS.items()},
+        **{k.upper(): (f"{k}", _(v)) for k, v in MISSIVE_EVENT_INFO.items()},
+        **{k.upper(): (f"{k}", _(v)) for k, v in MISSIVE_EVENT_FAILED.items()},
+    },
+)
 
 
 class MissivePriority(models.TextChoices):
@@ -46,8 +47,13 @@ class MissivePriority(models.TextChoices):
     URGENT = "URGENT", _("Urgent")
 
 
-# Mapping des styles pour chaque priorité
-_MISSIVE_PRIORITY_STYLE_MAP = {
+MISSIVE_STYLE_MAP = {
+    **_MISSIVE_EVENT_STYLE_MAP,
+    "draft": "secondary",
+    "processing": "info",
+    "success": "success",
+    "failed": "warning",
+    "error": "danger",
     "LOW": "info",
     "NORMAL": "secondary",
     "HIGH": "warning",
@@ -55,10 +61,22 @@ _MISSIVE_PRIORITY_STYLE_MAP = {
 }
 
 
-def get_priority_style(priority: str) -> str:
-    """Retourne le style associé à une priorité."""
-    return _MISSIVE_PRIORITY_STYLE_MAP.get(priority, "info")
+def get_missive_style(name: str) -> str:
+    """Return the style associated with a name."""
+    return MISSIVE_STYLE_MAP.get(name, "info")
 
+
+def event_to_missive_status(event: str | None) -> str:
+    """Map MissiveEventType to MissiveStatus."""
+    if not event:
+        return MissiveStatus.DRAFT
+    if event in MISSIVE_EVENT_SUCCESS:
+        return MissiveStatus.SUCCESS
+    if event in MISSIVE_EVENT_FAILED:
+        return MissiveStatus.FAILED
+    if event == "draft":
+        return MissiveStatus.DRAFT
+    return MissiveStatus.PROCESSING
 
 choices_missive_modes = {
     type_key: (type_key, _(type_description))

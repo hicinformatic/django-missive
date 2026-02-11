@@ -7,15 +7,14 @@ from ..models.webhook import MissiveWebhook
 from ..models.provider import MissiveProviderModel
 
 
+
 class WebhookForm(forms.ModelForm):
     """Form for creating/editing webhooks."""
+    url = forms.URLField(label=_("URL"), help_text="https://[BASE_DOMAIN]/webhook/provider/")
 
     class Meta:
         model = MissiveWebhook
         fields = ["provider", "type", "url"]
-        widgets = {
-            "url": forms.URLInput(attrs={"placeholder": "https://example.com/webhook"}),
-        }
 
     def save(self, commit=True):
         provider = self.cleaned_data.get("provider")

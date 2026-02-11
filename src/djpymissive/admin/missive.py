@@ -11,10 +11,10 @@ from phonenumber_field.modelfields import PhoneNumberField
 from phonenumber_field.formfields import SplitPhoneNumberField
 
 from ..models.missive import Missive
-from ..models.choices import get_priority_style, get_status_style
 from .attachment import MissiveAttachmentInline
 from .event import MissiveEventInline
 from .related_object import MissiveRelatedObjectInline
+from ..models.choices import get_missive_style
 from urllib.parse import unquote
 from django.contrib import messages
 from django.shortcuts import redirect
@@ -27,8 +27,7 @@ class MissiveAdmin(AdminBoostModel):
     list_display = [
         "recipient_display",
         "sender_display",
-        "subject",
-        "provider",
+        "provider_display",
         "status_display",
         "event_display",
     ]
@@ -104,17 +103,24 @@ class MissiveAdmin(AdminBoostModel):
     def sender_display(self, obj):
         return self.format_with_help_text(obj.sender_name, obj.sender)
     sender_display.short_description = _("Sender")
+
+    def provider_display(self, obj):
+        return self.format_with_help_text(f"{obj.provider} ({obj.get_missive_type_display()})", obj.provider._provider.display_name)
+    provider_display.short_description = _("Provider")
     
     def status_display(self, obj):
-        priority_style = get_priority_style(obj.priority)
-        status_style = get_status_style(obj.status)
-        status_html = format_html(
-            '{} {}',
-            self.format_label(obj.get_priority_display(), size="small", label_type=priority_style),
-            self.format_label(obj.get_status_display(), size="small", label_type=status_style)
-        )
-        return self.format_with_help_text(status_html, obj.get_missive_type_display())
-    status_display.short_description = _("Status")
+        priority_style = get_missive_style(obj.priority)
+        priority_html = self.format_label(obj.get_priority_display(), size="small", label_type=priority_style)
+        status_style = get_missive_style(obj.status)
+        status_html = self.format_label(obj.get_status_display(), size="small", label_type=status_style)
+        if obj.last_event:
+            event_style = get_missive_style(obj.last_event)
+            event_html = self.format_label(obj.last_event_display, size="small", label_type=event_style)
+            html = format_html('{} {} {}', priority_html, status_html, event_html)
+        else:
+            html = format_html('{} {}', priority_html, status_html)
+        return self.format_with_help_text(html, obj.subject)
+    status_display.short_description = _("Status / Subject")
 
     def button_show(self, obj):
         return format_html(

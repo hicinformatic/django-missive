@@ -13,14 +13,12 @@ class MissiveEventInline(admin.TabularInline):
     model = MissiveEvent
     extra = 0
     readonly_fields = [
-        "event_type",
-        "status",
+        "event",
         "description",
         "occurred_at",
     ]
     fields = [
-        "event_type",
-        "status",
+        "event",
         "description",
         "occurred_at",
     ]
@@ -40,26 +38,23 @@ class MissiveEventAdmin(AdminBoostModel):
 
     list_display = [
         "id",
-        "event_type",
+        "event",
         "missive",
-        "status",
         "occurred_at",
     ]
     list_filter = [
-        "event_type",
-        "status",
+        "event",
         "occurred_at",
     ]
     search_fields = [
-        "event_type",
+        "event",
         "description",
         "missive__subject",
         "missive__recipient_name",
     ]
     readonly_fields = [
         "missive",
-        "event_type",
-        "status",
+        "event",
         "description",
         "metadata",
         "trace",
@@ -73,8 +68,7 @@ class MissiveEventAdmin(AdminBoostModel):
             {
                 "fields": (
                     "missive",
-                    "event_type",
-                    "status",
+                    "event",
                 )
             },
         ),

@@ -16,12 +16,19 @@ def missive_preview(request, pk):
     missive = get_object_or_404(Missive, pk=pk)
     
     template_map = {
-        "EMAIL": "djpymissive/email_preview.html",
-        "SMS": "djpymissive/sms_preview.html",
-        "POSTAL": "djpymissive/postal_preview.html",
+        "email": "djpymissive/email_preview.html",
+        "email_marketing": "djpymissive/email_preview.html",
+        "sms": "djpymissive/sms_preview.html",
+        "rcs": "djpymissive/sms_preview.html",
+        "postal": "djpymissive/postal_preview.html",
+        "postal_registered": "djpymissive/postal_preview.html",
+        "postal_signature": "djpymissive/postal_preview.html",
+        "lre": "djpymissive/postal_preview.html",
+        "lre_qualified": "djpymissive/postal_preview.html",
+        "ere": "djpymissive/email_preview.html",
     }
-    
-    template_name = template_map.get(missive.missive_type, "djpymissive/base_preview.html")
+    missive_type_key = (missive.missive_type or "").lower()
+    template_name = template_map.get(missive_type_key, "djpymissive/base_preview.html")
     
     context = {
         "missive": missive,
@@ -106,16 +113,22 @@ def missive_preview_form(request):
                             pass
     
     template_map = {
-        "EMAIL": "djpymissive/email_preview.html",
-        "SMS": "djpymissive/sms_preview.html",
-        "POSTAL": "djpymissive/postal_preview.html",
+        "email": "djpymissive/email_preview.html",
+        "email_marketing": "djpymissive/email_preview.html",
+        "sms": "djpymissive/sms_preview.html",
+        "rcs": "djpymissive/sms_preview.html",
+        "postal": "djpymissive/postal_preview.html",
+        "postal_registered": "djpymissive/postal_preview.html",
+        "postal_signature": "djpymissive/postal_preview.html",
+        "lre": "djpymissive/postal_preview.html",
+        "lre_qualified": "djpymissive/postal_preview.html",
+        "ere": "djpymissive/email_preview.html",
     }
-    
-    missive_type = getattr(missive, 'missive_type', None) or request.POST.get('missive_type')
+    missive_type = getattr(missive, "missive_type", None) or request.POST.get("missive_type")
     if missive_type:
         missive.missive_type = missive_type
-    
-    template_name = template_map.get(missive_type, "djpymissive/base_preview.html")
+    missive_type_key = (missive_type or "").lower()
+    template_name = template_map.get(missive_type_key, "djpymissive/base_preview.html")
     
     context = {
         "missive": missive,

@@ -3,7 +3,7 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from .choices import MissiveStatus
+from .choices import MissiveEventType
 
 
 class MissiveEvent(models.Model):
@@ -17,19 +17,13 @@ class MissiveEvent(models.Model):
         help_text=_("Missive associated with this event"),
     )
 
-    event_type = models.CharField(
-        max_length=100,
-        verbose_name=_("Event Type"),
-        help_text=_("Type of event (sent, delivered, read, failed, etc.)"),
-    )
-
-    status = models.CharField(
+    event = models.CharField(
         max_length=50,
-        choices=MissiveStatus.choices,
+        choices=MissiveEventType.choices,
         null=True,
         blank=True,
-        verbose_name=_("Status"),
-        help_text=_("Status associated with this event"),
+        verbose_name=_("Event"),
+        help_text=_("Event type (sent, delivered, read, failed, etc.)"),
     )
 
     description = models.TextField(
@@ -64,4 +58,4 @@ class MissiveEvent(models.Model):
         ordering = ["-occurred_at"]
 
     def __str__(self):
-        return f"{self.missive} - {self.event_type} ({self.occurred_at})"
+        return f"{self.missive} - {self.event} ({self.occurred_at})"

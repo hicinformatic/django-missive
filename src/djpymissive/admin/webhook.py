@@ -47,13 +47,13 @@ class MissiveWebhookAdmin(AdminBoostModel):
     ]
     list_filter = [ProviderListFilter, "type"]
     search_fields = ["url", "description",]
-    readonly_fields = ["created_at", "updated_at"]
+    readonly_fields = ["id", "webhook_id", "provider", "type", "created_at", "updated_at"]
 
     def has_add_permission(self, request):
         return False
 
     def has_change_permission(self, request, obj=None):
-        return False
+        return True
 
     def get_object(self, request, object_id, from_field=None):
         provider, webhook_id = unquote(object_id).split("-")
@@ -64,6 +64,13 @@ class MissiveWebhookAdmin(AdminBoostModel):
         if provider := request.GET.get("provider"):
             return self.model.objects.get_queryset(provider)
         return self.model.objects.none()
+
+    def save_model(self, request, obj, form, change):
+        service = f"update_webhook_{obj.type}".lower()
+        provider = obj.get_provider()
+        if hasattr(provider._provider, service):
+            getattr(provider._provider, service)(webhook_id=obj.webhook_id, webhook_url=obj.url)
+        return True
 
     @admin_boost_view("adminform", "Add Webhook", requires_object=False)
     def add_webhook_view(self, request, form=None):

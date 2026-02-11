@@ -10,7 +10,14 @@ from djgeoaddress.fields import GeoaddressField
 
 from djproviderkit import ProviderField
 
-from .choices import AcknowledgementLevel, MissivePriority, MissiveStatus, MissiveType
+from .choices import (
+    AcknowledgementLevel,
+    MissiveEventType,
+    MissivePriority,
+    MissiveStatus,
+    event_to_missive_status,
+    MissiveType,
+)
 from ..managers import MissiveManager
 
 class Missive(models.Model):
@@ -43,7 +50,7 @@ class Missive(models.Model):
     )
 
     status = models.CharField(
-        max_length=50,
+        max_length=20,
         choices=MissiveStatus.choices,
         default=MissiveStatus.DRAFT,
         verbose_name=_("Status"),
@@ -193,6 +200,10 @@ class Missive(models.Model):
         recipient = self.recipient_name or self.recipient_email or 'Unknown'
         return f"{self.missive_type} - {recipient} ({self.status})"
 
+    @property
+    def last_event_display(self):
+        return dict(MissiveEventType.choices).get(self.last_event, self.last_event)
+
     def clean(self):
         super().clean()
         
@@ -304,45 +315,54 @@ class Missive(models.Model):
             and not field.name.startswith("_")
         }
 
-
     def call_provider_service(self, service: str, status: str | None = None, **kwargs):
         """Call a provider service."""
         serialized = self.get_serialized_data()
         service_name = f"{service}_{self.missive_type}".lower()
+        is_error = False
         try:
             description = f"Service {service_name} called"
             response = self.provider._provider.call_service(service_name, **serialized)
         except Exception as e:
-            status = MissiveStatus.FAILED
+            status = MissiveEventType.FAILED
             description = str(e)
             response = {"error": str(e)}
+            is_error = True
         event = self.to_missiveevent.create(
             missive=self,
-            event_type=service_name,
-            status=status,
+            event=status,
             trace=response,
             description=description,
+            metadata={"service": service_name},
         )
-        if event.status:
-            self.status = event.status
+        self.status = (
+            MissiveStatus.ERROR if is_error else event_to_missive_status(event.event)
+        )
+        self.save(update_fields=["status"])
         return response
 
     def prepare_missive(self):
         """Prepare the missive for sending."""
-        self.call_provider_service("prepare", status=MissiveStatus.PREPARE)
+        self.status = MissiveStatus.PROCESSING
+        self.save()
+        self.call_provider_service("prepare", status=MissiveEventType.PREPARE)
 
     def send_missive(self):
         """Send the missive."""
-        response = self.call_provider_service("send", status=MissiveStatus.SENT)
+        self.status = MissiveStatus.PROCESSING
+        self.save()
+        response = self.call_provider_service("send", status=MissiveEventType.SENT)
         print("response", response)
         self.external_id = self.provider._provider.get_external_id_email(response)
         print("external_id", self.external_id)
-        self.status = MissiveStatus.SENT if self.external_id else MissiveStatus.FAILED
+        self.status = (
+            MissiveStatus.SUCCESS if self.external_id else MissiveStatus.FAILED
+        )
         self.save()
 
     def cancel_missive(self):
         """Cancel the missive."""
-        self.call_provider_service("cancel", status=MissiveStatus.CANCELLED)
+        self.call_provider_service("cancel", status=MissiveEventType.CANCELLED)
 
     def status_missive(self):
         """Get the status of the missive."""

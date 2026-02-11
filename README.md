@@ -128,7 +128,7 @@ DEFAULT_FROM_EMAIL = 'noreply@example.com'
 ### Envoyer un email
 
 ```python
-from djpymissive.models import Missive, MissiveType, MissiveStatus
+from djpymissive.models import Missive, MissiveType, MissiveEventType
 
 # Créer une missive email
 missive = Missive.objects.create(
@@ -138,7 +138,7 @@ missive = Missive.objects.create(
     subject="Commande confirmée",
     body="<p>Votre commande #123 est confirmée</p>",
     body_text="Votre commande #123 est confirmée",
-    status=MissiveStatus.PENDING,
+    status=MissiveEventType.PENDING,
 )
 
 # L'envoi peut être géré via des tâches asynchrones ou manuellement
@@ -147,7 +147,7 @@ missive = Missive.objects.create(
 ### Utiliser le modèle pour créer des missives
 
 ```python
-from djpymissive.models import Missive, MissiveType, MissiveStatus
+from djpymissive.models import Missive, MissiveType, MissiveEventType
 
 # Créer un destinataire avec toutes ses coordonnées
 missive = Missive.objects.create(
@@ -163,7 +163,7 @@ missive = Missive.objects.create(
     recipient_country="FR",
     subject="Bienvenue",
     body="<p>Bonjour Jean, bienvenue!</p>",
-    status=MissiveStatus.PENDING,
+    status=MissiveEventType.PENDING,
 )
 
 # Créer un SMS avec les mêmes coordonnées
@@ -172,7 +172,7 @@ sms = Missive.objects.create(
     missive_type=MissiveType.SMS,
     recipient_phone="+33600000000",
     body="Votre code de vérification: 123456",
-    status=MissiveStatus.PENDING,
+    status=MissiveEventType.PENDING,
 )
 ```
 
@@ -202,15 +202,15 @@ result = provider.send_email(
 ### Valider et envoyer
 
 ```python
-from djpymissive.models import Missive, MissiveStatus
+from djpymissive.models import Missive, MissiveEventType
 
 # Récupérer une missive
 missive = Missive.objects.get(id=123)
 
 # Vérifier qu'elle est prête à être envoyée
-if missive.status == MissiveStatus.PENDING:
+if missive.status == MissiveEventType.PENDING:
     # Marquer comme envoyée (l'envoi réel se fait via le provider configuré)
-    missive.status = MissiveStatus.SENT
+    missive.status = MissiveEventType.SENT
     missive.save()
 ```
 
