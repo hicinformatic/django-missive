@@ -21,4 +21,4 @@ django-extensions>=3.2
 djangorestframework>=3.14
 django-phonenumber-field[phonenumbers]>=7.0
 babel>=2.0
-pyngrok>=5.0
+pyngrok>=7.5.0

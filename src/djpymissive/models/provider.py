@@ -2,19 +2,13 @@
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-
 from virtualqueryset.models import VirtualModel
 from djproviderkit.models.service import define_provider_fields, define_service_fields
-
 from ..managers.provider import ProviderManager
+from pymissive.providers.base import MissiveProviderBase
 
-# Get services from MissiveProviderBase, handling import errors gracefully
-try:
-    from pymissive.providers.base import MissiveProviderBase
-    services = list(MissiveProviderBase.services_cfg.keys())
-except (ImportError, AttributeError):
-    # Fallback: use empty list if import fails
-    services = []
+
+services = list(MissiveProviderBase.services_cfg.keys())
 
 
 @define_provider_fields(primary_key='name')

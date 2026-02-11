@@ -5,6 +5,7 @@ from .event import MissiveEventAdmin
 from .missive import MissiveAdmin
 from .provider import ProviderAdmin
 from .related_object import MissiveRelatedObjectAdmin
+from .webhook import MissiveWebhookAdmin
 
 __all__ = [
     "ProviderAdmin",
@@ -12,4 +13,5 @@ __all__ = [
     "MissiveAttachmentAdmin",
     "MissiveEventAdmin",
     "MissiveRelatedObjectAdmin",
+    "MissiveWebhookAdmin",
 ]

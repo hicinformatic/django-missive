@@ -61,7 +61,7 @@ def get_priority_style(priority: str) -> str:
 
 
 choices_missive_modes = {
-    type_key.upper(): (type_key.upper(), _(type_description))
+    type_key: (type_key, _(type_description))
     for type_key, type_description in MISSIVE_TYPES.items()
 }
 

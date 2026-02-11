@@ -6,6 +6,9 @@ from djproviderkit.admin.provider import BaseProviderAdmin
 
 from ..models.provider import MissiveProviderModel
 from django_boosted.decorators import admin_boost_view
+from django.utils.html import format_html
+from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 
 
 @admin.register(MissiveProviderModel)
@@ -20,7 +23,3 @@ class ProviderAdmin(BaseProviderAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
-
-    @admin_boost_view("message", "Custom Message View")
-    def custom_message_status_object_view(self, request, obj):
-        return {"message": "This is a custom message view"}
