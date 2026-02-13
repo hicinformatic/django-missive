@@ -4,7 +4,8 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from .choices import MissiveEventType
-
+from ..managers.event import MissiveEventManager
+from django.utils import timezone
 
 class MissiveEvent(models.Model):
     """Event tracking for missives (status changes, webhooks, etc.)."""
@@ -15,6 +16,18 @@ class MissiveEvent(models.Model):
         related_name="to_missiveevent",
         verbose_name=_("Missive"),
         help_text=_("Missive associated with this event"),
+        editable=False,
+    )
+
+    recipient = models.ForeignKey(
+        "djpymissive.MissiveRecipient",
+        on_delete=models.CASCADE,
+        related_name="to_recipientevent",
+        verbose_name=_("Recipient"),
+        help_text=_("Recipient associated with this event"),
+        blank=True,
+        null=True,
+        editable=False,
     )
 
     event = models.CharField(
@@ -47,15 +60,21 @@ class MissiveEvent(models.Model):
     )
 
     occurred_at = models.DateTimeField(
-        auto_now_add=True,
         verbose_name=_("Occurred At"),
         help_text=_("When this event occurred"),
     )
+
+    objects = MissiveEventManager()
 
     class Meta:
         verbose_name = _("Event")
         verbose_name_plural = _("Events")
         ordering = ["-occurred_at"]
+
+    def save(self, *args, **kwargs):
+        if not self.occurred_at:
+            self.occurred_at = timezone.now()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.missive} - {self.event} ({self.occurred_at})"

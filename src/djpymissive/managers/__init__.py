@@ -2,5 +2,24 @@
 
 from .provider import ProviderManager
 from .missive import MissiveManager
+from .campaign import MissiveCampaignManager
+from .event import MissiveEventManager
+from .document import (
+    MissiveDocumentManager,
+    MissiveAttachmentManager,
+    MissiveVirtualAttachmentManager,
+)
+from .related_object import MissiveRelatedObjectManager
+from .recipient import MissiveRecipientManager
 
-__all__ = ["ProviderManager", "MissiveManager"]
+__all__ = [
+    "ProviderManager",
+    "MissiveManager",
+    "MissiveCampaignManager",
+    "MissiveEventManager",
+    "MissiveDocumentManager",
+    "MissiveAttachmentManager",
+    "MissiveVirtualAttachmentManager",
+    "MissiveRelatedObjectManager",
+    "MissiveRecipientManager",
+]

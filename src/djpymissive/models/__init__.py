@@ -1,6 +1,7 @@
 """Models for djpymissive."""
 
-from .attachment import MissiveAttachment
+from .document import MissiveDocument, MissiveAttachment, MissiveVirtualAttachment
+from .campaign import MissiveCampaign, MissiveScheduledCampaign
 from .choices import AcknowledgementLevel, MissiveEventType, MissivePriority, MissiveStatus, MissiveType
 from .event import MissiveEvent
 from .missive import Missive
@@ -9,9 +10,13 @@ from .related_object import MissiveRelatedObject
 from .webhook import MissiveWebhook
 
 __all__ = [
+    "MissiveCampaign",
+    "MissiveScheduledCampaign",
     "MissiveProviderModel",
     "Missive",
+    "MissiveDocument",
     "MissiveAttachment",
+    "MissiveVirtualAttachment",
     "MissiveEvent",
     "MissiveRelatedObject",
     "MissiveWebhook",

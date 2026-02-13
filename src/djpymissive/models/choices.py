@@ -9,7 +9,21 @@ from pymissive.config import (
     MISSIVE_EVENT_SUCCESS,
     MISSIVE_EVENT_INFO,
     MISSIVE_EVENT_FAILED,
+    MISSIVE_GENERIC_SUPPORT,
 )
+
+
+MissiveSupport = models.TextChoices(
+    "MissiveSupport",
+    {
+        **{k.upper(): (k.lower(), _(k)) for k in MISSIVE_GENERIC_SUPPORT.keys()},
+    }
+)
+
+
+def get_missive_support_from_type(type: str) -> str:
+    """Get the missive support from the type."""
+    return next(key for key, values in MISSIVE_GENERIC_SUPPORT.items() if type in values)
 
 _MISSIVE_EVENT_STYLE_MAP = {
     **{k: "success" for k in MISSIVE_EVENT_SUCCESS.keys()},
@@ -97,3 +111,20 @@ AcknowledgementLevel = models.TextChoices(
     "AcknowledgementLevel",
     choices_acknowledgement_levels
 )
+
+class MissiveRecipientType(models.TextChoices):
+    """Recipient types."""
+    RECIPIENT = "recipient", _("Recipient")
+    SENDER = "sender", _("Sender")
+    REPLY_TO = "reply_to", _("Reply To")
+    CC = "cc", _("CC")
+    BCC = "bcc", _("BCC")
+
+class MissiveDocumentType(models.TextChoices):
+    """Document types."""
+    VIRTUAL_ATTACHMENT = "virtual_attachment", _("Virtual Attachment")
+    ATTACHMENT = "attachment", _("Attachment")
+    SIGNATURE = "signature", _("Signature")
+    RECEIPT = "receipt", _("Receipt")
+    PROOF = "proof", _("Proof")
+    OTHER = "other", _("Other")

@@ -8,6 +8,7 @@ from django_boosted import AdminBoostModel
 from urllib.parse import unquote
 from djpymissive.forms.webhook import WebhookForm
 from django_boosted.decorators import admin_boost_view
+from django.utils.safestring import mark_safe
 
 
 class ProviderListFilter(admin.SimpleListFilter):
@@ -47,7 +48,7 @@ class MissiveWebhookAdmin(AdminBoostModel):
     ]
     list_filter = [ProviderListFilter, "type"]
     search_fields = ["url", "description",]
-    readonly_fields = ["id", "webhook_id", "provider", "type", "created_at", "updated_at"]
+    readonly_fields = ["id", "webhook_id", "provider", "created_at", "updated_at"]
 
     def has_add_permission(self, request):
         return False
@@ -55,9 +56,15 @@ class MissiveWebhookAdmin(AdminBoostModel):
     def has_change_permission(self, request, obj=None):
         return True
 
+    def change_fieldsets(self):
+        self.add_to_fieldset(None, ["type", "url",])
+        self.add_to_fieldset(_("Backend"), ["provider", "webhook_id",])
+        self.add_to_fieldset(_("Timestamps"), ["created_at", "updated_at"])
+
     def get_object(self, request, object_id, from_field=None):
-        provider, webhook_id = unquote(object_id).split("-")
+        provider, webhook_id = unquote(object_id).split("-", 1)
         qs = self.model.objects.get_queryset(provider)
+        print("webhook_id", webhook_id)
         return next((item for item in qs if str(item.id) == str(webhook_id)), None)
 
     def get_queryset(self, request):
@@ -66,10 +73,15 @@ class MissiveWebhookAdmin(AdminBoostModel):
         return self.model.objects.none()
 
     def save_model(self, request, obj, form, change):
+        from django.contrib import messages
         service = f"update_webhook_{obj.type}".lower()
         provider = obj.get_provider()
         if hasattr(provider._provider, service):
-            getattr(provider._provider, service)(webhook_id=obj.webhook_id, webhook_url=obj.url)
+            try:
+                getattr(provider._provider, service)(webhook_id=obj.webhook_id, webhook_url=obj.url)
+                messages.success(request, _("Webhook updated successfully."))
+            except Exception as e:
+                messages.error(request, _("Webhook update failed: %s") % e)
         return True
 
     @admin_boost_view("adminform", "Add Webhook", requires_object=False)

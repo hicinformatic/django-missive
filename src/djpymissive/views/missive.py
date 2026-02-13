@@ -1,46 +1,105 @@
 """Views for Missive model."""
 
 from django.contrib.admin.views.decorators import staff_member_required
-from django.shortcuts import get_object_or_404
 from django.template.response import TemplateResponse
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_http_methods
+from django.views.generic import DetailView
 from django.forms import modelform_factory
 
 from ..models.missive import Missive
+from ..models.choices import MissiveRecipientType
+
+TEMPLATE_MAP = {
+    "email": "djpymissive/email_preview.html",
+    "email_marketing": "djpymissive/email_preview.html",
+    "sms": "djpymissive/sms_preview.html",
+    "rcs": "djpymissive/sms_preview.html",
+    "postal": "djpymissive/postal_preview.html",
+    "postal_registered": "djpymissive/postal_preview.html",
+    "postal_signature": "djpymissive/postal_preview.html",
+    "lre": "djpymissive/postal_preview.html",
+    "lre_qualified": "djpymissive/postal_preview.html",
+    "ere": "djpymissive/email_preview.html",
+}
 
 
-@staff_member_required
-def missive_preview(request, pk):
+def _format_recipient_email(r):
+    """Get email/contact string for a recipient."""
+    return r.email or (str(r.phone) if r.phone else str(r.address) if r.address else "")
+
+
+def _email_preview_context(missive):
+    """Build context for email preview with multiple recipients."""
+    sender_name = ""
+    sender_email = ""
+    reply_to_name = ""
+    reply_to_email = ""
+    to_recipients = []
+    cc_recipients = []
+    bcc_recipients = []
+
+    if hasattr(missive, "to_missiverecipient") and missive.to_missiverecipient.exists():
+        for r in missive.to_missiverecipient.all():
+            email = _format_recipient_email(r)
+            item = {"name": r.name or "", "email": email}
+            if r.recipient_type == MissiveRecipientType.SENDER:
+                sender_name = r.name or ""
+                sender_email = email
+            elif r.recipient_type == MissiveRecipientType.REPLY_TO:
+                reply_to_name = r.name or ""
+                reply_to_email = email
+            elif r.recipient_type == MissiveRecipientType.RECIPIENT:
+                to_recipients.append(item)
+            elif r.recipient_type == MissiveRecipientType.CC:
+                cc_recipients.append(item)
+            elif r.recipient_type == MissiveRecipientType.BCC:
+                bcc_recipients.append(item)
+    else:
+        sender = getattr(missive, "sender", None)
+        if hasattr(sender, "name"):
+            sender_name = sender.name or ""
+            sender_email = _format_recipient_email(sender)
+        recipient = getattr(missive, "first_recipient", None)
+        if hasattr(recipient, "name"):
+            to_recipients = [{
+                "name": recipient.name or "",
+                "email": _format_recipient_email(recipient),
+            }]
+        reply_to = getattr(missive, "reply_to", None)
+        if hasattr(reply_to, "name"):
+            reply_to_name = reply_to.name or ""
+            reply_to_email = _format_recipient_email(reply_to)
+
+    return {
+        "sender_name": sender_name,
+        "sender_email": sender_email,
+        "reply_to_name": reply_to_name,
+        "reply_to_email": reply_to_email,
+        "to_recipients": to_recipients,
+        "cc_recipients": cc_recipients,
+        "bcc_recipients": bcc_recipients,
+    }
+
+
+class MissivePreviewView(DetailView):
     """Preview a missive (email, SMS, postal, etc.) - Show existing object."""
-    missive = get_object_or_404(Missive, pk=pk)
-    
-    template_map = {
-        "email": "djpymissive/email_preview.html",
-        "email_marketing": "djpymissive/email_preview.html",
-        "sms": "djpymissive/sms_preview.html",
-        "rcs": "djpymissive/sms_preview.html",
-        "postal": "djpymissive/postal_preview.html",
-        "postal_registered": "djpymissive/postal_preview.html",
-        "postal_signature": "djpymissive/postal_preview.html",
-        "lre": "djpymissive/postal_preview.html",
-        "lre_qualified": "djpymissive/postal_preview.html",
-        "ere": "djpymissive/email_preview.html",
-    }
-    missive_type_key = (missive.missive_type or "").lower()
-    template_name = template_map.get(missive_type_key, "djpymissive/base_preview.html")
-    
-    context = {
-        "missive": missive,
-        "title": _("Preview: {}").format(missive),
-    }
-    
-    return TemplateResponse(
-        request,
-        template_name,
-        context,
-    )
 
+    model = Missive
+    context_object_name = "missive"
+
+    def get_template_names(self):
+        missive_type_key = (self.object.missive_type or "").lower()
+        template = TEMPLATE_MAP.get(missive_type_key, "djpymissive/base_preview.html")
+        return [template]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["title"] = _("Preview: {}").format(self.object)
+        template_name = self.get_template_names()[0]
+        if "email_preview" in template_name or "email" in template_name:
+            context.update(_email_preview_context(self.object))
+        return context
 
 @staff_member_required
 @require_http_methods(["POST"])
@@ -112,29 +171,19 @@ def missive_preview_form(request):
                         except (ValueError, TypeError):
                             pass
     
-    template_map = {
-        "email": "djpymissive/email_preview.html",
-        "email_marketing": "djpymissive/email_preview.html",
-        "sms": "djpymissive/sms_preview.html",
-        "rcs": "djpymissive/sms_preview.html",
-        "postal": "djpymissive/postal_preview.html",
-        "postal_registered": "djpymissive/postal_preview.html",
-        "postal_signature": "djpymissive/postal_preview.html",
-        "lre": "djpymissive/postal_preview.html",
-        "lre_qualified": "djpymissive/postal_preview.html",
-        "ere": "djpymissive/email_preview.html",
-    }
     missive_type = getattr(missive, "missive_type", None) or request.POST.get("missive_type")
     if missive_type:
         missive.missive_type = missive_type
     missive_type_key = (missive_type or "").lower()
-    template_name = template_map.get(missive_type_key, "djpymissive/base_preview.html")
+    template_name = TEMPLATE_MAP.get(missive_type_key, "djpymissive/base_preview.html")
     
     context = {
         "missive": missive,
         "title": _("Preview: {}").format(missive_type or "Missive"),
     }
-    
+    if "email_preview" in template_name or "email" in template_name:
+        context.update(_email_preview_context(missive))
+
     return TemplateResponse(
         request,
         template_name,

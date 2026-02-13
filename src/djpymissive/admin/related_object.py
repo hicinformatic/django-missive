@@ -39,8 +39,10 @@ class MissiveRelatedObjectAdmin(AdminBoostModel):
     ]
     search_fields = [
         "missive__subject",
-        "missive__recipient_name",
-        "missive__recipient_email",
+        "missive__recipients__name",
+        "missive__recipients__email",
+        "missive__recipients__phone",
+        "missive__recipients__address",
     ]
     readonly_fields = [
         "object_str",

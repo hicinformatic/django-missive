@@ -5,6 +5,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from ..managers.related_object import MissiveRelatedObjectManager
+
 
 class MissiveRelatedObject(models.Model):
     """Model to link a missive to any other Django model."""
@@ -39,6 +41,8 @@ class MissiveRelatedObject(models.Model):
         auto_now_add=True,
         verbose_name=_("Created At"),
     )
+
+    objects = MissiveRelatedObjectManager()
 
     class Meta:
         verbose_name = _("Related Object")

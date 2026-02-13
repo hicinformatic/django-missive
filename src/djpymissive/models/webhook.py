@@ -58,7 +58,6 @@ class MissiveWebhook(models.Model):
         if hasattr(provider._provider, service):
             provider._provider.call_service(service, webhook_id=self.webhook_id)
 
-
 for field, cfg in MISSIVE_WEBHOOK_FIELDS.items():
     if field != 'webhook_id':
         field_cfg = {
