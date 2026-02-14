@@ -1,6 +1,6 @@
 import django_rq
 from .base import BaseCampaignBackend
-from ..campaign import run_campaign
+from .campaign import run_campaign
 
 
 class RQBackend(BaseCampaignBackend):

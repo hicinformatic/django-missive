@@ -7,6 +7,7 @@ from .choices import MissiveEventType
 from ..managers.event import MissiveEventManager
 from django.utils import timezone
 
+
 class MissiveEvent(models.Model):
     """Event tracking for missives (status changes, webhooks, etc.)."""
 

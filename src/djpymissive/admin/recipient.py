@@ -1,13 +1,11 @@
 """Admin for MissiveRecipient model."""
 
 from django.contrib import admin
-from django.utils.translation import gettext_lazy as _
 from django_boosted import AdminBoostModel
 
 from ..models.recipient import MissiveRecipient
 from ..models.choices import get_missive_style
 from django.utils.html import format_html
-
 
 
 class MissiveRecipientInline(admin.TabularInline):
@@ -22,8 +20,8 @@ class MissiveRecipientInline(admin.TabularInline):
         "email",
         "phone",
         "address",
+        "notification_id",
     ]
-
 
 @admin.register(MissiveRecipient)
 class MissiveRecipientAdmin(AdminBoostModel):
@@ -57,16 +55,26 @@ class MissiveRecipientAdmin(AdminBoostModel):
     def recipient_type_display(self, obj):
         """Display the recipient type."""
         recipient_type_style = get_missive_style(obj.recipient_type)
-        recipient_type = self.format_label(obj.get_recipient_type_display(), size="small", label_type=recipient_type_style)
+        recipient_type = self.format_label(
+            obj.get_recipient_type_display(),
+            size="small",
+            label_type=recipient_type_style,
+        )
         status_style = get_missive_style(obj.status)
-        status = self.format_label(obj.get_status_display(), size="small", label_type=status_style)
-        html = format_html('{} {}', recipient_type, status)
+        status = self.format_label(
+            obj.get_status_display(), size="small", label_type=status_style
+        )
+        html = format_html("{} {}", recipient_type, status)
         if obj.last_event:
             event_style = get_missive_style(obj.last_event)
-            event = self.format_label(obj.last_event_description, size="small", label_type=event_style)
-            html = format_html('{} {}', html, event)
+            event = self.format_label(
+                obj.last_event_description, size="small", label_type=event_style
+            )
+            html = format_html("{} {}", html, event)
         return self.format_with_help_text(html, obj.last_event_date)
 
     def missive_display(self, obj):
         """Display the missive subject."""
-        return self.format_with_help_text(obj.missive.subject, obj.missive.get_missive_type_display())
+        return self.format_with_help_text(
+            obj.missive.subject, obj.missive.get_missive_type_display()
+        )

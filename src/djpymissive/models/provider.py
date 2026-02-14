@@ -11,7 +11,7 @@ from pymissive.providers.base import MissiveProviderBase
 services = list(MissiveProviderBase.services_cfg.keys())
 
 
-@define_provider_fields(primary_key='name')
+@define_provider_fields(primary_key="name")
 @define_service_fields(services)
 class MissiveProviderModel(VirtualModel):
     """Virtual model for missive providers."""
@@ -27,11 +27,11 @@ class MissiveProviderModel(VirtualModel):
 
     class Meta:
         managed = False
-        app_label = 'djpymissive'
+        app_label = "djpymissive"
         verbose_name = _("Provider")
         verbose_name_plural = _("Providers")
-        ordering = ['-priority', 'name']
+        ordering = ["-priority", "name"]
 
     def __str__(self) -> str:
-        display = getattr(self, 'display_name', None)
+        display = getattr(self, "display_name", None)
         return str(display or self.name)

@@ -2,7 +2,13 @@
 
 from .document import MissiveDocument, MissiveAttachment, MissiveVirtualAttachment
 from .campaign import MissiveCampaign, MissiveScheduledCampaign
-from .choices import AcknowledgementLevel, MissiveEventType, MissivePriority, MissiveStatus, MissiveType
+from .choices import (
+    AcknowledgementLevel,
+    MissiveEventType,
+    MissivePriority,
+    MissiveStatus,
+    MissiveType,
+)
 from .event import MissiveEvent
 from .missive import Missive
 from .provider import MissiveProviderModel

@@ -87,9 +87,8 @@ class MissiveEventAdmin(AdminBoostModel):
         """Configure fieldsets for change view."""
         self.add_to_fieldset(
             _("Details"),
-            [ "metadata", "occurred_at", "trace"],
+            ["metadata", "occurred_at", "trace"],
         )
-
 
     def has_add_permission(self, request):
         return False

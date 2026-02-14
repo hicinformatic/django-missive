@@ -1,6 +1,6 @@
 from threading import Thread
 from .base import BaseCampaignBackend
-from ..campaign import run_campaign
+from .campaign import run_campaign
 
 
 class ThreadBackend(BaseCampaignBackend):

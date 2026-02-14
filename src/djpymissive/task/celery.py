@@ -1,6 +1,6 @@
 from celery import shared_task
 from .base import BaseCampaignBackend
-from ..campaign import run_campaign
+from .campaign import run_campaign
 
 
 @shared_task

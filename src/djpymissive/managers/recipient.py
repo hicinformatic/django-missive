@@ -9,11 +9,14 @@ class MissiveRecipientManager(models.Manager):
 
     def last_event_subquery(self, field: str = "event"):
         from ..models.event import MissiveEvent
+
         return Subquery(
             MissiveEvent.objects.filter(
                 missive_id=OuterRef("missive_id"),
                 recipient_id=OuterRef("id"),
-            ).order_by("-occurred_at", "-id").values("event")[:1],
+            )
+            .order_by("-occurred_at", "-id")
+            .values("event")[:1],
             output_field=models.CharField(),
         )
 
@@ -22,9 +25,13 @@ class MissiveRecipientManager(models.Manager):
         qs = qs.select_related("missive")
         qs = qs.prefetch_related("to_recipientevent")
         qs = qs.annotate(
-            count_event=models.Count("to_recipientevent",),
+            count_event=models.Count(
+                "to_recipientevent",
+            ),
             last_event=self.last_event_subquery(field="event"),
             last_event_description=self.last_event_subquery(field="description"),
-            last_event_date=Coalesce(Max("to_recipientevent__occurred_at"), F("created_at")),
+            last_event_date=Coalesce(
+                Max("to_recipientevent__occurred_at"), F("created_at")
+            ),
         )
         return qs

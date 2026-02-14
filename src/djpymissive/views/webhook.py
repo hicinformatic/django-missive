@@ -1,5 +1,6 @@
 """Webhook view for receiving provider events."""
 
+import contextlib
 from datetime import timezone as dt_timezone
 
 from django.http import HttpResponse
@@ -13,7 +14,7 @@ from ..models.choices import event_to_missive_status, MissiveRecipientType
 from ..models.provider import MissiveProviderModel
 from ..models.event import MissiveEvent
 from ..models.missive import Missive
-import contextlib
+
 
 @method_decorator(csrf_exempt, name="dispatch")
 class WebhookView(DetailView):
@@ -23,12 +24,8 @@ class WebhookView(DetailView):
     slug_field = "name"
     slug_url_kwarg = "provider"
 
-    def post(self, request, *args, **kwargs):
-        """Handle webhook POST request."""
-        provider = self.get_object()
-        missive_type = kwargs.get("missive_type")
-        handler = f"handle_webhook_{missive_type.lower()}"
-        normalized = provider._provider.call_service(handler, request.body)
+    def _process_normalized_event(self, normalized):
+        """Process normalized webhook event and update missive/recipient status."""
         with contextlib.suppress(Exception):
             missive = Missive.objects.get(external_id=normalized["external_id"])
             recipient = missive.to_missiverecipient.get(
@@ -40,7 +37,8 @@ class WebhookView(DetailView):
                     MissiveRecipientType.RECIPIENT,
                     MissiveRecipientType.CC,
                     MissiveRecipientType.BCC,
-                ])
+                ],
+            )
             occurred_at = normalized.get("occurred_at")
             if isinstance(occurred_at, str):
                 occurred_at = parse_datetime(occurred_at.replace("Z", "+00:00"))
@@ -60,10 +58,21 @@ class WebhookView(DetailView):
             missive.save(update_fields=["status"])
             recipient.status = event_to_missive_status(event.event)
             recipient.save(update_fields=["status"])
+
+    def post(self, request, *args, **kwargs):
+        """Handle webhook POST request."""
+        provider = self.get_object()
+        missive_type = kwargs.get("missive_type")
+        handler = f"handle_webhook_{missive_type.lower()}"
+        normalized = provider._provider.call_service(handler, request.body)
+        if normalized is not None and normalized.get("external_id"):
+            self._process_normalized_event(normalized)
         return HttpResponse(status=200)
 
     def get(self, request, *args, **kwargs):
         """Handle webhook GET request."""
         provider = self.get_object()
-        provider._provider.handle_webhook(request.body)
+        normalized = provider._provider.handle_webhook(request.body)
+        if normalized is not None and normalized.get("external_id"):
+            self._process_normalized_event(normalized)
         return HttpResponse(status=200)

@@ -27,12 +27,12 @@ class DocumentDownloadView(DetailView):
                 name = doc.get("name", "unnamed_document")
             else:
                 content = doc
-                name = (getattr(doc_obj, "document_metadata", None) or {}).get("name", "unnamed_document")
+                name = (getattr(doc_obj, "document_metadata", None) or {}).get(
+                    "name", "unnamed_document"
+                )
             response = HttpResponse(
                 content,
                 content_type="application/octet-stream",
             )
             response["Content-Disposition"] = f'attachment; filename="{name}"'
         return response
-
-

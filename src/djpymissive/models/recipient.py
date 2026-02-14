@@ -7,8 +7,10 @@ from djgeoaddress.fields import GeoaddressField
 from .choices import MissiveRecipientType, MissiveStatus
 from ..managers.recipient import MissiveRecipientManager
 
+
 class MissiveRecipient(models.Model):
     """Recipient model"""
+
     missive = models.ForeignKey(
         "djpymissive.Missive",
         on_delete=models.CASCADE,
@@ -55,6 +57,13 @@ class MissiveRecipient(models.Model):
         verbose_name=_("Address"),
         help_text=_("Address"),
     )
+    notification_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name=_("Notification ID"),
+        help_text=_("Notification ID"),
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name=_("Created At"),
@@ -83,6 +92,7 @@ class MissiveRecipient(models.Model):
             "email": self.email,
             "phone": self.phone,
             "address": self.address,
+            "notification_id": self.notification_id,
         }
 
     @property

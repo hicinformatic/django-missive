@@ -5,10 +5,6 @@ from django.contrib import admin
 from djproviderkit.admin.provider import BaseProviderAdmin
 
 from ..models.provider import MissiveProviderModel
-from django_boosted.decorators import admin_boost_view
-from django.utils.html import format_html
-from django.urls import reverse
-from django.utils.translation import gettext_lazy as _
 
 
 @admin.register(MissiveProviderModel)

@@ -62,10 +62,12 @@ def _email_preview_context(missive):
             sender_email = _format_recipient_email(sender)
         recipient = getattr(missive, "first_recipient", None)
         if hasattr(recipient, "name"):
-            to_recipients = [{
-                "name": recipient.name or "",
-                "email": _format_recipient_email(recipient),
-            }]
+            to_recipients = [
+                {
+                    "name": recipient.name or "",
+                    "email": _format_recipient_email(recipient),
+                }
+            ]
         reply_to = getattr(missive, "reply_to", None)
         if hasattr(reply_to, "name"):
             reply_to_name = reply_to.name or ""
@@ -101,12 +103,13 @@ class MissivePreviewView(DetailView):
             context.update(_email_preview_context(self.object))
         return context
 
+
 @staff_member_required
 @require_http_methods(["POST"])
 def missive_preview_form(request):
     """Preview a missive from form data - Preview what it will look like."""
     pk = request.POST.get("id") or request.POST.get("_save")
-    
+
     if pk:
         try:
             missive = Missive.objects.get(pk=pk)
@@ -118,36 +121,43 @@ def missive_preview_form(request):
     else:
         MissiveForm = modelform_factory(Missive, fields="__all__")
         form = MissiveForm(request.POST)
-    
+
     if form.is_valid():
         missive = form.save(commit=False)
     else:
         # If form is not valid, try to get values from cleaned_data first
         # (some fields might be valid even if the whole form is not)
         missive = form.instance if form.instance.pk else Missive()
-        
+
         # Populate from cleaned_data if available
-        if hasattr(form, 'cleaned_data') and form.cleaned_data:
+        if hasattr(form, "cleaned_data") and form.cleaned_data:
             for field_name, value in form.cleaned_data.items():
                 if value is not None:
                     try:
                         setattr(missive, field_name, value)
                     except (ValueError, TypeError):
                         pass
-        
+
         # Also populate from POST data for fields that might not be in cleaned_data
         # This ensures we get all the data even if validation fails
         for field_name in form.fields:
             if field_name in request.POST:
                 value = request.POST[field_name]
                 # Only set if value is not empty and field is not already set
-                if value and (not hasattr(missive, field_name) or getattr(missive, field_name, None) is None):
+                if value and (
+                    not hasattr(missive, field_name)
+                    or getattr(missive, field_name, None) is None
+                ):
                     try:
                         # Use the form field's widget to extract the value from POST
                         # This handles special fields like PhoneNumberField correctly
                         field = form.fields[field_name]
-                        if hasattr(field, 'widget') and hasattr(field.widget, 'value_from_datadict'):
-                            widget_value = field.widget.value_from_datadict(request.POST, None, field_name)
+                        if hasattr(field, "widget") and hasattr(
+                            field.widget, "value_from_datadict"
+                        ):
+                            widget_value = field.widget.value_from_datadict(
+                                request.POST, None, field_name
+                            )
                             if widget_value:
                                 # Try to clean the value using the field
                                 try:
@@ -170,13 +180,15 @@ def missive_preview_form(request):
                             setattr(missive, field_name, value)
                         except (ValueError, TypeError):
                             pass
-    
-    missive_type = getattr(missive, "missive_type", None) or request.POST.get("missive_type")
+
+    missive_type = getattr(missive, "missive_type", None) or request.POST.get(
+        "missive_type"
+    )
     if missive_type:
         missive.missive_type = missive_type
     missive_type_key = (missive_type or "").lower()
     template_name = TEMPLATE_MAP.get(missive_type_key, "djpymissive/base_preview.html")
-    
+
     context = {
         "missive": missive,
         "title": _("Preview: {}").format(missive_type or "Missive"),

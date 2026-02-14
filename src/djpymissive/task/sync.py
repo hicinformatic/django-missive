@@ -1,5 +1,5 @@
 from .base import BaseCampaignBackend
-from ..campaign import run_campaign
+from .campaign import run_campaign
 
 
 class SyncBackend(BaseCampaignBackend):

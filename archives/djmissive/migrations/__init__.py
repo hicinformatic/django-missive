@@ -1,2 +1,0 @@
-"""Migrations for djmissive app."""
-

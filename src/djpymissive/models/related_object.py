@@ -34,7 +34,9 @@ class MissiveRelatedObject(models.Model):
         max_length=500,
         blank=True,
         verbose_name=_("Object String Representation"),
-        help_text=_("String representation of the related object (saved for reference if object is deleted)"),
+        help_text=_(
+            "String representation of the related object (saved for reference if object is deleted)"
+        ),
     )
 
     created_at = models.DateTimeField(

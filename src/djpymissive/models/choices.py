@@ -1,5 +1,7 @@
 """Missive model choices."""
 
+from typing import Optional
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -17,13 +19,16 @@ MissiveSupport = models.TextChoices(
     "MissiveSupport",
     {
         **{k.upper(): (k.lower(), _(k)) for k in MISSIVE_GENERIC_SUPPORT.keys()},
-    }
+    },
 )
 
 
 def get_missive_support_from_type(type: str) -> str:
     """Get the missive support from the type."""
-    return next(key for key, values in MISSIVE_GENERIC_SUPPORT.items() if type in values)
+    return next(
+        str(key) for key, values in MISSIVE_GENERIC_SUPPORT.items() if type in values
+    )
+
 
 _MISSIVE_EVENT_STYLE_MAP = {
     **{k: "success" for k in MISSIVE_EVENT_SUCCESS.keys()},
@@ -80,7 +85,7 @@ def get_missive_style(name: str) -> str:
     return MISSIVE_STYLE_MAP.get(name, "info")
 
 
-def event_to_missive_status(event: str | None) -> str:
+def event_to_missive_status(event: Optional[str]) -> str:
     """Map MissiveEventType to MissiveStatus."""
     if not event:
         return MissiveStatus.DRAFT
@@ -92,15 +97,13 @@ def event_to_missive_status(event: str | None) -> str:
         return MissiveStatus.DRAFT
     return MissiveStatus.PROCESSING
 
+
 choices_missive_modes = {
     type_key: (type_key, _(type_description))
     for type_key, type_description in MISSIVE_TYPES.items()
 }
 
-MissiveType = models.TextChoices(
-    "MissiveMode",
-    choices_missive_modes
-)
+MissiveType = models.TextChoices("MissiveMode", choices_missive_modes)
 
 choices_acknowledgement_levels = {
     level["name"].upper(): (level["name"], _(level["display_name"]))
@@ -108,20 +111,23 @@ choices_acknowledgement_levels = {
 }
 
 AcknowledgementLevel = models.TextChoices(
-    "AcknowledgementLevel",
-    choices_acknowledgement_levels
+    "AcknowledgementLevel", choices_acknowledgement_levels
 )
+
 
 class MissiveRecipientType(models.TextChoices):
     """Recipient types."""
+
     RECIPIENT = "recipient", _("Recipient")
     SENDER = "sender", _("Sender")
     REPLY_TO = "reply_to", _("Reply To")
     CC = "cc", _("CC")
     BCC = "bcc", _("BCC")
 
+
 class MissiveDocumentType(models.TextChoices):
     """Document types."""
+
     VIRTUAL_ATTACHMENT = "virtual_attachment", _("Virtual Attachment")
     ATTACHMENT = "attachment", _("Attachment")
     SIGNATURE = "signature", _("Signature")

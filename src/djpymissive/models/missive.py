@@ -1,12 +1,11 @@
-"""Modèle Missive principal pour l'envoi multi-canal."""
+"""Main Missive model for multi-channel sending."""
 
 import uuid
+from typing import Optional
 
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from phonenumber_field.modelfields import PhoneNumberField
-from djgeoaddress.fields import GeoaddressField
 from django.template import Context, Template
 from djproviderkit import ProviderField
 from django.utils.safestring import mark_safe
@@ -41,8 +40,9 @@ PREVIEW_TPL_HTML = """<a href='{url}' target='_blank' rel='noopener' style='{sty
     {icon}&nbsp;{text}
 </a>"""
 
+
 class Missive(models.Model):
-    """Modèle de missive multi-canal (email, SMS, postal, WhatsApp, etc.)."""
+    """Multi-channel missive model (email, SMS, postal, WhatsApp, etc.)."""
 
     campaign = models.ForeignKey(
         "djpymissive.MissiveCampaign",
@@ -60,7 +60,7 @@ class Missive(models.Model):
         verbose_name=_("ID"),
     )
     provider = ProviderField(
-        package_name='pymissive',
+        package_name="pymissive",
         blank=True,
         verbose_name=_("Provider"),
         help_text=_("Provider used to send this missive"),
@@ -71,6 +71,13 @@ class Missive(models.Model):
         verbose_name=_("Missive Support"),
         help_text=_("Support for the missive (email, SMS, postal, etc.)"),
         editable=False,
+    )
+    brand_name = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        verbose_name=_("Brand Name"),
+        help_text=_("Brand name used to send this missive"),
     )
     missive_type = models.CharField(
         max_length=50,
@@ -181,7 +188,7 @@ class Missive(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        recipient = self.first_recipient or 'Unknown'
+        recipient = self.first_recipient or "Unknown"
         return f"{self.missive_type} - {recipient} ({self.status})"
 
     def save(self, *args, **kwargs):
@@ -201,36 +208,48 @@ class Missive(models.Model):
     def get_serialized_data(self):
         """Serialize missive data to a dictionary for provider calls."""
         from .recipient import MissiveRecipient
+
         missive_data = {
-            field.name: getattr(self, field.name) 
-            for field in self._meta.get_fields() 
-            if not field.is_relation and not field.many_to_many
-            and not field.name.startswith("_") and field.name not in ["body", "body_text"]
+            field.name: getattr(self, field.name)
+            for field in self._meta.get_fields()
+            if not field.is_relation
+            and not field.many_to_many
+            and not field.name.startswith("_")
+            and field.name not in ["body", "body_text"]
         }
         missive_data["body"] = self.body_compiled()
         missive_data["body_text"] = self.body_text_compiled()
-        missive_data["recipients"] = [recipient.get_serialized_data() for recipient in self.recipients]
+        missive_data["recipients"] = [
+            recipient.get_serialized_data() for recipient in self.recipients
+        ]
         if isinstance(self.sender, MissiveRecipient) and self.sender:
             missive_data["sender"] = self.sender.get_serialized_data()
         if isinstance(self.reply_to, MissiveRecipient) and self.reply_to:
             missive_data["reply_to"] = self.reply_to.get_serialized_data()
         if self.cc:
-            missive_data["cc"] = [recipient.get_serialized_data() for recipient in self.cc]
+            missive_data["cc"] = [
+                recipient.get_serialized_data() for recipient in self.cc
+            ]
         if self.bcc:
-            missive_data["bcc"] = [recipient.get_serialized_data() for recipient in self.bcc]
+            missive_data["bcc"] = [
+                recipient.get_serialized_data() for recipient in self.bcc
+            ]
         missive_data["attachments"] = self.get_serialized_attachments(linked=False)
         return missive_data
 
-    def call_provider_service(self, service: str, status: str | None = None, **kwargs):
+    def call_provider_service(
+        self, service: str, status: Optional[str] = None, **kwargs
+    ):
         """Call a provider service."""
         serialized = self.get_serialized_data()
         service_name = f"{service}_{self.missive_type}".lower()
         is_error = False
         try:
             description = f"Service {service_name} called"
-            response = self.provider._provider.call_service(service_name, silent=False, **serialized)
+            response = self.provider._provider.call_service(
+                service_name, silent=False, **serialized
+            )
         except Exception as e:
-            raise e
             status = MissiveEventType.FAILED
             description = str(e)
             response = {"error": str(e)}
@@ -269,7 +288,7 @@ class Missive(models.Model):
         data = {
             "url": url,
             "icon": PREVIEW_ICON,
-            "text": _('Preview in browser'),
+            "text": _("Preview in browser"),
             "style": PREVIEW_STYLE,
         }
         return mark_safe(PREVIEW_TPL_HTML.format(**data))
@@ -298,9 +317,10 @@ class Missive(models.Model):
     @property
     def domain(self):
         from django.conf import settings
+
         if settings.DEBUG:
             return "http://localhost:8000"
-        return settings.DOMAIN 
+        return settings.DOMAIN
 
     @property
     def show_attachments_linked(self):
@@ -308,9 +328,9 @@ class Missive(models.Model):
         html = "<div>"
         for attachment in self.get_serialized_attachments(linked=True):
             data = {
-                "url": self.domain + attachment['url'],
+                "url": self.domain + attachment["url"],
                 "icon": ATTACHMENT_ICON,
-                "name": attachment['name'],
+                "name": attachment["name"],
                 "style": ATTACHMENT_STYLE,
             }
             html += ATTACHMENT_TPL_HTML.format(**data)
@@ -326,14 +346,16 @@ class Missive(models.Model):
         title = _("Attachments:")
         text = f"{title}{SEPARATOR}"
         for attachment in qs:
-            text += f"- {attachment['name']}\n{ self.domain }{attachment['url']}{SEPARATOR}"
+            text += (
+                f"- {attachment['name']}\n{self.domain}{attachment['url']}{SEPARATOR}"
+            )
         return text
 
     @property
     def attachments(self):
         return self.to_missivedocument.filter(
-            models.Q(document_type=MissiveDocumentType.ATTACHMENT) |
-            models.Q(document_type=MissiveDocumentType.VIRTUAL_ATTACHMENT),
+            models.Q(document_type=MissiveDocumentType.ATTACHMENT)
+            | models.Q(document_type=MissiveDocumentType.VIRTUAL_ATTACHMENT),
         )
 
     @property
@@ -393,20 +415,26 @@ class Missive(models.Model):
     @property
     def sender(self):
         try:
-            return self.to_missiverecipient.get(recipient_type=MissiveRecipientType.SENDER)
+            return self.to_missiverecipient.get(
+                recipient_type=MissiveRecipientType.SENDER
+            )
         except ObjectDoesNotExist:
             return _("Unknown sender")
 
     @property
     def reply_to(self):
         try:
-            return self.to_missiverecipient.get(recipient_type=MissiveRecipientType.REPLY_TO)
+            return self.to_missiverecipient.get(
+                recipient_type=MissiveRecipientType.REPLY_TO
+            )
         except ObjectDoesNotExist:
             return _("Unknown reply to")
 
     @property
     def recipients(self):
-        return self.to_missiverecipient.filter(recipient_type=MissiveRecipientType.RECIPIENT)
+        return self.to_missiverecipient.filter(
+            recipient_type=MissiveRecipientType.RECIPIENT
+        )
 
     @property
     def first_recipient(self):

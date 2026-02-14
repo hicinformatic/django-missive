@@ -8,8 +8,20 @@ from .views.document import DocumentDownloadView
 app_name = "djpymissive"
 
 urlpatterns: List[URLPattern] = [
-    path("missive/<uuid:pk>/preview/", MissivePreviewView.as_view(), name="missive_preview"),
+    path(
+        "missive/<uuid:pk>/preview/",
+        MissivePreviewView.as_view(),
+        name="missive_preview",
+    ),
     path("missive/preview/", missive_preview_form, name="missive_preview_form"),
-    path("webhook/<str:provider>/<str:missive_type>/", WebhookView.as_view(), name="missive_webhook"),
-    path("document/<uuid:pk>/download/", DocumentDownloadView.as_view(), name="document_download"),
+    path(
+        "webhook/<str:provider>/<str:missive_type>/",
+        WebhookView.as_view(),
+        name="missive_webhook",
+    ),
+    path(
+        "document/<uuid:pk>/download/",
+        DocumentDownloadView.as_view(),
+        name="document_download",
+    ),
 ]

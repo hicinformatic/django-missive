@@ -11,6 +11,7 @@ class MissiveDocumentManager(models.Manager):
         qs = qs.select_related("missive")
         return qs
 
+
 class MissiveAttachmentManager(MissiveDocumentManager):
     """Manager for the MissiveAttachment model."""
 
@@ -18,6 +19,7 @@ class MissiveAttachmentManager(MissiveDocumentManager):
         qs = super().get_queryset()
         qs = qs.filter(document_type=MissiveDocumentType.ATTACHMENT)
         return qs
+
 
 class MissiveVirtualAttachmentManager(MissiveDocumentManager):
     """Manager for the MissiveVirtualAttachment model."""

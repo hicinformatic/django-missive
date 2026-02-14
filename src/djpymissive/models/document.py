@@ -15,6 +15,7 @@ import os
 import uuid
 from django.urls import reverse
 
+
 class MissiveDocument(models.Model):
     """File attachment for missives or any other model."""
 
@@ -82,7 +83,7 @@ class MissiveDocument(models.Model):
     linked = models.BooleanField(
         default=True,
         verbose_name=_("Linked"),
-        help_text=_("Indicates if the document is linked to a related object"), 
+        help_text=_("Indicates if the document is linked to a related object"),
     )
 
     order = models.PositiveIntegerField(
@@ -98,7 +99,9 @@ class MissiveDocument(models.Model):
     class Meta:
         verbose_name = _("Document")
         verbose_name_plural = _("Documents")
-        ordering = ["order",]
+        ordering = [
+            "order",
+        ]
 
     @property
     def can_be_modified(self):
@@ -106,7 +109,13 @@ class MissiveDocument(models.Model):
 
     def can_access_document(self):
         """Checks if the document can be accessed."""
-        return all([self.document_content_type, self.document_object_id, self.document_object_arguments])
+        return all(
+            [
+                self.document_content_type,
+                self.document_object_id,
+                self.document_object_arguments,
+            ]
+        )
 
     def get_virtual_attachment(self):
         """Gets the virtual attachment."""
@@ -124,7 +133,7 @@ class MissiveDocument(models.Model):
     @property
     def attachment_url(self):
         return self.get_serialized_document(linked=True, ignore_content=True)
-    
+
     @property
     def attachment(self):
         return self.get_serialized_document(linked=True, ignore_content=False)
@@ -144,12 +153,14 @@ class MissiveDocument(models.Model):
             document.seek(0)
         data["content"] = document.read()
         return data
-        
+
     def clean(self):
         """Validates document."""
         if not self.document and not self.can_access_document():
             raise ValidationError(
-                _("You must provide either a local document or a method to access the document.")
+                _(
+                    "You must provide either a local document or a method to access the document."
+                )
             )
 
 
@@ -162,7 +173,8 @@ class MissiveAttachment(MissiveDocument):
         proxy = True
         verbose_name = _("Attachment")
         verbose_name_plural = _("Attachments")
-    
+
+
 class MissiveVirtualAttachment(MissiveDocument):
     """Virtual attachment for missives."""
 

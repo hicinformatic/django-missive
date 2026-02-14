@@ -7,10 +7,12 @@ from ..models.webhook import MissiveWebhook
 from ..models.provider import MissiveProviderModel
 
 
-
 class WebhookForm(forms.ModelForm):
     """Form for creating/editing webhooks."""
-    url = forms.URLField(label=_("URL"), help_text="https://[BASE_DOMAIN]/webhook/provider/")
+
+    url = forms.URLField(
+        label=_("URL"), help_text="https://[BASE_DOMAIN]/webhook/provider/"
+    )
 
     class Meta:
         model = MissiveWebhook

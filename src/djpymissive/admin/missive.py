@@ -20,6 +20,8 @@ from ..models.choices import get_missive_style, MissiveStatus
 from urllib.parse import unquote
 from django.contrib import messages
 from django.shortcuts import redirect
+from django.contrib.admin import RelatedOnlyFieldListFilter
+
 
 
 @admin.register(Missive)
@@ -30,11 +32,11 @@ class MissiveAdmin(AdminBoostModel):
         "recipient_display",
         "sender_display",
         "provider_display",
+        "campaign_display",
         "status_display",
         "event_display",
     ]
     list_filter = [
-        "campaign",
         "missive_type",
         "status",
         "priority",
@@ -66,18 +68,19 @@ class MissiveAdmin(AdminBoostModel):
     def get_readonly_fields(self, request, obj=None):
         """Make all fields readonly if missive has events."""
         readonly = list(super().get_readonly_fields(request, obj))
-        
+
         if obj and obj.pk and obj.external_id:
             has_events = obj.to_missiveevent.exists()
             if has_events:
                 all_fields = [
-                    f.name for f in self.model._meta.get_fields() 
-                    if (not f.is_relation or f.one_to_one) 
-                    and f.name not in ['id']
+                    f.name
+                    for f in self.model._meta.get_fields()
+                    if (not f.is_relation or f.one_to_one) and f.name not in ["id"]
                 ]
                 readonly = list(set(readonly + all_fields))
-        
+
         return readonly
+
     inlines = [
         MissiveRecipientInline,
         MissiveAttachmentInline,
@@ -97,7 +100,7 @@ class MissiveAdmin(AdminBoostModel):
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         if isinstance(db_field, PhoneNumberField):
-            kwargs.setdefault('required', False)
+            kwargs.setdefault("required", False)
             return SplitPhoneNumberField(**kwargs)
         return super().formfield_for_dbfield(db_field, request, **kwargs)
 
@@ -106,9 +109,10 @@ class MissiveAdmin(AdminBoostModel):
         if isinstance(recipient, MissiveRecipient):
             text = recipient.name
             if obj.count_target > 1:
-                text += f" (+{obj.count_target-1})"
+                text += f" (+{obj.count_target - 1})"
             return self.format_with_help_text(text, recipient.target)
         return recipient
+
     recipient_display.short_description = _("Recipient")
 
     def sender_display(self, obj):
@@ -116,24 +120,36 @@ class MissiveAdmin(AdminBoostModel):
         if isinstance(sender, MissiveRecipient):
             return self.format_with_help_text(sender.name, sender.target)
         return sender
+
     sender_display.short_description = _("Sender")
 
     def provider_display(self, obj):
-        return self.format_with_help_text(f"{obj.provider} ({obj.get_missive_type_display()})", obj.provider._provider.display_name)
+        return self.format_with_help_text(
+            f"{obj.provider} ({obj.get_missive_type_display()})",
+            obj.provider._provider.display_name,
+        )
+
     provider_display.short_description = _("Provider")
-    
+
     def status_display(self, obj):
         priority_style = get_missive_style(obj.priority)
-        priority_html = self.format_label(obj.get_priority_display(), size="small", label_type=priority_style)
+        priority_html = self.format_label(
+            obj.get_priority_display(), size="small", label_type=priority_style
+        )
         status_style = get_missive_style(obj.status)
-        status_html = self.format_label(obj.get_status_display(), size="small", label_type=status_style)
+        status_html = self.format_label(
+            obj.get_status_display(), size="small", label_type=status_style
+        )
         if obj.last_event:
             event_style = get_missive_style(obj.last_event)
-            event_html = self.format_label(obj.last_event_display, size="small", label_type=event_style)
-            html = format_html('{} {} {}', priority_html, status_html, event_html)
+            event_html = self.format_label(
+                obj.last_event_display, size="small", label_type=event_style
+            )
+            html = format_html("{} {} {}", priority_html, status_html, event_html)
         else:
-            html = format_html('{} {}', priority_html, status_html)
+            html = format_html("{} {}", priority_html, status_html)
         return self.format_with_help_text(html, obj.last_event_date)
+
     status_display.short_description = _("Status / Last Event Date")
 
     def button_show(self, obj):
@@ -150,7 +166,7 @@ class MissiveAdmin(AdminBoostModel):
             preview_url,
             _("Preview"),
         )
-    
+
     def buttons_show_and_preview(self, obj):
         buttons_html = []
         if obj.pk:
@@ -158,16 +174,29 @@ class MissiveAdmin(AdminBoostModel):
         elif not obj.pk or not obj.to_missiveevent.exists():
             buttons_html.append(self.button_preview(obj))
         return mark_safe(" ".join(str(btn) for btn in buttons_html))
+
     buttons_show_and_preview.short_description = _("Show and Preview")
 
     def event_display(self, obj):
         event_related_html = format_html(
-            '{} {}',
+            "{} {}",
             self.format_label(f"{obj.count_event} event(s)", size="small"),
-            self.format_label(f"{obj.count_related_object} related(s)", size="small", label_type="secondary")
+            self.format_label(
+                f"{obj.count_related_object} related(s)",
+                size="small",
+                label_type="secondary",
+            ),
         )
         return self.format_with_help_text(event_related_html, obj.subject)
     event_display.short_description = _("Event(s)/Related(s)/Subject")
+
+    def campaign_display(self, obj):
+        if obj.campaign is None:
+            return "-"
+        return self.format_with_help_text(
+            self.format_label(obj.campaign.name, size="small"),
+            obj.last_campaign_send_date)
+    campaign_display.short_description = _("Campaign / Last Send Date")
 
     def change_fieldsets(self):
         """Configure fieldsets for change view."""
@@ -178,6 +207,7 @@ class MissiveAdmin(AdminBoostModel):
                 "provider",
                 "missive_support",
                 "missive_type",
+                "brand_name",
                 "acknowledgement",
                 "status",
                 "priority",
@@ -229,7 +259,7 @@ class MissiveAdmin(AdminBoostModel):
         messages.success(request, _("Missive status updated successfully."))
 
     def has_duplicate_missive_permission(self, request, obj=None):
-        return (obj and obj.pk)
+        return obj and obj.pk
 
     def handle_duplicate_missive(self, request, object_id):
         """Duplicate a missive by creating a copy."""
@@ -247,8 +277,6 @@ class MissiveAdmin(AdminBoostModel):
             recipient.id = None
             recipient.missive = missive
             recipient.save()
-        
+
         messages.success(request, _("Missive duplicated successfully."))
         return redirect(reverse("admin:djpymissive_missive_change", args=[missive.pk]))
-        
-        
