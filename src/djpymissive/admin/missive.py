@@ -12,7 +12,12 @@ from phonenumber_field.formfields import SplitPhoneNumberField
 
 from ..models.missive import Missive
 from ..models.recipient import MissiveRecipient
-from .recipient import MissiveRecipientInline
+from .recipient import (
+    MissiveRecipientEmailInline,
+    MissiveRecipientPhoneInline,
+    MissiveRecipientAddressInline,
+    MissiveRecipientNotificationInline,
+)
 from .document import MissiveAttachmentInline, MissiveVirtualAttachmentInline
 from .event import MissiveEventInline
 from .related_object import MissiveRelatedObjectInline
@@ -82,7 +87,10 @@ class MissiveAdmin(AdminBoostModel):
         return readonly
 
     inlines = [
-        MissiveRecipientInline,
+        MissiveRecipientEmailInline,
+        MissiveRecipientPhoneInline,
+        MissiveRecipientAddressInline,
+        MissiveRecipientNotificationInline,
         MissiveAttachmentInline,
         MissiveVirtualAttachmentInline,
         MissiveEventInline,

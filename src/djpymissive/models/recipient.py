@@ -5,7 +5,13 @@ from phonenumber_field.modelfields import PhoneNumberField
 from djgeoaddress.fields import GeoaddressField
 
 from .choices import MissiveRecipientType, MissiveStatus
-from ..managers.recipient import MissiveRecipientManager
+from ..managers.recipient import (
+    MissiveRecipientManager,
+    MissiveRecipientEmailManager,
+    MissiveRecipientPhoneManager,
+    MissiveRecipientAddressManager,
+    MissiveRecipientNotificationManager,
+)
 
 
 class MissiveRecipient(models.Model):
@@ -38,6 +44,7 @@ class MissiveRecipient(models.Model):
         verbose_name=_("Name"),
         help_text=_("Full name or company name"),
     )
+
     email = models.EmailField(
         blank=True,
         null=True,
@@ -64,6 +71,15 @@ class MissiveRecipient(models.Model):
         verbose_name=_("Notification ID"),
         help_text=_("Notification ID"),
     )
+
+    external_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name=_("External ID"),
+        help_text=_("External identifier from the provider"),
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name=_("Created At"),
@@ -98,3 +114,38 @@ class MissiveRecipient(models.Model):
     @property
     def can_be_modified(self):
         return self.missive.can_be_modified
+
+class MissiveRecipientEmail(MissiveRecipient):
+    objects = MissiveRecipientEmailManager()
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Email Recipient")
+        verbose_name_plural = _("Email Recipients")
+
+
+class MissiveRecipientPhone(MissiveRecipient):
+    objects = MissiveRecipientPhoneManager()
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Phone Recipient")
+        verbose_name_plural = _("Phone Recipients")
+
+
+class MissiveRecipientAddress(MissiveRecipient):
+    objects = MissiveRecipientAddressManager()
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Address Recipient")
+        verbose_name_plural = _("Address Recipients")
+
+
+class MissiveRecipientNotification(MissiveRecipient):
+    objects = MissiveRecipientNotificationManager()
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Notification Recipient")
+        verbose_name_plural = _("Notification Recipients")

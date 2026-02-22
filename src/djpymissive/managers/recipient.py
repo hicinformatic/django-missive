@@ -35,3 +35,36 @@ class MissiveRecipientManager(models.Manager):
             ),
         )
         return qs
+
+
+class MissiveRecipientEmailManager(models.Manager):
+    """Manager for the MissiveRecipientEmail model."""
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        qs = qs.filter(email__isnull=False)
+        return qs
+
+class MissiveRecipientPhoneManager(models.Manager):
+    """Manager for the MissiveRecipientPhone model."""
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        qs = qs.filter(phone__isnull=False)
+        return qs
+
+class MissiveRecipientAddressManager(models.Manager):
+    """Manager for the MissiveRecipientAddress model."""
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        qs = qs.filter(address__isnull=False)
+        return qs
+
+class MissiveRecipientNotificationManager(models.Manager):
+    """Manager for the MissiveRecipientNotification model."""
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        qs = qs.filter(notification_id__isnull=False)
+        return qs

@@ -14,6 +14,13 @@ from .missive import Missive
 from .provider import MissiveProviderModel
 from .related_object import MissiveRelatedObject
 from .webhook import MissiveWebhook
+from .recipient import (
+    MissiveRecipient,
+    MissiveRecipientEmail,
+    MissiveRecipientPhone,
+    MissiveRecipientAddress,
+    MissiveRecipientNotification,
+)
 
 __all__ = [
     "MissiveCampaign",

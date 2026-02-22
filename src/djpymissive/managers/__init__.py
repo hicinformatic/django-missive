@@ -10,7 +10,13 @@ from .document import (
     MissiveVirtualAttachmentManager,
 )
 from .related_object import MissiveRelatedObjectManager
-from .recipient import MissiveRecipientManager
+from .recipient import (
+    MissiveRecipientManager,
+    MissiveRecipientEmailManager,
+    MissiveRecipientPhoneManager,
+    MissiveRecipientAddressManager,
+    MissiveRecipientNotificationManager,
+)
 
 __all__ = [
     "ProviderManager",
@@ -22,4 +28,8 @@ __all__ = [
     "MissiveVirtualAttachmentManager",
     "MissiveRelatedObjectManager",
     "MissiveRecipientManager",
+    "MissiveRecipientEmailManager",
+    "MissiveRecipientPhoneManager",
+    "MissiveRecipientAddressManager",
+    "MissiveRecipientNotificationManager",
 ]

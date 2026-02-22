@@ -3,7 +3,13 @@
 from django.contrib import admin
 from django_boosted import AdminBoostModel
 
-from ..models.recipient import MissiveRecipient
+from ..models.recipient import (
+    MissiveRecipient,
+    MissiveRecipientEmail,
+    MissiveRecipientPhone,
+    MissiveRecipientAddress,
+    MissiveRecipientNotification,
+)
 from ..models.choices import get_missive_style
 from django.utils.html import format_html
 
@@ -21,7 +27,61 @@ class MissiveRecipientInline(admin.TabularInline):
         "phone",
         "address",
         "notification_id",
+        "external_id",
     ]
+
+class MissiveRecipientEmailInline(admin.TabularInline):
+    """Inline for missive recipient emails."""
+
+    model = MissiveRecipientEmail
+    extra = 0
+    fields = [
+        "recipient_type",
+        "status",
+        "name",
+        "email",
+        "external_id",
+    ]
+
+class MissiveRecipientPhoneInline(admin.TabularInline):
+    """Inline for missive recipient phones."""
+
+    model = MissiveRecipientPhone
+    extra = 0
+    fields = [
+        "recipient_type",
+        "status",
+        "name",
+        "phone",
+        "external_id",
+    ]
+
+class MissiveRecipientAddressInline(admin.TabularInline):
+    """Inline for missive recipient addresses."""
+
+    model = MissiveRecipientAddress
+    extra = 0
+    fields = [
+        "recipient_type",
+        "status",
+        "name",
+        "address",
+        "external_id",
+    ]
+
+class MissiveRecipientNotificationInline(admin.TabularInline):
+    """Inline for missive recipient notifications."""
+
+    model = MissiveRecipientNotification
+    extra = 0
+    fields = [
+        "recipient_type",
+        "status",
+        "name",
+        "notification_id",
+        "external_id",
+    ]
+
 
 @admin.register(MissiveRecipient)
 class MissiveRecipientAdmin(AdminBoostModel):

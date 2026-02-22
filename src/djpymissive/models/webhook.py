@@ -40,9 +40,10 @@ class MissiveWebhook(models.Model):
         return self.webhook_id
 
     def get_provider(self):
+        if getattr(self.provider, "_provider", None):
+            return self.provider
         from ..models.provider import MissiveProviderModel
-
-        provider = self.webhook_id.split("-")[0]
+        provider = self.webhook_id.split("-")[0] or provider
         return MissiveProviderModel.objects.get(name=provider)
 
     @property
