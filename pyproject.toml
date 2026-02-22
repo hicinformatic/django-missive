@@ -202,8 +202,34 @@ module = "djpymissive.models.document"
 disable_error_code = ["misc"]
 
 [[tool.mypy.overrides]]
+module = "djpymissive.models.recipient"
+disable_error_code = ["misc", "assignment"]
+
+[[tool.mypy.overrides]]
 module = "djpymissive.migrations.*"
 ignore_missing_imports = true
+
+[tool.pylint.main]
+ignore = ["migrations"]
+
+[tool.pylint.messages_control]
+disable = [
+    "C0111", "C0103", "R0903",  # Already in qualitybase
+    "C0415",   # import-outside-toplevel (Django lazy imports)
+    "E1101",   # no-member (Django ORM dynamic attributes)
+    "R0801",   # duplicate-code
+    "R0401",   # cyclic-import
+    "C0411",   # wrong-import-order
+    "C0301", "C0302", "C0303", "C0304",  # line-length, lines
+    "C0201",   # consider-iterating-dictionary
+    "W0622",   # redefined-builtin
+    "W0212",   # protected-access
+    "C0412",   # ungrouped-imports
+    "E0401",   # import-error (optional deps: celery, django_rq)
+    "E0307",   # invalid-str-returned
+    "E1136",   # unsubscriptable-object
+    "E1111",   # assignment-from-no-return
+]
 
 [tool.vulture]
 ignore_names = ["commit"]

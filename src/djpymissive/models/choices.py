@@ -85,7 +85,7 @@ def get_missive_style(name: str) -> str:
     return MISSIVE_STYLE_MAP.get(name, "info")
 
 
-def event_to_missive_status(event: Optional[str]) -> str:
+def event_to_status(event: Optional[str]) -> str:
     """Map MissiveEventType to MissiveStatus."""
     if not event:
         return MissiveStatus.DRAFT

@@ -78,7 +78,7 @@ class MissiveScheduledCampaign(models.Model):
         verbose_name=_("Ended at"),
         help_text=_("Actual ended date for the campaign"),
     )
-    
+
     class Meta:
         verbose_name = _("Campaign send")
         verbose_name_plural = _("Campaign sends")

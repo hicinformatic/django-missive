@@ -17,7 +17,7 @@ from .choices import (
     MissiveEventType,
     MissivePriority,
     MissiveStatus,
-    event_to_missive_status,
+    event_to_status,
     MissiveType,
     get_missive_support_from_type,
     MissiveRecipientType,
@@ -243,28 +243,9 @@ class Missive(models.Model):
         """Call a provider service."""
         serialized = self.get_serialized_data()
         service_name = f"{service}_{self.missive_type}".lower()
-        is_error = False
-        try:
-            description = f"Service {service_name} called"
-            response = self.provider._provider.call_service(
-                service_name, silent=False, **serialized
-            )
-        except Exception as e:
-            status = MissiveEventType.FAILED
-            description = str(e)
-            response = {"error": str(e)}
-            is_error = True
-        event = self.to_missiveevent.create(
-            missive=self,
-            event=status,
-            trace=response,
-            description=description,
-            metadata={"service": service_name},
+        response = self.provider._provider.call_service(
+            service_name, silent=False, **serialized
         )
-        self.status = (
-            MissiveStatus.ERROR if is_error else event_to_missive_status(event.event)
-        )
-        self.save(update_fields=["status"])
         return response
 
     #########################################################
@@ -291,7 +272,7 @@ class Missive(models.Model):
             "text": _("Preview in browser"),
             "style": PREVIEW_STYLE,
         }
-        return mark_safe(PREVIEW_TPL_HTML.format(**data))
+        return mark_safe(PREVIEW_TPL_HTML.format(**data))  # nosec B703 B308
 
     @property
     def show_preview_browser_text(self):
@@ -335,7 +316,7 @@ class Missive(models.Model):
             }
             html += ATTACHMENT_TPL_HTML.format(**data)
         html += "</div>"
-        return mark_safe(html)
+        return mark_safe(html)  # nosec B703 B308
 
     @property
     def show_attachments_linked_text(self):
@@ -380,13 +361,16 @@ class Missive(models.Model):
     def send_missive(self):
         """Send the missive."""
         self.status = MissiveStatus.PROCESSING
-        self.save()
         response = self.call_provider_service("send", status=MissiveEventType.SENT)
-        self.external_id = self.provider._provider.get_external_id_email(response)
-        self.status = (
-            MissiveStatus.SUCCESS if self.external_id else MissiveStatus.FAILED
-        )
+        self.external_id, recipients_external_ids = self.provider._provider.get_external_id_email(response)
+        for recipient in recipients_external_ids:
+            external_id = recipient.pop("external_id")
+            recipient = self.to_missiverecipient.get(**recipient)
+            recipient.external_id = external_id
+            recipient.save()
+        self.status = MissiveStatus.SUCCESS if self.external_id else MissiveStatus.FAILED
         self.save()
+
 
     def cancel_missive(self):
         """Cancel the missive."""
@@ -394,7 +378,18 @@ class Missive(models.Model):
 
     def status_missive(self):
         """Get the status of the missive."""
-        self.call_provider_service("status")
+        from ..task.events import handle_events
+        response = self.call_provider_service("status")
+        handle_events(response)
+        self.set_last_status()
+
+    def set_last_status(self):
+        last_event = self.to_missiveevent.filter(event__isnull=False).order_by("-occurred_at").first()
+        if last_event:
+            status = event_to_status(last_event.event)
+            if status != self.status:
+                self.status = status
+                self.save(update_fields=["status"])
 
     #########################################################
     # Billing

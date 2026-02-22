@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from phonenumber_field.modelfields import PhoneNumberField
 from djgeoaddress.fields import GeoaddressField
 
-from .choices import MissiveRecipientType, MissiveStatus
+from .choices import MissiveRecipientType, MissiveStatus, event_to_status
 from ..managers.recipient import (
     MissiveRecipientManager,
     MissiveRecipientEmailManager,
@@ -109,11 +109,20 @@ class MissiveRecipient(models.Model):
             "phone": self.phone,
             "address": self.address,
             "notification_id": self.notification_id,
+            "external_id": self.external_id,
         }
 
     @property
     def can_be_modified(self):
         return self.missive.can_be_modified
+
+    def set_last_status(self):
+        last_event = self.to_recipientevent.filter(event__isnull=False, recipient=self).order_by("-occurred_at").first()
+        if last_event:
+            status = event_to_status(last_event.event)
+            if status != self.status:
+                self.status = status
+                self.save(update_fields=["status"])
 
 class MissiveRecipientEmail(MissiveRecipient):
     objects = MissiveRecipientEmailManager()

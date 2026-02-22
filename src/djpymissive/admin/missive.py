@@ -25,7 +25,6 @@ from ..models.choices import get_missive_style, MissiveStatus
 from urllib.parse import unquote
 from django.contrib import messages
 from django.shortcuts import redirect
-from django.contrib.admin import RelatedOnlyFieldListFilter
 
 
 
@@ -181,7 +180,7 @@ class MissiveAdmin(AdminBoostModel):
             buttons_html.append(self.button_show(obj))
         elif not obj.pk or not obj.to_missiveevent.exists():
             buttons_html.append(self.button_preview(obj))
-        return mark_safe(" ".join(str(btn) for btn in buttons_html))
+        return mark_safe(" ".join(str(btn) for btn in buttons_html))  # nosec B703 B308
 
     buttons_show_and_preview.short_description = _("Show and Preview")
 
@@ -242,11 +241,21 @@ class MissiveAdmin(AdminBoostModel):
             ["is_billed"],
         )
 
+    def provider_has_service(self, obj, service):
+        service_name = f"{service}_{obj.missive_type}".lower()
+        return hasattr(obj.provider._provider, service_name)
+
+    def has_prepare_missive_permission(self, request, obj=None):
+        return obj and obj.pk and self.provider_has_service(obj, "prepare")
+
     def handle_prepare_missive(self, request, object_id):
         object_id = unquote(object_id)
         obj = self.get_object(request, object_id)
         obj.prepare_missive()
         messages.success(request, _("Missive prepared successfully."))
+
+    def has_send_missive_permission(self, request, obj=None):
+        return obj and obj.pk and self.provider_has_service(obj, "send")
 
     def handle_send_missive(self, request, object_id):
         object_id = unquote(object_id)
@@ -254,11 +263,17 @@ class MissiveAdmin(AdminBoostModel):
         obj.send_missive()
         messages.success(request, _("Missive sent successfully."))
 
+    def has_cancel_missive_permission(self, request, obj=None):
+        return obj and obj.pk and self.provider_has_service(obj, "cancel")
+
     def handle_cancel_missive(self, request, object_id):
         object_id = unquote(object_id)
         obj = self.get_object(request, object_id)
         obj.cancel_missive()
         messages.success(request, _("Missive cancelled successfully."))
+
+    def has_status_missive_permission(self, request, obj=None):
+        return obj and obj.pk and self.provider_has_service(obj, "status")
 
     def handle_status_missive(self, request, object_id):
         object_id = unquote(object_id)
@@ -283,7 +298,9 @@ class MissiveAdmin(AdminBoostModel):
         for recipient in recipients:
             recipient.pk = None
             recipient.id = None
+            recipient.external_id = None
             recipient.missive = missive
+            recipient.status = MissiveStatus.DRAFT
             recipient.save()
 
         messages.success(request, _("Missive duplicated successfully."))
