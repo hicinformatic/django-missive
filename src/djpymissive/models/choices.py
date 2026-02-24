@@ -115,6 +115,14 @@ AcknowledgementLevel = models.TextChoices(
 )
 
 
+class MissiveRecipientModel(models.TextChoices):
+    """Recipient models."""
+
+    EMAIL = "email", _("Email")
+    PHONE = "phone", _("Phone")
+    ADDRESS = "address", _("Address")
+    NOTIFICATION = "notification", _("Notification")
+
 class MissiveRecipientType(models.TextChoices):
     """Recipient types."""
 

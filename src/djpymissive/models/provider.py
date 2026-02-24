@@ -3,8 +3,8 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from virtualqueryset.models import VirtualModel
-from djproviderkit.models.service import define_provider_fields, define_service_fields
-from ..managers.provider import ProviderManager
+from djproviderkit.models.define import define_provider_fields, define_service_fields
+from djproviderkit.managers import BaseProviderManager
 from pymissive.providers.base import MissiveProviderBase
 
 
@@ -23,7 +23,7 @@ class MissiveProviderModel(VirtualModel):
         primary_key=True,
     )
 
-    objects = ProviderManager()
+    objects = BaseProviderManager(package_name='pymissive')
 
     class Meta:
         managed = False

@@ -158,6 +158,13 @@ class Missive(models.Model):
         verbose_name=_("Delivered At"),
         help_text=_("When the missive was delivered"),
     )
+    webhook_url = models.URLField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name=_("Webhook URL"),
+        help_text=_("Webhook URL for the missive"),
+    )
     is_billed = models.BooleanField(
         default=False,
         verbose_name=_("Billed"),
@@ -237,16 +244,10 @@ class Missive(models.Model):
         missive_data["attachments"] = self.get_serialized_attachments(linked=False)
         return missive_data
 
-    def call_provider_service(
-        self, service: str, status: Optional[str] = None, **kwargs
-    ):
+    def call_provider_service(self, service: str, **kwargs):
         """Call a provider service."""
-        serialized = self.get_serialized_data()
         service_name = f"{service}_{self.missive_type}".lower()
-        response = self.provider._provider.call_service(
-            service_name, silent=False, **serialized
-        )
-        return response
+        return self.provider.call_service(service_name,  **kwargs)
 
     #########################################################
     # Template rendering / Context
@@ -356,30 +357,29 @@ class Missive(models.Model):
         """Prepare the missive for sending."""
         self.status = MissiveStatus.PROCESSING
         self.save()
-        self.call_provider_service("prepare", status=MissiveEventType.PREPARE)
+        self.call_provider_service("prepare", **self.get_serialized_data())
 
     def send_missive(self):
         """Send the missive."""
         self.status = MissiveStatus.PROCESSING
-        response = self.call_provider_service("send", status=MissiveEventType.SENT)
-        self.external_id, recipients_external_ids = self.provider._provider.get_external_id_email(response)
-        for recipient in recipients_external_ids:
+        response = self.call_provider_service("send", **self.get_serialized_data())
+        self.external_id = response.get("external_id")
+        for recipient in response.get("recipients_external_ids") or []:
             external_id = recipient.pop("external_id")
             recipient = self.to_missiverecipient.get(**recipient)
             recipient.external_id = external_id
             recipient.save()
-        self.status = MissiveStatus.SUCCESS if self.external_id else MissiveStatus.FAILED
+        self.status = MissiveStatus.PROCESSING if self.external_id else MissiveStatus.FAILED
         self.save()
-
 
     def cancel_missive(self):
         """Cancel the missive."""
-        self.call_provider_service("cancel", status=MissiveEventType.CANCELLED)
+        self.call_provider_service("cancel", **self.get_serialized_data())
 
     def status_missive(self):
         """Get the status of the missive."""
         from ..task.events import handle_events
-        response = self.call_provider_service("status")
+        response = self.call_provider_service("status", **self.get_serialized_data())
         handle_events(response)
         self.set_last_status()
 
@@ -397,11 +397,11 @@ class Missive(models.Model):
 
     def billing_amount_missive(self):
         """Get the billing amount of the missive."""
-        self.call_provider_service("billing_amount")
+        self.call_provider_service("billing_amount", **self.get_serialized_data())
 
     def estimate_amount_missive(self):
         """Get the estimate amount of the missive."""
-        self.call_provider_service("estimate_amount")
+        self.call_provider_service("estimate_amount", **self.get_serialized_data())
 
     #########################################################
     # Recipients

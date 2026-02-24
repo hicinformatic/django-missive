@@ -230,7 +230,7 @@ class MissiveAdmin(AdminBoostModel):
         )
         self.add_to_fieldset(
             _("Tracking"),
-            ["external_id", "metadata"],
+            ["webhook_url", "external_id", "metadata"],
         )
         self.add_to_fieldset(
             _("Timestamps"),
@@ -273,7 +273,7 @@ class MissiveAdmin(AdminBoostModel):
         messages.success(request, _("Missive cancelled successfully."))
 
     def has_status_missive_permission(self, request, obj=None):
-        return obj and obj.pk and self.provider_has_service(obj, "status")
+        return obj and obj.pk and self.provider_has_service(obj, "status") and obj.external_id
 
     def handle_status_missive(self, request, object_id):
         object_id = unquote(object_id)

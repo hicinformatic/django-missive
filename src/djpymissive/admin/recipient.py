@@ -1,6 +1,7 @@
 """Admin for MissiveRecipient model."""
 
 from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
 from django_boosted import AdminBoostModel
 
 from ..models.recipient import (
@@ -89,10 +90,12 @@ class MissiveRecipientAdmin(AdminBoostModel):
 
     list_display = [
         "recipient_display",
+        "recipient_model",
         "missive_display",
         "recipient_type_display",
     ]
     list_filter = [
+        "recipient_model",
         "recipient_type",
         "status",
     ]
@@ -106,6 +109,14 @@ class MissiveRecipientAdmin(AdminBoostModel):
     readonly_fields = [
         "status",
     ]
+    raw_id_fields = [
+        "missive",
+    ]
+
+    def change_fieldsets(self):
+        """Configure fieldsets for change view."""
+        self.add_to_fieldset(None, ["missive", "recipient_model", "recipient_type", "status", "name"])
+        self.add_to_fieldset(_("Target"), ["email", "phone", "address", "notification_id", "external_id"])
 
     def recipient_display(self, obj):
         """Display the recipient name and email or phone or address."""

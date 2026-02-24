@@ -3,6 +3,7 @@ from django.db.models.expressions import Subquery, OuterRef
 from django.db.models import F, Max
 from django.db.models.functions import Coalesce
 
+from ..models.choices import MissiveRecipientModel
 
 class MissiveRecipientManager(models.Manager):
     """Manager for the MissiveRecipient model."""
@@ -42,7 +43,7 @@ class MissiveRecipientEmailManager(models.Manager):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        qs = qs.filter(email__isnull=False)
+        qs = qs.filter(recipient_model=MissiveRecipientModel.EMAIL)
         return qs
 
 class MissiveRecipientPhoneManager(models.Manager):
@@ -50,7 +51,7 @@ class MissiveRecipientPhoneManager(models.Manager):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        qs = qs.filter(phone__isnull=False)
+        qs = qs.filter(recipient_model=MissiveRecipientModel.PHONE)
         return qs
 
 class MissiveRecipientAddressManager(models.Manager):
@@ -58,7 +59,7 @@ class MissiveRecipientAddressManager(models.Manager):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        qs = qs.filter(address__isnull=False)
+        qs = qs.filter(recipient_model=MissiveRecipientModel.ADDRESS)
         return qs
 
 class MissiveRecipientNotificationManager(models.Manager):
@@ -66,5 +67,5 @@ class MissiveRecipientNotificationManager(models.Manager):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        qs = qs.filter(notification_id__isnull=False)
+        qs = qs.filter(recipient_model=MissiveRecipientModel.NOTIFICATION)
         return qs

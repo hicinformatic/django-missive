@@ -70,6 +70,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 ROOT_URLCONF = "tests.urls"
 INSTALLED_APPS += [
     "virtualqueryset",
+    "djproviderkit",
     "djgeoaddress",
     "phonenumber_field",
     "djpymissive",

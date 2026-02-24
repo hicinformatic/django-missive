@@ -14,6 +14,7 @@ from .missive import MissiveAdmin
 from .provider import ProviderAdmin
 from .related_object import MissiveRelatedObjectAdmin
 from .webhook import MissiveWebhookAdmin
+from .service import MissiveServiceAdmin
 
 __all__ = [
     "ProviderAdmin",
@@ -28,4 +29,5 @@ __all__ = [
     "MissiveRecipientAddressInline",
     "MissiveRecipientNotificationInline",
     "MissiveWebhookAdmin",
+    "MissiveServiceAdmin",
 ]

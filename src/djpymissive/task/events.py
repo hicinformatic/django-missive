@@ -19,27 +19,34 @@ def _get_occurred_at(occurred_at):
         return timezone.now()
     return occurred_at
 
-def _process_normalized_event_recipient(missive, recipient, _event_type):
+def get_recipient_data(normalized):
+    """Get recipient data from normalized event."""
+    data = {}
+    for field in ["email", "phone", "address", "notification_id"]:
+        if normalized.get(field) and normalized[field] is not None:
+            return {field: normalized[field]}
+    return data
+
+def _process_normalized_event_recipient(missive, normalized):
     """Process normalized webhook event recipient."""
-    recipient = MissiveRecipient.objects.get(
-        **{missive.missive_support.lower(): recipient},
-        missive=missive,
-        recipient_type__in=[
-            MissiveRecipientType.RECIPIENT,
-            MissiveRecipientType.CC,
-            MissiveRecipientType.BCC,
-        ],
-    )
+    recipient_data = get_recipient_data(normalized)
+    recipient = None
+    if recipient_data:
+        recipient = MissiveRecipient.objects.get(
+            **recipient_data,
+            missive=missive,
+            recipient_type__in=[
+                MissiveRecipientType.RECIPIENT,
+                MissiveRecipientType.CC,
+                MissiveRecipientType.BCC,
+            ],
+        )
     return recipient
 
 def _process_normalized_event(normalized):
     """Process normalized webhook event and update missive/recipient status."""
     missive = Missive.objects.get(external_id=normalized["external_id"])
-    recipient = None
-    if normalized.get("recipient"):
-        recipient = _process_normalized_event_recipient(
-            missive, normalized.get("recipient"), normalized["event"]
-        )
+    recipient = _process_normalized_event_recipient(missive, normalized)
     occurred_at = _get_occurred_at(normalized.get("occurred_at"))
     MissiveEvent.objects.get_or_create(
         missive=missive,
@@ -47,17 +54,19 @@ def _process_normalized_event(normalized):
         event=normalized["event"],
         description=normalized["description"],
         occurred_at=occurred_at,
-        trace=normalized["trace"],
+        trace=normalized["raw"],
     )
     return missive, recipient
 
 
-def handle_events(events: list[dict]):
+def handle_events(events: list[dict] | dict):
+    if isinstance(events, dict):
+        events = [events]
     missive = None
     recipients = []
     for event in events:
         missive, recipient = _process_normalized_event(event)
-        if recipient not in recipients:
+        if recipient and recipient not in recipients:
             recipients.append(recipient)
     if missive:
         missive.set_last_status()
