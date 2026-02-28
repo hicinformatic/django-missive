@@ -178,8 +178,7 @@ class MissiveAdmin(AdminBoostModel):
         buttons_html = []
         if obj.pk:
             buttons_html.append(self.button_show(obj))
-        elif not obj.pk or not obj.to_missiveevent.exists():
-            buttons_html.append(self.button_preview(obj))
+        buttons_html.append(self.button_preview(obj))
         return mark_safe(" ".join(str(btn) for btn in buttons_html))  # nosec B703 B308
 
     buttons_show_and_preview.short_description = _("Show and Preview")
@@ -255,7 +254,7 @@ class MissiveAdmin(AdminBoostModel):
         messages.success(request, _("Missive prepared successfully."))
 
     def has_send_missive_permission(self, request, obj=None):
-        return obj and obj.pk and self.provider_has_service(obj, "send")
+        return obj and obj.can_send()
 
     def handle_send_missive(self, request, object_id):
         object_id = unquote(object_id)

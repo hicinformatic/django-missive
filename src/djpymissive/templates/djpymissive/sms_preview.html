@@ -17,10 +17,12 @@
                 <div class="notification">
                     <div class="notification-header">
                         <div class="notification-icon">💬</div>
+                        {% if missive.sender_name or missive.sender_phone %}
                         <div class="notification-info">
                             <div class="notification-title">{{ missive.sender_name|default:missive.sender_phone|default:_('Unknown') }}</div>
                             <div class="notification-time">now</div>
                         </div>
+                        {% endif %}
                     </div>
                     <div class="notification-body">
                         {% if missive.body_text %}

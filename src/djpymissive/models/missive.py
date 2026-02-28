@@ -204,6 +204,10 @@ class Missive(models.Model):
             self.missive_support = get_missive_support_from_type(self.missive_type)
         super().save(*args, **kwargs)
 
+    def has_service(self, service):
+        service_name = f"{service}_{self.missive_type}".lower()
+        return hasattr(self.provider._provider, service_name)
+
     @property
     def can_be_modified(self):
         return not self.external_id
@@ -250,17 +254,26 @@ class Missive(models.Model):
         return self.provider.call_service(service_name,  **kwargs)
 
     #########################################################
-    # Template rendering / Context
+    # Check methods
     #########################################################
 
-    def missive_context(self):
-        """Get the context of the missive."""
-        return {
-            "show_preview_browser": self.show_preview_browser,
-            "show_preview_browser_text": self.show_preview_browser_text,
-            "show_attahcments_linked": self.show_attachments_linked,
-            "show_attachments_linked_text": self.show_attachments_linked_text,
-        }
+    def can_send(self):
+        if self.has_service("send"):
+            service_method = f"check_{self.missive_type}"
+            return getattr(self, service_method)() if hasattr(self, service_method) else True
+        return False
+
+    def check_recipients(self):
+        return self.recipients.filter(recipient_type=MissiveRecipientType.RECIPIENT).exists()
+
+    def check_email(self):
+        return self.check_recipients() and (self.body or self.body_text) and self.subject
+
+    def check_sms(self):
+        return self.check_recipients() and self.body_text
+
+    def check_postal(self):
+        return self.check_recipients() and self.body
 
     @property
     def show_preview_browser(self):
@@ -281,6 +294,15 @@ class Missive(models.Model):
         url = reverse("djpymissive:missive_preview", args=[self.pk])
         url = self.domain + url
         return f"- {_('Preview in browser')}:{SEPARATOR}{url}\n"
+
+    def missive_context(self):
+        """Get the context of the missive."""
+        return {
+            "show_preview_browser": self.show_preview_browser,
+            "show_preview_browser_text": self.show_preview_browser_text,
+            "show_attahcments_linked": self.show_attachments_linked,
+            "show_attachments_linked_text": self.show_attachments_linked_text,
+        }
 
     def body_compiled(self):
         """Compile the body of the missive."""
@@ -361,6 +383,8 @@ class Missive(models.Model):
 
     def send_missive(self):
         """Send the missive."""
+        if not self.can_send():
+            raise ValidationError(_("Missive cannot be sent"))
         self.status = MissiveStatus.PROCESSING
         response = self.call_provider_service("send", **self.get_serialized_data())
         self.external_id = response.get("external_id")
@@ -459,14 +483,21 @@ class Missive(models.Model):
     def clean_support_email(self):
         """Clean the missive for email support."""
         if not self.body and not self.body_text:
-            raise ValidationError(_("Body or body text is required"))
+            raise ValidationError({
+                "body": _("Body or body text is required"),
+                "body_text": _("Body or body text is required"),
+            })
 
     def clean_support_phone(self):
         """Clean the missive for SMS support."""
         if not self.body_text:
-            raise ValidationError(_("Body text is required"))
+            raise ValidationError({
+                "body_text": _("Body text is required"),
+            })
 
     def clean_support_postal(self):
         """Clean the missive for phone support."""
-        if not self.body and len(self.to_missivedocument.all()) == 0:
-            raise ValidationError(_("Body or attachments are required"))
+        if not self.body or self.to_missivedocument.all().exists():
+            raise ValidationError({
+                "body": _("Body or attachments are required"),
+            })
